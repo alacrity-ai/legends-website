@@ -1,5 +1,11 @@
 .hero {
   background-color: var(--color-primary);
+  background-image:
+    linear-gradient(to right, rgba(26, 26, 46, 0.85), rgba(26, 26, 46, 0.45)),
+    url('/assets/images/hero.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   color: var(--color-text-inverse);
   padding-top: var(--space-4xl);
   padding-bottom: var(--space-4xl);
