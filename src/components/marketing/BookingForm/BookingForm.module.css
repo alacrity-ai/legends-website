@@ -1,0 +1,92 @@
+.section {
+  background-color: var(--color-bg-alt);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: 640px;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 1;
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.required {
+  color: var(--color-error);
+}
+
+.input,
+.textarea {
+  width: 100%;
+  padding: var(--space-md);
+  font-size: var(--text-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  transition: border-color 0.2s;
+}
+
+.input:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.2);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* ── Success state ───────────────────────────────────────── */
+
+.successMessage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+  text-align: center;
+  padding: var(--space-3xl) 0;
+  color: var(--color-text);
+}
+
+.successHeading {
+  color: var(--color-accent);
+}
+
+/* ── Error state ─────────────────────────────────────────── */
+
+.errorMessage {
+  font-size: var(--text-sm);
+  color: var(--color-error);
+  padding: var(--space-md);
+  background-color: rgba(220, 38, 38, 0.08);
+  border-radius: var(--radius-md);
+}
+
+/* ── Desktop ─────────────────────────────────────────────── */
+
+@media (min-width: 768px) {
+  .row {
+    flex-direction: row;
+  }
+}
+

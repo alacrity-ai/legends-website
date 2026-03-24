@@ -1,0 +1,35 @@
+/* App shell styles */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  overflow-x: hidden;
+}
+
+.app > main {
+  flex: 1;
+}
+
+/* ── Skip to content (a11y) ─────────────────────────────── */
+
+.skipLink {
+  position: absolute;
+  top: -100%;
+  left: var(--space-md);
+  z-index: 200;
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--color-accent);
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+}
+
+.skipLink:focus {
+  top: var(--space-md);
+}
+

@@ -1,0 +1,16 @@
+.wrapper {
+  text-align: center;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.actions {
+  margin-top: var(--space-xl);
+}
+
+.meta {
+  margin-top: var(--space-md);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+

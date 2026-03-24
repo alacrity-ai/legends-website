@@ -1,0 +1,43 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  max-width: 680px;
+}
+
+.copy {
+  font-size: var(--text-lg);
+  line-height: 1.7;
+  color: var(--color-text);
+}
+
+.highlights {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-sm);
+}
+
+.highlightItem {
+  font-size: var(--text-base);
+  color: var(--color-text-muted);
+  padding-left: var(--space-md);
+  position: relative;
+}
+
+.highlightItem::before {
+  content: '✦';
+  position: absolute;
+  left: 0;
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+}
+
+/* ── Desktop ─────────────────────────────────────────────── */
+
+@media (min-width: 768px) {
+  .highlights {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-md);
+  }
+}
+

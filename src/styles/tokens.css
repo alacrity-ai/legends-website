@@ -1,0 +1,76 @@
+:root {
+  /* ── Colors ──────────────────────────────────────────────── */
+  --color-primary: #1a1a2e;
+  --color-primary-light: #2d2d4a;
+  --color-accent: #c9a227;
+  --color-accent-hover: #b8911f;
+  --color-text: #1a1a1a;
+  --color-text-muted: #555555;
+  --color-text-inverse: #ffffff;
+  --color-bg: #ffffff;
+  --color-bg-alt: #f5f5f0;
+  --color-bg-dark: #1a1a2e;
+  --color-border: #e0e0e0;
+  --color-success: #2e7d32;
+  --color-error: #c62828;
+
+  /* ── Spacing scale ───────────────────────────────────────── */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+  --space-4xl: 6rem;
+
+  /* ── Layout ──────────────────────────────────────────────── */
+  --max-width: 1120px;
+  --container-padding: 1.25rem;
+
+  /* ── Section padding ─────────────────────────────────────── */
+  --section-padding-y: var(--space-3xl);
+
+  /* ── Border radius ───────────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* ── Font sizes ──────────────────────────────────────────── */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 2rem;
+  --text-4xl: 2.5rem;
+  --text-5xl: 3.25rem;
+
+  /* ── Font families ───────────────────────────────────────── */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-heading: var(--font-sans);
+
+  /* ── Button ──────────────────────────────────────────────── */
+  --btn-primary-bg: var(--color-accent);
+  --btn-primary-text: var(--color-primary);
+  --btn-primary-hover-bg: var(--color-accent-hover);
+  --btn-secondary-bg: transparent;
+  --btn-secondary-text: var(--color-text-inverse);
+  --btn-secondary-border: var(--color-text-inverse);
+
+  /* ── Shadows ─────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Responsive overrides ───────────────────────────────── */
+
+@media (max-width: 640px) {
+  :root {
+    --section-padding-y: var(--space-2xl);
+    --container-padding: 1rem;
+  }
+}
+

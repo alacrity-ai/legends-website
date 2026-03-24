@@ -1,0 +1,57 @@
+.hero {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+  padding-top: var(--space-4xl);
+  padding-bottom: var(--space-4xl);
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: 720px;
+}
+
+.headline {
+  font-size: var(--text-4xl);
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--color-accent);
+  letter-spacing: -0.02em;
+}
+
+.subcopy {
+  font-size: var(--text-lg);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.85);
+  max-width: 600px;
+}
+
+.ctas {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  padding-top: var(--space-sm);
+}
+
+/* ── Desktop scaling ─────────────────────────────────────── */
+
+@media (min-width: 768px) {
+  .hero {
+    padding-top: var(--space-4xl);
+    padding-bottom: var(--space-4xl);
+    min-height: 80vh;
+  }
+
+  .headline {
+    font-size: var(--text-5xl);
+  }
+
+  .subcopy {
+    font-size: var(--text-xl);
+  }
+}
+
