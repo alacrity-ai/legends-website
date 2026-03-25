@@ -1,0 +1,41 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_BOOKING_FORM_ENDPOINT: ${{ secrets.VITE_BOOKING_FORM_ENDPOINT }}
+          VITE_GOOGLE_CALENDAR_EMBED_URL: ${{ secrets.VITE_GOOGLE_CALENDAR_EMBED_URL }}
+          VITE_GOOGLE_CALENDAR_PUBLIC_URL: ${{ secrets.VITE_GOOGLE_CALENDAR_PUBLIC_URL }}
+          VITE_YOUTUBE_VIDEO_ID: ${{ secrets.VITE_YOUTUBE_VIDEO_ID }}
+          VITE_MAILING_LIST_FORM_ACTION: ${{ secrets.VITE_MAILING_LIST_FORM_ACTION }}
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name legends-website
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
