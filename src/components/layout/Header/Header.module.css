@@ -17,13 +17,16 @@
 /* ── Wordmark ──────────────────────────────────────────────── */
 
 .wordmark {
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: var(--color-primary);
+  display: flex;
+  align-items: center;
   text-decoration: none;
-  white-space: nowrap;
-  letter-spacing: -0.02em;
   border-radius: var(--radius-sm);
+}
+
+.logo {
+  height: 44px;
+  width: auto;
+  display: block;
 }
 
 .wordmark:focus-visible {

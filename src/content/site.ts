@@ -25,9 +25,38 @@ export const heroSubcopy =
 
 /* ── About ─────────────────────────────────────────────────── */
 
-export const aboutHeading = 'About DJKMD Legends';
-export const aboutCopy =
-  'DJKMD Legends delivers world-class celebrity impersonator and tribute performances to venues and events of all sizes. From intimate cocktail hours to packed house parties, our roster of talented performers brings iconic music and unforgettable entertainment to every stage.';
+export type AboutHeadingPart =
+  | { type: 'text'; value: string }
+  | { type: 'image'; src: string; alt: string };
+
+export const aboutHeadingParts: AboutHeadingPart[] = [
+  {
+    type: 'image',
+    src: '/assets/images/logo_djkmd.png',
+    alt: 'DJ KMD',
+  },
+  { type: 'text', value: ' ' },
+  {
+    type: 'image',
+    src: '/assets/images/logo_legends.png',
+    alt: 'Legends',
+  },
+];
+
+export const aboutProductName = 'DJ KMD Presents: Legends';
+
+export const aboutCopyParts = [
+  {
+    type: 'product',
+    value: aboutProductName,
+  },
+  {
+    type: 'text',
+    value:
+      ' delivers world-class celebrity impersonator and tribute performances to venues and events of all sizes. From intimate cocktail hours to packed house parties, our roster of talented performers brings iconic music and unforgettable entertainment to every stage.',
+  },
+];
+
 export const aboutHighlights = [
   'Bars & restaurants',
   'Private parties & corporate events',

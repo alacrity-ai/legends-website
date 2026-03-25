@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Cropper</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
+  h1 { margin-bottom: 16px; font-size: 1.4rem; color: #aac; }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  button, label.btn { background: #334; border: 1px solid #556; color: #dde; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: .9rem; }
+  button:hover, label.btn:hover { background: #445; }
+  button:disabled { opacity: .4; cursor: default; }
+  #fileInput { display: none; }
+  .canvas-wrap { position: relative; display: inline-block; background: repeating-conic-gradient(#333 0% 25%, #444 0% 50%) 50%/20px 20px; border: 2px solid #556; border-radius: 4px; }
+  canvas { display: block; }
+  #selBox { position: absolute; border: 2px dashed #0ff; background: rgba(0,255,255,.08); pointer-events: none; display: none; }
+  .info { margin-top: 10px; font-size: .8rem; color: #889; }
+  #dims { margin-left: 12px; color: #8cf; font-size: .85rem; }
+</style>
+</head>
+<body>
+<h1>🖼️ PNG Cropper</h1>
+<div class="toolbar">
+  <label class="btn" for="fileInput">📂 Load Image</label>
+  <input type="file" id="fileInput" accept="image/png">
+  <button id="cropBtn" disabled>✂️ Crop Selection</button>
+  <button id="saveBtn" disabled>💾 Save PNG</button>
+  <button id="resetBtn" disabled>↩️ Reset</button>
+  <span id="dims"></span>
+</div>
+<div class="canvas-wrap" id="canvasWrap">
+  <canvas id="canvas" width="600" height="400"></canvas>
+  <div id="selBox"></div>
+</div>
+<p class="info">Click and drag on the image to select a crop region. Transparency is preserved.</p>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const fileInput = document.getElementById('fileInput');
+const cropBtn = document.getElementById('cropBtn');
+const saveBtn = document.getElementById('saveBtn');
+const resetBtn = document.getElementById('resetBtn');
+const selBox = document.getElementById('selBox');
+const dims = document.getElementById('dims');
+const wrap = document.getElementById('canvasWrap');
+
+let img = null;
+let selection = null;
+let dragging = false;
+let startX, startY;
+
+fileInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const i = new Image();
+    i.onload = () => { img = i; drawImage(); resetBtn.disabled = false; selection = null; selBox.style.display = 'none'; cropBtn.disabled = true; saveBtn.disabled = false; dims.textContent = `${i.width} × ${i.height}`; };
+    i.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+function drawImage() {
+  if (!img) return;
+  canvas.width = img.width;
+  canvas.height = img.height;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0);
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (!img) return;
+  dragging = true;
+  const r = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / r.width;
+  const scaleY = canvas.height / r.height;
+  startX = (e.clientX - r.left) * scaleX;
+  startY = (e.clientY - r.top) * scaleY;
+  selection = null;
+  selBox.style.display = 'block';
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const r = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / r.width;
+  const scaleY = canvas.height / r.height;
+  let curX = (e.clientX - r.left) * scaleX;
+  let curY = (e.clientY - r.top) * scaleY;
+  let x = Math.min(startX, curX), y = Math.min(startY, curY);
+  let w = Math.abs(curX - startX), h = Math.abs(curY - startY);
+  x = Math.max(0, x); y = Math.max(0, y);
+  w = Math.min(w, canvas.width - x); h = Math.min(h, canvas.height - y);
+  selection = { x, y, w, h };
+  // Position the overlay box using CSS (in display coords)
+  selBox.style.left = (x / scaleX) + 'px';
+  selBox.style.top = (y / scaleY) + 'px';
+  selBox.style.width = (w / scaleX) + 'px';
+  selBox.style.height = (h / scaleY) + 'px';
+  dims.textContent = `Selection: ${Math.round(w)} × ${Math.round(h)}`;
+});
+
+window.addEventListener('mouseup', () => {
+  if (!dragging) return;
+  dragging = false;
+  cropBtn.disabled = !(selection && selection.w > 1 && selection.h > 1);
+});
+
+cropBtn.addEventListener('click', () => {
+  if (!selection || !img) return;
+  const { x, y, w, h } = selection;
+  const tmp = document.createElement('canvas');
+  tmp.width = Math.round(w);
+  tmp.height = Math.round(h);
+  const tCtx = tmp.getContext('2d');
+  tCtx.drawImage(canvas, Math.round(x), Math.round(y), Math.round(w), Math.round(h), 0, 0, tmp.width, tmp.height);
+  // Replace current image with cropped version
+  const cropped = new Image();
+  cropped.onload = () => { img = cropped; drawImage(); selection = null; selBox.style.display = 'none'; cropBtn.disabled = true; dims.textContent = `${cropped.width} × ${cropped.height}`; };
+  cropped.src = tmp.toDataURL('image/png');
+});
+
+saveBtn.addEventListener('click', () => {
+  if (!img) return;
+  const a = document.createElement('a');
+  a.download = 'cropped.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+});
+
+resetBtn.addEventListener('click', () => {
+  fileInput.value = '';
+  img = null;
+  canvas.width = 600; canvas.height = 400;
+  ctx.clearRect(0, 0, 600, 400);
+  selection = null;
+  selBox.style.display = 'none';
+  cropBtn.disabled = true;
+  saveBtn.disabled = true;
+  resetBtn.disabled = true;
+  dims.textContent = '';
+});
+</script>
+</body>
+</html>

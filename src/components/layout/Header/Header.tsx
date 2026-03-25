@@ -15,7 +15,11 @@ export default function Header() {
     <header className={styles.header}>
       <Container className={styles.inner}>
         <a href="#home" className={styles.wordmark}>
-          {siteTitle}
+          <img
+            src="/assets/images/logo_full.png"
+            alt={siteTitle}
+            className={styles.logo}
+          />
         </a>
 
         <button

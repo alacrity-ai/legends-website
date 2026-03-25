@@ -32,6 +32,17 @@
   font-size: var(--text-sm);
 }
 
+.inlineLogo {
+  height: 2em;              /* doubled from 1em */
+  vertical-align: middle;
+  display: inline-block;
+}
+
+.productName {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
 /* ── Desktop ─────────────────────────────────────────────── */
 
 @media (min-width: 768px) {

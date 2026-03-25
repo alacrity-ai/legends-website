@@ -1,0 +1,55 @@
+Legends header logo:
+
+```
+<svg width="520" height="90" viewBox="0 0 520 90" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DJ KMD presents Legends logo">
+  <defs>
+    <!-- Gold gradient -->
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff5cc"/>
+      <stop offset="25%" stop-color="#ffd700"/>
+      <stop offset="50%" stop-color="#ffb700"/>
+      <stop offset="75%" stop-color="#e6a300"/>
+      <stop offset="100%" stop-color="#fff0a3"/>
+    </linearGradient>
+
+    <!-- Subtle glow -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Metallic shine -->
+    <linearGradient id="shine" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.9)"/>
+      <stop offset="40%" stop-color="rgba(255,255,255,0.2)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Top line -->
+  <text x="10" y="28"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="16"
+        fill="#e8c86b"
+        letter-spacing="1.5">
+    DJ KMD presents
+  </text>
+
+  <!-- Main wordmark -->
+  <text x="10" y="70"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="48"
+        font-weight="700"
+        fill="url(#goldGradient)"
+        filter="url(#glow)"
+        letter-spacing="2">
+    LEGENDS
+  </text>
+
+  <!-- Shine overlay -->
+  <rect x="10" y="35" width="380" height="40" fill="url(#shine)" opacity="0.25"/>
+</svg>
+```
