@@ -69,12 +69,11 @@ cp .env.example .env.local
 
 | Variable                            | Purpose                              |
 | ----------------------------------- | ------------------------------------ |
-| `VITE_BOOKING_API_URL`              | Booking worker URL (`http://localhost:8787` for local dev) |
+| `VITE_BOOKING_API_URL`              | Worker URL (`http://localhost:8787` for local dev) |
 | `VITE_YOUTUBE_VIDEO_ID`             | YouTube video ID for Media section   |
-| `VITE_GOOGLE_CALENDAR_EMBED_URL`    | Google Calendar iframe embed URL     |
-| `VITE_GOOGLE_CALENDAR_PUBLIC_URL`   | Google Calendar public link          |
+| `VITE_GOOGLE_CALENDAR_PUBLIC_URL`   | Google Calendar public link (fallback) |
 
-> **Note:** The site runs locally without any `.env` file — all values have placeholder fallbacks. The booking form requires the worker to be running.
+> **Note:** The site runs locally without any `.env` file — all values have placeholder fallbacks. The booking form and calendar require the worker to be running.
 
 ### Worker secrets (`worker/.dev.vars`)
 
@@ -86,6 +85,7 @@ cp worker/.dev.vars.example worker/.dev.vars
 | ----------------- | ------------------------------------ |
 | `MAILGUN_API_KEY` | Mailgun API key                      |
 | `MAILGUN_DOMAIN`  | Mailgun sending domain (`mg.djkmdlegends.com`) |
+| `GOOGLE_API_KEY`  | Google Calendar API key              |
 
 These are read automatically by `wrangler dev`. In production they are stored as Cloudflare Worker secrets.
 

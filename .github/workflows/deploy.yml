@@ -27,7 +27,6 @@ jobs:
         run: npm run build
         env:
           VITE_BOOKING_API_URL: ${{ secrets.VITE_BOOKING_API_URL }}
-          VITE_GOOGLE_CALENDAR_EMBED_URL: ${{ secrets.VITE_GOOGLE_CALENDAR_EMBED_URL }}
           VITE_GOOGLE_CALENDAR_PUBLIC_URL: ${{ secrets.VITE_GOOGLE_CALENDAR_PUBLIC_URL }}
           VITE_YOUTUBE_VIDEO_ID: ${{ secrets.VITE_YOUTUBE_VIDEO_ID }}
           VITE_MAILING_LIST_FORM_ACTION: ${{ secrets.VITE_MAILING_LIST_FORM_ACTION }}

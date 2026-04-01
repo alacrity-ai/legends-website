@@ -76,17 +76,19 @@ export const eventTypes = [
 /* ── Media ─────────────────────────────────────────────────── */
 
 /** @see .env.example — VITE_YOUTUBE_VIDEO_ID */
-export const youtubeVideoId =
-  import.meta.env.VITE_YOUTUBE_VIDEO_ID || 'dQw4w9WgXcQ';
+export const youtubeVideoId: string = import.meta.env.VITE_YOUTUBE_VIDEO_ID || '';
 export const mediaCaption =
   'See DJKMD Legends in action — live performances that captivate any crowd.';
 
+/* ── Tickets (placeholder) ─────────────────────────────────── */
+
+export const ticketDefaultPrice = 25;
+export const ticketCurrency = '$';
+export const ticketComingSoonMessage =
+  'Ticket sales coming soon! For now, please use the booking form or contact us at booking@djkmdlegends.com';
+
 /* ── Calendar ──────────────────────────────────────────────── */
 
-/** @see .env.example — VITE_GOOGLE_CALENDAR_EMBED_URL */
-export const googleCalendarEmbedUrl =
-  import.meta.env.VITE_GOOGLE_CALENDAR_EMBED_URL ||
-  'https://calendar.google.com/calendar/embed?src=placeholder';
 /** @see .env.example — VITE_GOOGLE_CALENDAR_PUBLIC_URL */
 export const googleCalendarPublicUrl =
   import.meta.env.VITE_GOOGLE_CALENDAR_PUBLIC_URL ||

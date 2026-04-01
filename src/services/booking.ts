@@ -3,6 +3,7 @@ export interface BookingFormData {
   email: string;
   phone?: string;
   date: string;
+  time?: string;
   eventType?: string;
   location: string;
   message?: string;

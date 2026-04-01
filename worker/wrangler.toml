@@ -12,3 +12,4 @@ zone_name = "djkmdlegends.com"
 [vars]
 BOOKING_EMAIL = "booking@djkmdlegends.com"
 ALLOWED_ORIGINS = "https://djkmdlegends.com,http://localhost:5173"
+GOOGLE_CALENDAR_ID = "c_f31ec573a399824b85486344a243eb27e6742ef72157c2240a8723ad89987594@group.calendar.google.com"

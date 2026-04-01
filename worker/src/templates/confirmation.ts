@@ -12,6 +12,7 @@ export function buildConfirmationEmail(inquiry: BookingInquiry): {
     ['Email', inquiry.email],
     ['Phone', inquiry.phone],
     ['Event Date', inquiry.date],
+    ['Event Time', inquiry.time],
     ['Event Type', inquiry.eventType],
     ['Location / Venue', inquiry.location],
     ['Message', inquiry.message],

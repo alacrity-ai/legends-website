@@ -1,6 +1,6 @@
 import type { BookingInquiry } from './types.ts';
 
-const MAX_PAYLOAD_FIELDS = 7;
+const MAX_PAYLOAD_FIELDS = 8;
 const MAX_FIELD_LENGTH = 5000;
 
 export function parseBookingInquiry(body: unknown): BookingInquiry {
@@ -10,7 +10,7 @@ export function parseBookingInquiry(body: unknown): BookingInquiry {
 
   const obj = body as Record<string, unknown>;
 
-  const allowedKeys = new Set(['name', 'email', 'phone', 'date', 'eventType', 'location', 'message']);
+  const allowedKeys = new Set(['name', 'email', 'phone', 'date', 'time', 'eventType', 'location', 'message']);
   const keys = Object.keys(obj);
   if (keys.length > MAX_PAYLOAD_FIELDS) {
     throw new Error('Too many fields');
@@ -30,10 +30,11 @@ export function parseBookingInquiry(body: unknown): BookingInquiry {
   const location = requireString(obj, 'location');
 
   const phone = optionalString(obj, 'phone');
+  const time = optionalString(obj, 'time');
   const eventType = optionalString(obj, 'eventType');
   const message = optionalString(obj, 'message');
 
-  return { name, email, date, location, phone, eventType, message };
+  return { name, email, date, location, phone, time, eventType, message };
 }
 
 function requireString(obj: Record<string, unknown>, field: string): string {

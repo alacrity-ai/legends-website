@@ -4,3 +4,6 @@
 
 MAILGUN_API_KEY=your-mailgun-api-key
 MAILGUN_DOMAIN=mg.djkmdlegends.com
+
+# This API Key should have permissions for Google Calendar API
+GOOGLE_API_KEY=your-google-api-key

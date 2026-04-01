@@ -72,6 +72,18 @@
   color: var(--color-accent);
 }
 
+/* ── Field validation errors ─────────────────────────────── */
+
+.inputError {
+  border-color: var(--color-error);
+}
+
+.fieldError {
+  font-size: var(--text-sm);
+  color: var(--color-error);
+  margin: 0;
+}
+
 /* ── Error state ─────────────────────────────────────────── */
 
 .errorMessage {

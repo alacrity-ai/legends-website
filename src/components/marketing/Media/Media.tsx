@@ -9,6 +9,8 @@ import {
 import styles from './Media.module.css';
 
 export default function Media() {
+  if (!youtubeVideoId) return null;
+
   const embedUrl = `https://www.youtube.com/embed/${youtubeVideoId}`;
 
   return (

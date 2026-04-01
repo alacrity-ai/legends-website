@@ -1,0 +1,37 @@
+# DJ KMD Presents: Legends
+
+## About
+
+DJ KMD Presents: Legends delivers world-class celebrity impersonator and tribute performances to venues and events of all sizes. From intimate cocktail hours to packed house parties, our roster of talented performers brings iconic music and unforgettable entertainment to every stage.
+
+We serve bars, restaurants, private parties, corporate events, festivals, outdoor venues, and themed or holiday celebrations.
+
+## Performer Roster
+
+**The King Experience** — A high-energy Elvis Presley tribute featuring iconic hits, authentic costumes, and electrifying stage presence.
+
+**Believe in Cher** — A glamorous Cher-inspired tribute packed with powerhouse vocals, dazzling costume changes, and larger-than-life stage presence.
+
+**The Amy Experience** — Soulful, raw, and unforgettable — a tribute to Amy Winehouse capturing the voice and spirit that defined a generation.
+
+**Dolly Pardon** — A dazzling Dolly Parton tribute packed with country charm, powerhouse vocals, and all the rhinestone glamour your audience deserves.
+
+**Sinatra Under the Stars** — Timeless Frank Sinatra classics delivered with smooth vocals and old-school charm — perfect for upscale venues and cocktail events.
+
+**Miley Mania** — High-energy Miley Cyrus tribute bringing pop anthems, bold stage presence, and non-stop party vibes to any event.
+
+**24K Bruno** — A slick Bruno Mars tribute delivering chart-topping hits, dynamic choreography, and crowd-pleasing funk-pop energy.
+
+## Book a Show
+
+To inquire about booking a performance, contact us at:
+
+- Email: booking@djkmdlegends.com
+- Website: https://djkmdlegends.com
+
+## Follow Us
+
+- Instagram: https://www.instagram.com/djkmdlegends
+- Facebook: https://www.facebook.com/djkmdlegends
+- YouTube: https://www.youtube.com/@djkmdlegends
+- TikTok: https://www.tiktok.com/@djkmdlegends

@@ -13,15 +13,37 @@ import styles from './BookingForm.module.css';
 
 type FormStatus = 'idle' | 'submitting' | 'success' | 'error';
 
+type FieldErrors = Partial<Record<'name' | 'email' | 'date' | 'location', string>>;
+
+function validate(formData: FormData): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!formData.get('name')?.toString().trim()) errors.name = 'Name is required';
+  const email = formData.get('email')?.toString().trim() ?? '';
+  if (!email) errors.email = 'Email is required';
+  else if (!email.includes('@')) errors.email = 'Please enter a valid email';
+  if (!formData.get('date')?.toString().trim()) errors.date = 'Event date is required';
+  if (!formData.get('location')?.toString().trim()) errors.location = 'Location is required';
+  return errors;
+}
+
 export default function BookingForm() {
   const [status, setStatus] = useState<FormStatus>('idle');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setStatus('submitting');
 
     const form = e.currentTarget;
     const formData = new FormData(form);
+    const errors = validate(formData);
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+
+    setFieldErrors({});
+    setStatus('submitting');
 
     try {
       await submitBookingInquiry({
@@ -29,6 +51,7 @@ export default function BookingForm() {
         email: formData.get('email') as string,
         phone: (formData.get('phone') as string) || undefined,
         date: formData.get('date') as string,
+        time: (formData.get('time') as string) || undefined,
         eventType: (formData.get('eventType') as string) || undefined,
         location: formData.get('location') as string,
         message: (formData.get('message') as string) || undefined,
@@ -71,9 +94,10 @@ export default function BookingForm() {
               name="name"
               type="text"
               required
-              className={styles.input}
+              className={`${styles.input} ${fieldErrors.name ? styles.inputError : ''}`}
               placeholder="Your name"
             />
+            {fieldErrors.name && <p className={styles.fieldError}>{fieldErrors.name}</p>}
           </div>
 
           <div className={styles.fieldGroup}>
@@ -85,9 +109,10 @@ export default function BookingForm() {
               name="email"
               type="email"
               required
-              className={styles.input}
+              className={`${styles.input} ${fieldErrors.email ? styles.inputError : ''}`}
               placeholder="you@example.com"
             />
+            {fieldErrors.email && <p className={styles.fieldError}>{fieldErrors.email}</p>}
           </div>
 
           <div className={styles.fieldGroup}>
@@ -113,27 +138,40 @@ export default function BookingForm() {
                 name="date"
                 type="date"
                 required
-                className={styles.input}
+                className={`${styles.input} ${fieldErrors.date ? styles.inputError : ''}`}
               />
+              {fieldErrors.date && <p className={styles.fieldError}>{fieldErrors.date}</p>}
             </div>
 
             <div className={styles.fieldGroup}>
-              <label htmlFor="booking-event-type" className={styles.label}>
-                Event Type
+              <label htmlFor="booking-time" className={styles.label}>
+                Event Time
               </label>
-              <select
-                id="booking-event-type"
-                name="eventType"
+              <input
+                id="booking-time"
+                name="time"
+                type="time"
                 className={styles.input}
-              >
-                <option value="">Select type…</option>
-                {eventTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
+          </div>
+
+          <div className={styles.fieldGroup}>
+            <label htmlFor="booking-event-type" className={styles.label}>
+              Event Type
+            </label>
+            <select
+              id="booking-event-type"
+              name="eventType"
+              className={styles.input}
+            >
+              <option value="">Select type…</option>
+              {eventTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className={styles.fieldGroup}>
@@ -145,9 +183,10 @@ export default function BookingForm() {
               name="location"
               type="text"
               required
-              className={styles.input}
+              className={`${styles.input} ${fieldErrors.location ? styles.inputError : ''}`}
               placeholder="Venue name or address"
             />
+            {fieldErrors.location && <p className={styles.fieldError}>{fieldErrors.location}</p>}
           </div>
 
           <div className={styles.fieldGroup}>

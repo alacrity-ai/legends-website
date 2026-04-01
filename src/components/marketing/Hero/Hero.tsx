@@ -20,8 +20,8 @@ export default function Hero() {
             <Button href={`#${sectionIds.book}`} variant="primary">
               Book Now
             </Button>
-            <Button href={`#${sectionIds.calendar}`} variant="secondary">
-              View Calendar
+            <Button href={`#${sectionIds.calendar}`} variant="primary">
+              See Upcoming Shows
             </Button>
           </div>
         </div>

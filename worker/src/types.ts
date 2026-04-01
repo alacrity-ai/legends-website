@@ -3,9 +3,17 @@ export interface BookingInquiry {
   email: string;
   phone?: string;
   date: string;
+  time?: string;
   eventType?: string;
   location: string;
   message?: string;
+}
+
+export interface CalendarEvent {
+  title: string;
+  date: string;
+  time: string | null;
+  location: string | null;
 }
 
 export interface Env {
@@ -13,4 +21,6 @@ export interface Env {
   MAILGUN_DOMAIN: string;
   BOOKING_EMAIL: string;
   ALLOWED_ORIGINS: string;
+  GOOGLE_API_KEY: string;
+  GOOGLE_CALENDAR_ID: string;
 }

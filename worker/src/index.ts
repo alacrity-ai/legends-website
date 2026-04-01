@@ -3,6 +3,7 @@ import { parseBookingInquiry } from './validation.ts';
 import { sendEmail } from './services/mailgun.ts';
 import { buildNotificationEmail } from './templates/notification.ts';
 import { buildConfirmationEmail } from './templates/confirmation.ts';
+import { fetchUpcomingEvents } from './services/google-calendar.ts';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -14,70 +15,99 @@ export default {
 
     const url = new URL(request.url);
 
-    if (url.pathname !== '/api/booking') {
-      return jsonResponse(404, { error: 'Not found' }, corsHeaders);
+    if (url.pathname === '/api/events') {
+      if (request.method !== 'GET') {
+        return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+      }
+      return handleEvents(env, corsHeaders);
     }
 
-    if (request.method !== 'POST') {
-      return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+    if (url.pathname === '/api/booking') {
+      if (request.method !== 'POST') {
+        return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+      }
+      return handleBooking(request, env, corsHeaders);
     }
 
-    let inquiry;
-    try {
-      const body = await request.json();
-      inquiry = parseBookingInquiry(body);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Invalid request';
-      return jsonResponse(400, { error: message }, corsHeaders);
-    }
-
-    const notification = buildNotificationEmail(inquiry);
-    const notificationResult = await sendEmail(
-      {
-        from: `DJKMD Legends <noreply@${env.MAILGUN_DOMAIN}>`,
-        to: env.BOOKING_EMAIL,
-        subject: notification.subject,
-        text: notification.text,
-        html: notification.html,
-      },
-      env.MAILGUN_API_KEY,
-      env.MAILGUN_DOMAIN,
-    );
-
-    if (!notificationResult.success) {
-      console.error('Notification email failed:', notificationResult.error);
-      return jsonResponse(500, { error: 'Failed to send email' }, corsHeaders);
-    }
-
-    const confirmation = buildConfirmationEmail(inquiry);
-    const confirmationResult = await sendEmail(
-      {
-        from: `DJKMD Legends <booking@${env.MAILGUN_DOMAIN}>`,
-        to: inquiry.email,
-        replyTo: env.BOOKING_EMAIL,
-        subject: confirmation.subject,
-        text: confirmation.text,
-        html: confirmation.html,
-      },
-      env.MAILGUN_API_KEY,
-      env.MAILGUN_DOMAIN,
-    );
-
-    if (!confirmationResult.success) {
-      console.error('Confirmation email failed:', confirmationResult.error);
-      return jsonResponse(500, { error: 'Failed to send email' }, corsHeaders);
-    }
-
-    return jsonResponse(200, { success: true }, corsHeaders);
+    return jsonResponse(404, { error: 'Not found' }, corsHeaders);
   },
 } satisfies ExportedHandler<Env>;
+
+async function handleEvents(
+  env: Env,
+  corsHeaders: Record<string, string>,
+): Promise<Response> {
+  try {
+    const events = await fetchUpcomingEvents(env.GOOGLE_API_KEY, env.GOOGLE_CALENDAR_ID);
+    return jsonResponse(200, { events }, corsHeaders, {
+      'Cache-Control': 'public, max-age=60',
+    });
+  } catch (err) {
+    console.error('Failed to fetch events:', err instanceof Error ? err.message : err);
+    return jsonResponse(500, { error: 'Failed to fetch events' }, corsHeaders);
+  }
+}
+
+async function handleBooking(
+  request: Request,
+  env: Env,
+  corsHeaders: Record<string, string>,
+): Promise<Response> {
+  let inquiry;
+  try {
+    const body = await request.json();
+    inquiry = parseBookingInquiry(body);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Invalid request';
+    return jsonResponse(400, { error: message }, corsHeaders);
+  }
+
+  const notification = buildNotificationEmail(inquiry);
+  const notificationResult = await sendEmail(
+    {
+      from: `DJKMD Legends <noreply@${env.MAILGUN_DOMAIN}>`,
+      to: env.BOOKING_EMAIL,
+      subject: notification.subject,
+      text: notification.text,
+      html: notification.html,
+    },
+    env.MAILGUN_API_KEY,
+    env.MAILGUN_DOMAIN,
+  );
+
+  if (!notificationResult.success) {
+    console.error('Notification email failed:', notificationResult.error);
+    return jsonResponse(500, { error: 'Failed to send email' }, corsHeaders);
+  }
+
+  const confirmation = buildConfirmationEmail(inquiry);
+  const confirmationResult = await sendEmail(
+    {
+      from: `DJKMD Legends <booking@${env.MAILGUN_DOMAIN}>`,
+      to: inquiry.email,
+      replyTo: env.BOOKING_EMAIL,
+      subject: confirmation.subject,
+      text: confirmation.text,
+      html: confirmation.html,
+    },
+    env.MAILGUN_API_KEY,
+    env.MAILGUN_DOMAIN,
+  );
+
+  if (!confirmationResult.success) {
+    console.error('Confirmation email failed:', confirmationResult.error);
+    return jsonResponse(500, { error: 'Failed to send email' }, corsHeaders);
+  }
+
+  return jsonResponse(200, { success: true }, corsHeaders);
+}
 
 function getCorsHeaders(request: Request, allowedOrigins: string): Record<string, string> {
   const origin = request.headers.get('Origin') ?? '';
   const allowed = allowedOrigins.split(',').map((o) => o.trim());
 
   const headers: Record<string, string> = {
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
 
@@ -91,13 +121,13 @@ function getCorsHeaders(request: Request, allowedOrigins: string): Record<string
 function jsonResponse(
   status: number,
   body: Record<string, unknown>,
-  extraHeaders: Record<string, string>,
+  ...headerObjects: Record<string, string>[]
 ): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       'Content-Type': 'application/json',
-      ...extraHeaders,
+      ...Object.assign({}, ...headerObjects),
     },
   });
 }

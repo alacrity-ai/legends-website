@@ -1,0 +1,1 @@
+{"root":["./src/index.ts","./src/types.ts","./src/validation.ts","./src/services/google-calendar.ts","./src/services/mailgun.ts","./src/templates/confirmation.ts","./src/templates/notification.ts"],"version":"5.9.3"}
