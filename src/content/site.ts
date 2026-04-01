@@ -32,14 +32,8 @@ export type AboutHeadingPart =
 export const aboutHeadingParts: AboutHeadingPart[] = [
   {
     type: 'image',
-    src: '/assets/images/logo_djkmd.png',
-    alt: 'DJ KMD',
-  },
-  { type: 'text', value: ' ' },
-  {
-    type: 'image',
-    src: '/assets/images/logo_legends.png',
-    alt: 'Legends',
+    src: '/assets/images/full_logo.png',
+    alt: 'DJKMD Presents Legends',
   },
 ];
 
@@ -67,9 +61,6 @@ export const aboutHighlights = [
 /* ── Booking ───────────────────────────────────────────────── */
 
 export const bookingEmail = 'booking@djkmdlegends.com';
-/** @see .env.example — VITE_BOOKING_FORM_ENDPOINT */
-export const bookingFormEndpoint =
-  import.meta.env.VITE_BOOKING_FORM_ENDPOINT || 'https://formspree.io/f/placeholder';
 export const bookingIntroCopy =
   "Ready to bring the Legends experience to your venue or event? Fill out the form below and we'll be in touch.";
 

@@ -26,7 +26,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_BOOKING_FORM_ENDPOINT: ${{ secrets.VITE_BOOKING_FORM_ENDPOINT }}
+          VITE_BOOKING_API_URL: ${{ secrets.VITE_BOOKING_API_URL }}
           VITE_GOOGLE_CALENDAR_EMBED_URL: ${{ secrets.VITE_GOOGLE_CALENDAR_EMBED_URL }}
           VITE_GOOGLE_CALENDAR_PUBLIC_URL: ${{ secrets.VITE_GOOGLE_CALENDAR_PUBLIC_URL }}
           VITE_YOUTUBE_VIDEO_ID: ${{ secrets.VITE_YOUTUBE_VIDEO_ID }}
@@ -39,3 +39,14 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist --project-name legends-website
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install worker dependencies
+        run: cd worker && npm ci
+
+      - name: Deploy booking worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          command: deploy

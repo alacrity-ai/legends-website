@@ -16,7 +16,7 @@ export default function Header() {
       <Container className={styles.inner}>
         <a href="#home" className={styles.wordmark}>
           <img
-            src="/assets/images/logo_full.png"
+            src="/assets/images/logo_wide.png"
             alt={siteTitle}
             className={styles.logo}
           />

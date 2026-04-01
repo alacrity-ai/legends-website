@@ -1,0 +1,6 @@
+# Local development secrets for wrangler dev
+# Copy this file to .dev.vars and fill in real values
+# This file is automatically picked up by `wrangler dev`
+
+MAILGUN_API_KEY=your-mailgun-api-key
+MAILGUN_DOMAIN=mg.djkmdlegends.com

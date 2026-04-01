@@ -4,11 +4,11 @@ import Container from '../../layout/Container/Container.tsx';
 import Heading from '../../shared/Heading/Heading.tsx';
 import Button from '../../shared/Button/Button.tsx';
 import {
-  bookingFormEndpoint,
   bookingIntroCopy,
   eventTypes,
   sectionIds,
 } from '../../../content/site.ts';
+import { submitBookingInquiry } from '../../../services/booking.ts';
 import styles from './BookingForm.module.css';
 
 type FormStatus = 'idle' | 'submitting' | 'success' | 'error';
@@ -21,21 +21,20 @@ export default function BookingForm() {
     setStatus('submitting');
 
     const form = e.currentTarget;
-    const data = new FormData(form);
+    const formData = new FormData(form);
 
     try {
-      const res = await fetch(bookingFormEndpoint, {
-        method: 'POST',
-        body: data,
-        headers: { Accept: 'application/json' },
+      await submitBookingInquiry({
+        name: formData.get('name') as string,
+        email: formData.get('email') as string,
+        phone: (formData.get('phone') as string) || undefined,
+        date: formData.get('date') as string,
+        eventType: (formData.get('eventType') as string) || undefined,
+        location: formData.get('location') as string,
+        message: (formData.get('message') as string) || undefined,
       });
-
-      if (res.ok) {
-        setStatus('success');
-        form.reset();
-      } else {
-        setStatus('error');
-      }
+      setStatus('success');
+      form.reset();
     } catch {
       setStatus('error');
     }

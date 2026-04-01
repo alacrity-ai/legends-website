@@ -33,7 +33,7 @@
 }
 
 .inlineLogo {
-  height: 2em;              /* doubled from 1em */
+  height: 6em;              /* doubled from 1em */
   vertical-align: middle;
   display: inline-block;
 }
