@@ -1,5 +1,5 @@
 import type { Env } from './types.ts';
-import { parseBookingInquiry } from './validation.ts';
+import { parseBookingInquiry, parseMailingListSignup } from './validation.ts';
 import { sendEmail } from './services/mailgun.ts';
 import { buildNotificationEmail } from './templates/notification.ts';
 import { buildConfirmationEmail } from './templates/confirmation.ts';
@@ -27,6 +27,13 @@ export default {
         return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
       }
       return handleBooking(request, env, corsHeaders);
+    }
+
+    if (url.pathname === '/api/mailing-list') {
+      if (request.method !== 'POST') {
+        return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+      }
+      return handleMailingList(request, env, corsHeaders);
     }
 
     return jsonResponse(404, { error: 'Not found' }, corsHeaders);
@@ -97,6 +104,33 @@ async function handleBooking(
   if (!confirmationResult.success) {
     console.error('Confirmation email failed:', confirmationResult.error);
     return jsonResponse(500, { error: 'Failed to send email' }, corsHeaders);
+  }
+
+  return jsonResponse(200, { success: true }, corsHeaders);
+}
+
+async function handleMailingList(
+  request: Request,
+  env: Env,
+  corsHeaders: Record<string, string>,
+): Promise<Response> {
+  let signup;
+  try {
+    const body = await request.json();
+    signup = parseMailingListSignup(body);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Invalid request';
+    return jsonResponse(400, { error: message }, corsHeaders);
+  }
+
+  try {
+    await env.MAILING_LIST.put(
+      signup.email.toLowerCase(),
+      JSON.stringify({ name: signup.name ?? null, signedUpAt: new Date().toISOString() }),
+    );
+  } catch (err) {
+    console.error('Failed to save signup:', err instanceof Error ? err.message : err);
+    return jsonResponse(500, { error: 'Failed to save signup' }, corsHeaders);
   }
 
   return jsonResponse(200, { success: true }, corsHeaders);

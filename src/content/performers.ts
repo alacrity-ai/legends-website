@@ -30,7 +30,7 @@ export const performers: Performer[] = [
   },
   {
     id: 'dolly-parton',
-    name: 'Dolly Pardon',
+    name: 'Dolly Parton',
     imageSrc: '/assets/images/performer-dolly.webp',
     imageAlt: 'Dolly Parton tribute performer on stage',
     shortDescription:

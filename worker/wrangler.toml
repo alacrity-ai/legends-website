@@ -9,6 +9,11 @@ preview_urls = false
 pattern = "djkmdlegends.com/api/*"
 zone_name = "djkmdlegends.com"
 
+[[kv_namespaces]]
+binding = "MAILING_LIST"
+id = "87b3a569d4e145a4a7458c26d88ad8fa"
+preview_id = "006ad453ff844658bc33c7285f2bdc35"
+
 [vars]
 BOOKING_EMAIL = "booking@djkmdlegends.com"
 ALLOWED_ORIGINS = "https://djkmdlegends.com,https://www.djkmdlegends.com,http://localhost:5173"

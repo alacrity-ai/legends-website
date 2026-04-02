@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import './App.css';
 import Header from '../components/layout/Header/Header.tsx';
 import Footer from '../components/layout/Footer/Footer.tsx';
@@ -7,17 +8,22 @@ import Performers from '../components/marketing/Performers/Performers.tsx';
 import Media from '../components/marketing/Media/Media.tsx';
 import Calendar from '../components/marketing/Calendar/Calendar.tsx';
 import BookingForm from '../components/marketing/BookingForm/BookingForm.tsx';
+import MailingList from '../components/marketing/MailingList/MailingList.tsx';
 import PressKit from '../components/marketing/PressKit/PressKit.tsx';
 
 function App() {
+  const [showMailingList, setShowMailingList] = useState(false);
+
+  const openMailingList = () => setShowMailingList(true);
+
   return (
     <div className="app">
       <a href="#main-content" className="skipLink">
         Skip to content
       </a>
-      <Header />
+      <Header onOpenMailingList={openMailingList} />
       <main id="main-content">
-        <Hero />
+        <Hero onOpenMailingList={openMailingList} />
         <About />
         <Performers />
         <Media />
@@ -26,9 +32,12 @@ function App() {
         <PressKit />
       </main>
       <Footer />
+
+      {showMailingList && (
+        <MailingList onClose={() => setShowMailingList(false)} />
+      )}
     </div>
   );
 }
 
 export default App;
-

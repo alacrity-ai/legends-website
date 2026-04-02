@@ -37,6 +37,29 @@ export function parseBookingInquiry(body: unknown): BookingInquiry {
   return { name, email, date, location, phone, time, eventType, message };
 }
 
+export function parseMailingListSignup(body: unknown): { email: string; name?: string } {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw new Error('Invalid request body');
+  }
+
+  const obj = body as Record<string, unknown>;
+
+  const allowedKeys = new Set(['email', 'name']);
+  for (const key of Object.keys(obj)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`Unexpected field: ${key}`);
+    }
+  }
+
+  const email = requireString(obj, 'email');
+  if (!email.includes('@')) {
+    throw new Error('email is invalid');
+  }
+
+  const name = optionalString(obj, 'name');
+  return { email, name };
+}
+
 function requireString(obj: Record<string, unknown>, field: string): string {
   const value = obj[field];
   if (typeof value !== 'string' || value.trim().length === 0) {

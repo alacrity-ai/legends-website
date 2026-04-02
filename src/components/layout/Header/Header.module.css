@@ -88,6 +88,12 @@
   outline-offset: 2px;
 }
 
+.navButtons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 /* ── Mobile styles ─────────────────────────────────────────── */
 
 @media (max-width: 768px) {
@@ -124,6 +130,12 @@
     padding: var(--space-md) var(--space-sm);
     font-size: var(--text-base);
     min-height: 44px;
+  }
+
+  .navButtons {
+    flex-direction: column;
+    width: 100%;
+    gap: var(--space-sm);
   }
 
   .menuIcon {

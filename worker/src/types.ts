@@ -23,4 +23,5 @@ export interface Env {
   ALLOWED_ORIGINS: string;
   GOOGLE_API_KEY: string;
   GOOGLE_CALENDAR_ID: string;
+  MAILING_LIST: KVNamespace;
 }

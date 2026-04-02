@@ -8,7 +8,11 @@ import {
 } from '../../../content/site.ts';
 import styles from './Hero.module.css';
 
-export default function Hero() {
+interface HeroProps {
+  onOpenMailingList: () => void;
+}
+
+export default function Hero({ onOpenMailingList }: HeroProps) {
   return (
     <Section id={sectionIds.home} className={styles.hero}>
       <Container>
@@ -21,7 +25,10 @@ export default function Hero() {
               Book Now
             </Button>
             <Button href={`#${sectionIds.calendar}`} variant="primary">
-              See Upcoming Shows
+              Upcoming Shows
+            </Button>
+            <Button variant="secondary" onClick={onOpenMailingList}>
+              Join Mailing List
             </Button>
           </div>
         </div>

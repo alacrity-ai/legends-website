@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import Container from '../Container/Container.tsx';
 import Button from '../../shared/Button/Button.tsx';
-import { siteTitle, navItems } from '../../../content/site.ts';
+import { siteTitle, navItems, sectionIds } from '../../../content/site.ts';
 import styles from './Header.module.css';
 
-export default function Header() {
+interface HeaderProps {
+  onOpenMailingList: () => void;
+}
+
+export default function Header({ onOpenMailingList }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleNavClick = () => {
@@ -53,9 +57,17 @@ export default function Header() {
               ))}
           </ul>
 
-          <Button href="#book" variant="primary" onClick={handleNavClick}>
-            Book Now
-          </Button>
+          <div className={styles.navButtons}>
+            <Button href={`#${sectionIds.calendar}`} variant="secondary" onClick={handleNavClick}>
+              Shows
+            </Button>
+            <Button variant="secondary" onClick={() => { handleNavClick(); onOpenMailingList(); }}>
+              Mailing List
+            </Button>
+            <Button href={`#${sectionIds.book}`} variant="primary" onClick={handleNavClick}>
+              Book Now
+            </Button>
+          </div>
         </nav>
       </Container>
     </header>

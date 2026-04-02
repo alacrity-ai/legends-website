@@ -12,8 +12,6 @@ export const navItems: NavItem[] = [
   { label: 'Home', href: '#home' },
   { label: 'About', href: '#about' },
   { label: 'Acts', href: '#acts' },
-  { label: 'Calendar', href: '#calendar' },
-  { label: 'Book', href: '#book' },
   { label: 'Press Kit', href: '#press-kit' },
 ];
 
@@ -97,9 +95,6 @@ export const calendarCopy = 'See where Legends is appearing next.';
 
 /* ── Mailing list ──────────────────────────────────────────── */
 
-/** @see .env.example — VITE_MAILING_LIST_FORM_ACTION */
-export const mailingListFormAction =
-  import.meta.env.VITE_MAILING_LIST_FORM_ACTION || '';
 export const mailingListHeadline = 'Stay in the Loop';
 export const mailingListCopy =
   'Get updates on upcoming shows, new acts, and exclusive event announcements — straight to your inbox.';
