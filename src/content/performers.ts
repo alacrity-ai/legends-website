@@ -29,6 +29,15 @@ export const performers: Performer[] = [
     tags: ['tribute', 'live vocals', 'themed show'],
   },
   {
+    id: 'neil-diamond',
+    name: 'Sweet Caroline',
+    imageSrc: '/assets/images/performer-diamond.webp',
+    imageAlt: 'Neil Diamond tribute performer on stage',
+    shortDescription:
+      'A captivating Neil Diamond tribute bringing timeless classics, sing-along anthems, and warm showmanship to every crowd.',
+    tags: ['tribute', 'live vocals', 'event-ready'],
+  },
+  {
     id: 'dolly-parton',
     name: 'Dolly Parton',
     imageSrc: '/assets/images/performer-dolly.webp',
@@ -63,5 +72,5 @@ export const performers: Performer[] = [
     shortDescription:
       'A slick Bruno Mars tribute delivering chart-topping hits, dynamic choreography, and crowd-pleasing funk-pop energy.',
     tags: ['tribute', 'live vocals', 'event-ready'],
-  },
+  }
 ];
