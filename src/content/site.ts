@@ -32,7 +32,7 @@ export type AboutHeadingPart =
 export const aboutHeadingParts: AboutHeadingPart[] = [
   {
     type: 'image',
-    src: '/assets/images/full_logo.png',
+    src: '/assets/images/full_logo.webp',
     alt: 'DJKMD Presents Legends',
   },
 ];

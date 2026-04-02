@@ -2,7 +2,7 @@
   background-color: var(--color-primary);
   background-image:
     linear-gradient(to right, rgba(26, 26, 46, 0.85), rgba(26, 26, 46, 0.45)),
-    url('/assets/images/hero.png');
+    url('/assets/images/hero.webp');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
