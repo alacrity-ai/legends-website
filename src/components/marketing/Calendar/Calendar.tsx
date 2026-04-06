@@ -104,7 +104,6 @@ export default function Calendar() {
         )}
         {ticketEvent && (
           <TicketModal
-            events={events}
             selectedEvent={ticketEvent}
             onClose={() => setTicketEvent(null)}
           />

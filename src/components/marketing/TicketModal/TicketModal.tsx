@@ -1,36 +1,49 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import type { CalendarEvent } from '../../../types/event.ts';
-import {
-  ticketDefaultPrice,
-  ticketCurrency,
-  ticketComingSoonMessage,
-} from '../../../content/site.ts';
+import { ticketComingSoonMessage } from '../../../content/site.ts';
 import styles from './TicketModal.module.css';
 
 interface TicketModalProps {
-  events: CalendarEvent[];
   selectedEvent: CalendarEvent;
   onClose: () => void;
 }
 
-function formatEventOption(event: CalendarEvent): string {
-  const [year, month, day] = event.date.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  const formatted = date.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-  return `${event.title} — ${formatted}`;
+function parseDescription(html: string | null): {
+  text: string | null;
+  squareUrl: string | null;
+} {
+  if (!html) return { text: null, squareUrl: null };
+
+  // Extract the Square link from href or text content before stripping tags
+  const squareMatch = html.match(/https:\/\/square\.link\/u\/[A-Za-z0-9]+/);
+  const squareUrl = squareMatch ? squareMatch[0] : null;
+
+  // Remove the entire <a> tag (and surrounding <p>) that contains the Square link
+  let cleaned = html;
+  if (squareUrl) {
+    cleaned = cleaned.replace(/<p>\s*<a[^>]*>https:\/\/square\.link\/u\/[A-Za-z0-9]+<\/a>\s*<\/p>/i, '');
+    // Fallback: remove any remaining raw Square URLs
+    cleaned = cleaned.replace(/https:\/\/square\.link\/u\/[A-Za-z0-9]+/, '');
+  }
+
+  // Convert <p> tags to newlines, strip all remaining HTML tags, decode entities
+  const text = cleaned
+    .replace(/<\/p>\s*<p>/gi, '\n\n')
+    .replace(/<\/?p>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .trim() || null;
+
+  return { text, squareUrl };
 }
 
-export default function TicketModal({ events, selectedEvent, onClose }: TicketModalProps) {
-  const [selectedIndex, setSelectedIndex] = useState(() =>
-    events.findIndex((e) => e.date === selectedEvent.date && e.title === selectedEvent.title),
-  );
-  const [quantity, setQuantity] = useState(1);
-  const [purchased, setPurchased] = useState(false);
-
+export default function TicketModal({ selectedEvent, onClose }: TicketModalProps) {
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -47,7 +60,7 @@ export default function TicketModal({ events, selectedEvent, onClose }: TicketMo
     };
   }, [handleEscape]);
 
-  const total = quantity * ticketDefaultPrice;
+  const { text, squareUrl } = parseDescription(selectedEvent.description);
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -56,63 +69,24 @@ export default function TicketModal({ events, selectedEvent, onClose }: TicketMo
           &times;
         </button>
 
-        <h2 className={styles.heading}>Get Tickets</h2>
+        <h2 className={styles.heading}>{selectedEvent.title}</h2>
 
-        {purchased ? (
+        {text && <p className={styles.description}>{text}</p>}
+
+        {squareUrl ? (
+          <a
+            href={`${squareUrl}?src=embed`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.buyNowLink}
+            onClick={onClose}
+          >
+            Buy Now
+          </a>
+        ) : (
           <div className={styles.comingSoon}>
             <p>{ticketComingSoonMessage}</p>
-            <button className={styles.dismissButton} onClick={onClose}>
-              Close
-            </button>
           </div>
-        ) : (
-          <>
-            <div className={styles.fieldGroup}>
-              <label htmlFor="ticket-event" className={styles.label}>Event</label>
-              <select
-                id="ticket-event"
-                className={styles.input}
-                value={selectedIndex}
-                onChange={(e) => setSelectedIndex(Number(e.target.value))}
-              >
-                {events.map((event, i) => (
-                  <option key={`${event.date}-${i}`} value={i}>
-                    {formatEventOption(event)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label htmlFor="ticket-quantity" className={styles.label}>Quantity</label>
-              <select
-                id="ticket-quantity"
-                className={styles.input}
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-              >
-                {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className={styles.priceRow}>
-              <span>Price per ticket</span>
-              <span className={styles.priceValue}>{ticketCurrency}{ticketDefaultPrice.toFixed(2)}</span>
-            </div>
-
-            <div className={styles.totalRow}>
-              <span>Total</span>
-              <span className={styles.totalValue}>{ticketCurrency}{total.toFixed(2)}</span>
-            </div>
-
-            <p className={styles.priceNote}>(Final pricing TBD)</p>
-
-            <button className={styles.purchaseButton} onClick={() => setPurchased(true)}>
-              Purchase
-            </button>
-          </>
         )}
       </div>
     </div>

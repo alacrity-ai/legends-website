@@ -2,6 +2,7 @@ import type { CalendarEvent } from '../types.ts';
 
 interface GoogleEventItem {
   summary?: string;
+  description?: string;
   status?: string;
   location?: string;
   start?: {
@@ -26,7 +27,7 @@ export async function fetchUpcomingEvents(
     orderBy: 'startTime',
     singleEvents: 'true',
     eventTypes: 'default',
-    fields: 'items(summary,start,location,status)',
+    fields: 'items(summary,description,start,location,status)',
   });
 
   const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`;
@@ -67,6 +68,7 @@ export async function fetchUpcomingEvents(
         date,
         time,
         location: item.location ?? null,
+        description: item.description ?? null,
       };
     });
 }

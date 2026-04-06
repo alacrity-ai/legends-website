@@ -14,6 +14,7 @@ export interface CalendarEvent {
   date: string;
   time: string | null;
   location: string | null;
+  description: string | null;
 }
 
 export interface Env {

@@ -44,78 +44,20 @@
   margin: 0 0 var(--space-lg);
 }
 
-/* ── Form fields ────────────────────────────────────────── */
+/* ── Description ───────────────────────────────────────── */
 
-.fieldGroup {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  margin-bottom: var(--space-lg);
-}
-
-.label {
-  font-size: var(--text-sm);
-  font-weight: 600;
+.description {
   color: var(--color-text);
-}
-
-.input {
-  width: 100%;
-  padding: var(--space-md);
   font-size: var(--text-base);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background-color: var(--color-bg);
-  color: var(--color-text);
+  line-height: 1.6;
+  margin: 0 0 var(--space-lg);
+  white-space: pre-line;
 }
 
-.input:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.2);
-}
+/* ── Buy Now link ──────────────────────────────────────── */
 
-/* ── Price display ──────────────────────────────────────── */
-
-.priceRow,
-.totalRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-sm) 0;
-  color: var(--color-text-muted);
-  font-size: var(--text-base);
-}
-
-.totalRow {
-  border-top: 1px solid var(--color-border);
-  margin-top: var(--space-sm);
-  padding-top: var(--space-md);
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.priceValue {
-  color: var(--color-accent);
-  font-weight: 500;
-}
-
-.totalValue {
-  color: var(--color-accent);
-  font-size: var(--text-lg);
-  font-weight: 700;
-}
-
-.priceNote {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  text-align: center;
-  margin: var(--space-sm) 0 var(--space-lg);
-}
-
-/* ── Purchase button ────────────────────────────────────── */
-
-.purchaseButton {
+.buyNowLink {
+  display: block;
   width: 100%;
   padding: var(--space-md) var(--space-lg);
   font-size: var(--text-base);
@@ -124,11 +66,13 @@
   border-radius: var(--radius-md);
   background-color: var(--btn-primary-bg);
   color: var(--btn-primary-text);
+  text-align: center;
+  text-decoration: none;
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
-.purchaseButton:hover {
+.buyNowLink:hover {
   background-color: var(--btn-primary-hover-bg);
 }
 
@@ -143,21 +87,5 @@
   color: var(--color-text);
   font-size: var(--text-base);
   line-height: 1.6;
-  margin: 0 0 var(--space-lg);
-}
-
-.dismissButton {
-  padding: var(--space-sm) var(--space-xl);
-  font-size: var(--text-base);
-  font-weight: 600;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--color-text);
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-.dismissButton:hover {
-  border-color: var(--color-accent);
+  margin: 0;
 }

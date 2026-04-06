@@ -58,14 +58,14 @@ export default function Header({ onOpenMailingList }: HeaderProps) {
           </ul>
 
           <div className={styles.navButtons}>
-            <Button href={`#${sectionIds.calendar}`} variant="secondary" onClick={handleNavClick}>
-              Shows
+            <Button href={`#${sectionIds.calendar}`} variant="primary" onClick={handleNavClick}>
+              Buy Tickets!
             </Button>
             <Button variant="secondary" onClick={() => { handleNavClick(); onOpenMailingList(); }}>
               Mailing List
             </Button>
-            <Button href={`#${sectionIds.book}`} variant="primary" onClick={handleNavClick}>
-              Book Now
+            <Button href={`#${sectionIds.book}`} variant="secondary" onClick={handleNavClick}>
+              Book Us!
             </Button>
           </div>
         </nav>

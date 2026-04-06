@@ -80,8 +80,6 @@ export const mediaCaption =
 
 /* ── Tickets (placeholder) ─────────────────────────────────── */
 
-export const ticketDefaultPrice = 25;
-export const ticketCurrency = '$';
 export const ticketComingSoonMessage =
   'Ticket sales coming soon! For now, please use the booking form or contact us at booking@djkmdlegends.com';
 
