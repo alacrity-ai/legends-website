@@ -14,6 +14,11 @@ binding = "MAILING_LIST"
 id = "87b3a569d4e145a4a7458c26d88ad8fa"
 preview_id = "006ad453ff844658bc33c7285f2bdc35"
 
+[[kv_namespaces]]
+binding = "GUESTLIST"
+id = "b52560156960470db4af905dc2e82f5d"
+preview_id = "751f392d15924b5dbd77ad634eb4ab11"
+
 [vars]
 BOOKING_EMAIL = "booking@djkmdlegends.com"
 ALLOWED_ORIGINS = "https://djkmdlegends.com,https://www.djkmdlegends.com,http://localhost:5173"

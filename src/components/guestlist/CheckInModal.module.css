@@ -1,0 +1,232 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 100;
+  padding: 0;
+}
+
+@media (min-width: 640px) {
+  .overlay {
+    align-items: center;
+    padding: 1rem;
+  }
+}
+
+.modal {
+  width: 100%;
+  max-width: 480px;
+  background: var(--color-bg-alt);
+  border-top: 1px solid var(--color-border);
+  border-left: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  padding: 1.25rem 1.25rem 1.5rem;
+  position: relative;
+}
+
+@media (min-width: 640px) {
+  .modal {
+    border-radius: var(--radius-lg);
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+.close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 1.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.close:hover,
+.close:focus-visible {
+  color: var(--color-text);
+}
+
+.name {
+  margin: 0 2rem 0.5rem 0;
+  font-size: var(--text-2xl);
+  color: var(--color-text);
+}
+
+.headline {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.qty {
+  font-size: var(--text-4xl);
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.ticketLabel {
+  font-size: var(--text-base);
+  color: var(--color-text-muted);
+}
+
+.notes {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  margin: 0 0 0.85rem;
+  background: rgba(243, 212, 107, 0.12);
+  border: 1px solid rgba(243, 212, 107, 0.45);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: var(--text-base);
+}
+
+.notesLabel {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: var(--color-primary);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(243, 212, 107, 0.18);
+}
+
+.purchases {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+}
+
+.purchases li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  color: var(--color-text);
+}
+
+.purchaseQty {
+  font-weight: 700;
+  color: var(--color-primary);
+  min-width: 2.25rem;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0 0 1.25rem;
+  font-size: var(--text-sm);
+}
+
+.details dt {
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  align-self: center;
+}
+
+.details dd {
+  margin: 0;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.link {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.link:hover,
+.link:focus-visible {
+  text-decoration: underline;
+}
+
+.status {
+  background: rgba(63, 165, 91, 0.12);
+  border: 1px solid rgba(63, 165, 91, 0.4);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  margin: 0 0 1rem;
+}
+
+.status strong {
+  color: var(--color-success);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.button {
+  width: 100%;
+  padding: 1rem 1rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.primary {
+  background: var(--color-success);
+  color: #0a1d10;
+}
+
+.primary:hover:not(:disabled),
+.primary:focus-visible:not(:disabled) {
+  background: #4abe6a;
+}
+
+.undo {
+  background: transparent;
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+}
+
+.undo:hover:not(:disabled),
+.undo:focus-visible:not(:disabled) {
+  background: rgba(217, 92, 92, 0.1);
+}
+
+.cancel {
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.cancel:hover:not(:disabled),
+.cancel:focus-visible:not(:disabled) {
+  border-color: var(--color-accent);
+}

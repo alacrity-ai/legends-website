@@ -10,10 +10,15 @@ import Calendar from '../components/marketing/Calendar/Calendar.tsx';
 import BookingForm from '../components/marketing/BookingForm/BookingForm.tsx';
 import MailingList from '../components/marketing/MailingList/MailingList.tsx';
 import PressKit from '../components/marketing/PressKit/PressKit.tsx';
+import Guestlist from '../components/guestlist/Guestlist.tsx';
 
-function App() {
+function isGuestlistRoute(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname.replace(/\/$/, '') === '/guestlist';
+}
+
+function MarketingSite() {
   const [showMailingList, setShowMailingList] = useState(false);
-
   const openMailingList = () => setShowMailingList(true);
 
   return (
@@ -38,6 +43,10 @@ function App() {
       )}
     </div>
   );
+}
+
+function App() {
+  return isGuestlistRoute() ? <Guestlist /> : <MarketingSite />;
 }
 
 export default App;

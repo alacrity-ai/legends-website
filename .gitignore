@@ -15,6 +15,7 @@ dist-ssr
 .env.*
 !.env.example
 worker/.dev.vars
+scratch/
 
 # Editor directories and files
 .vscode/*
@@ -26,3 +27,5 @@ worker/.dev.vars
 *.njsproj
 *.sln
 *.sw?
+
+DO_NOT_COMMIT.md

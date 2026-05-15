@@ -1,0 +1,78 @@
+.row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.95rem 1rem;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-height: 56px;
+}
+
+.row:hover,
+.row:focus-visible {
+  background: var(--color-bg-alt);
+}
+
+.row:active {
+  background: var(--color-surface);
+}
+
+.checkedIn {
+  background: rgba(63, 165, 91, 0.12);
+}
+
+.checkedIn:hover,
+.checkedIn:focus-visible {
+  background: rgba(63, 165, 91, 0.2);
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.check {
+  color: var(--color-success);
+  font-weight: 700;
+  font-size: 1.1em;
+}
+
+.name {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.qty {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.variation {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}

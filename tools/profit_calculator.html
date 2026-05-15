@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Show Profit Calculator</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121933;
+      --panel-2: #192347;
+      --text: #edf2ff;
+      --muted: #a8b3d1;
+      --accent: #7cc4ff;
+      --good: #7ee787;
+      --warn: #ffd166;
+      --bad: #ff7b72;
+      --border: #2b3768;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(180deg, #0b1020 0%, #0e1530 100%);
+      color: var(--text);
+      line-height: 1.45;
+    }
+
+    .wrap {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 28px 20px 48px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      letter-spacing: 0.01em;
+    }
+
+    .sub {
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 20px;
+    }
+
+    .card {
+      background: rgba(18, 25, 51, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+    }
+
+    .card h2, .card h3 {
+      margin-top: 0;
+    }
+
+    .section-title {
+      margin-top: 18px;
+      margin-bottom: 10px;
+      font-size: 1rem;
+      color: var(--accent);
+    }
+
+    .label {
+      display: block;
+      font-size: 0.92rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    input[type="number"], input[type="text"] {
+      width: 100%;
+      appearance: textfield;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 1rem;
+      margin-bottom: 12px;
+    }
+
+    .small-input {
+      margin-bottom: 0;
+    }
+
+    .btn {
+      background: #1b2a59;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+
+    .btn:hover {
+      filter: brightness(1.08);
+    }
+
+    .btn.secondary {
+      background: #101833;
+    }
+
+    .ticket-type {
+      background: #101833;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .ticket-type-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .ticket-type-title {
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .ticket-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 0.8fr 0.8fr 0.8fr;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .mix-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .mix-row {
+      background: #101833;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #172146;
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-size: 0.86rem;
+      margin-top: 4px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(180px, 1fr));
+      gap: 14px;
+    }
+
+    .metric {
+      background: #101833;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .metric .k {
+      font-size: 0.86rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .metric .v {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .good { color: var(--good); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-size: 0.96rem;
+    }
+
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #263158;
+      text-align: right;
+      vertical-align: top;
+    }
+
+    th:first-child, td:first-child { text-align: left; }
+    th { color: var(--muted); font-weight: 600; }
+
+    .scenario-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .scenario {
+      background: #101833;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .scenario .title {
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .scenario .body {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .footer {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 1000px) {
+      .grid { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: 1fr; }
+      .scenario-list { grid-template-columns: 1fr; }
+      .ticket-grid { grid-template-columns: 1fr 1fr; }
+      .mix-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Generic Show Profit Calculator</h1>
+    <div class="sub">
+      Configure hall capacity, fixed costs, and any number of ticket types. Useful for dinner shows, general admission, VIP tiers, and mixed-format events.
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Show setup</h2>
+
+        <label class="label" for="showName">Show / venue label</label>
+        <input id="showName" type="text" value="Princeton Station Show" />
+
+        <div class="section-title">Global parameters</div>
+
+        <label class="label" for="capacity">Capacity</label>
+        <input id="capacity" type="number" min="0" step="1" value="225" />
+
+        <label class="label" for="fixedCost">Fixed cost</label>
+        <input id="fixedCost" type="number" min="0" step="0.01" value="650" />
+
+        <div class="section-title">Ticket configurations</div>
+        <div id="ticketTypes"></div>
+
+        <div class="row-actions">
+          <button class="btn" id="addTicketType">+ Add ticket type</button>
+          <button class="btn secondary" id="resetDefaults">Reset example</button>
+        </div>
+
+        <div class="section-title">Sales mix</div>
+        <label class="label" for="totalTickets">Total tickets sold</label>
+        <input id="totalTickets" type="number" min="0" step="1" value="100" />
+
+        <div id="mixInputs"></div>
+        <div class="pill">Mix percentages should sum to 100%</div>
+
+        <div class="note muted" style="margin-top: 12px;">
+          Ticket types support both price and per-ticket variable cost. That covers meals, drink tickets, merch bundles, or any other per-attendee fulfillment cost.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 id="resultsHeading">Results</h2>
+
+        <div class="metrics">
+          <div class="metric">
+            <div class="k">Gross revenue</div>
+            <div class="v" id="grossRevenue">$0.00</div>
+          </div>
+          <div class="metric">
+            <div class="k">Total costs</div>
+            <div class="v" id="totalCosts">$0.00</div>
+          </div>
+          <div class="metric">
+            <div class="k">Net profit / loss</div>
+            <div class="v" id="netProfit">$0.00</div>
+          </div>
+          <div class="metric">
+            <div class="k">Average profit per attendee</div>
+            <div class="v" id="profitPerAttendee">$0.00</div>
+          </div>
+        </div>
+
+        <div class="section-title">By ticket type</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Count</th>
+              <th>Revenue</th>
+              <th>Variable Cost</th>
+              <th>Contribution</th>
+            </tr>
+          </thead>
+          <tbody id="ticketSummaryBody"></tbody>
+        </table>
+
+        <div class="section-title">Break-even and upside</div>
+        <table>
+          <tr><td>Break-even tickets at current mix</td><td id="breakEvenTickets">0</td></tr>
+          <tr><td>Break-even occupancy at current mix</td><td id="breakEvenPercent">0%</td></tr>
+          <tr><td>Profit at full capacity using current mix</td><td id="bestCurrentMix">$0.00</td></tr>
+          <tr><td>Best possible full-capacity profit (highest-margin ticket only)</td><td id="bestAbsolute">$0.00</td></tr>
+          <tr><td>Highest-margin ticket type</td><td id="bestTicketType">—</td></tr>
+        </table>
+
+        <div class="section-title">Quick scenarios</div>
+        <div class="scenario-list">
+          <div class="scenario">
+            <div class="title">50 tickets</div>
+            <div class="body" id="scenario50">—</div>
+          </div>
+          <div class="scenario">
+            <div class="title">100 tickets</div>
+            <div class="body" id="scenario100">—</div>
+          </div>
+          <div class="scenario">
+            <div class="title">Current mix at full capacity</div>
+            <div class="body" id="scenarioCapacity">—</div>
+          </div>
+          <div class="scenario">
+            <div class="title">Best-case full capacity</div>
+            <div class="body" id="scenarioBestCase">—</div>
+          </div>
+        </div>
+
+        <div class="footer">
+          Counts are rounded to whole attendees. Break-even uses the current weighted contribution margin per attendee. If your mix percentages do not sum to 100%, the calculator will normalize them automatically.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+    const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+    const fmtPct = (n) => `${n.toFixed(1)}%`;
+
+    let ticketTypes = [
+      { id: crypto.randomUUID(), name: 'Dinner + Show', price: 64.95, variableCost: 32.95, mixPct: 50 },
+      { id: crypto.randomUUID(), name: 'Show Only', price: 40.00, variableCost: 0.00, mixPct: 50 }
+    ];
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function readGlobalInputs() {
+      return {
+        showName: el('showName').value.trim() || 'Show',
+        capacity: clamp(Math.round(Number(el('capacity').value) || 0), 0, 100000),
+        fixedCost: Math.max(0, Number(el('fixedCost').value) || 0),
+        totalTickets: clamp(Math.round(Number(el('totalTickets').value) || 0), 0, clamp(Math.round(Number(el('capacity').value) || 0), 0, 100000))
+      };
+    }
+
+    function normalizeMix(types) {
+      const rawTotal = types.reduce((sum, t) => sum + Math.max(0, Number(t.mixPct) || 0), 0);
+      if (rawTotal <= 0) {
+        const equal = 100 / types.length;
+        return types.map(t => ({ ...t, normalizedPct: equal }));
+      }
+      return types.map(t => ({
+        ...t,
+        normalizedPct: (Math.max(0, Number(t.mixPct) || 0) / rawTotal) * 100
+      }));
+    }
+
+    function allocateCounts(totalTickets, types) {
+      const normalized = normalizeMix(types);
+      const base = normalized.map(t => ({
+        ...t,
+        rawCount: totalTickets * (t.normalizedPct / 100),
+        count: Math.floor(totalTickets * (t.normalizedPct / 100))
+      }));
+
+      let assigned = base.reduce((sum, t) => sum + t.count, 0);
+      let remaining = totalTickets - assigned;
+
+      base
+        .map((t, idx) => ({ idx, frac: t.rawCount - t.count }))
+        .sort((a, b) => b.frac - a.frac)
+        .slice(0, remaining)
+        .forEach(({ idx }) => {
+          base[idx].count += 1;
+        });
+
+      return base;
+    }
+
+    function computeScenario(totalTickets, types, fixedCost) {
+      const allocated = allocateCounts(totalTickets, types).map(t => {
+        const revenue = t.count * t.price;
+        const variableCost = t.count * t.variableCost;
+        const contribution = revenue - variableCost;
+        return { ...t, revenue, variableCost, contribution };
+      });
+
+      const grossRevenue = allocated.reduce((sum, t) => sum + t.revenue, 0);
+      const totalVariableCost = allocated.reduce((sum, t) => sum + t.variableCost, 0);
+      const totalCosts = fixedCost + totalVariableCost;
+      const netProfit = grossRevenue - totalCosts;
+      const weightedContributionPerTicket = totalTickets > 0
+        ? allocated.reduce((sum, t) => sum + t.contribution, 0) / totalTickets
+        : 0;
+
+      return {
+        allocated,
+        grossRevenue,
+        totalVariableCost,
+        totalCosts,
+        netProfit,
+        weightedContributionPerTicket
+      };
+    }
+
+    function renderTicketTypes() {
+      const container = el('ticketTypes');
+      container.innerHTML = '';
+
+      ticketTypes.forEach((type, index) => {
+        const div = document.createElement('div');
+        div.className = 'ticket-type';
+        div.innerHTML = `
+          <div class="ticket-type-header">
+            <div class="ticket-type-title">Ticket Type ${index + 1}</div>
+            ${ticketTypes.length > 1 ? `<button class="btn secondary remove-ticket" data-id="${type.id}">Remove</button>` : ''}
+          </div>
+          <div class="ticket-grid">
+            <div>
+              <label class="label">Name</label>
+              <input class="small-input ticket-name" data-id="${type.id}" type="text" value="${escapeHtml(type.name)}" />
+            </div>
+            <div>
+              <label class="label">Price</label>
+              <input class="small-input ticket-price" data-id="${type.id}" type="number" min="0" step="0.01" value="${type.price}" />
+            </div>
+            <div>
+              <label class="label">Variable cost</label>
+              <input class="small-input ticket-cost" data-id="${type.id}" type="number" min="0" step="0.01" value="${type.variableCost}" />
+            </div>
+            <div>
+              <label class="label">Mix %</label>
+              <input class="small-input ticket-mix" data-id="${type.id}" type="number" min="0" step="0.01" value="${type.mixPct}" />
+            </div>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+
+      container.querySelectorAll('.ticket-name').forEach(input => {
+        input.addEventListener('input', e => updateTicket(e.target.dataset.id, 'name', e.target.value));
+      });
+      container.querySelectorAll('.ticket-price').forEach(input => {
+        input.addEventListener('input', e => updateTicket(e.target.dataset.id, 'price', Number(e.target.value) || 0));
+      });
+      container.querySelectorAll('.ticket-cost').forEach(input => {
+        input.addEventListener('input', e => updateTicket(e.target.dataset.id, 'variableCost', Number(e.target.value) || 0));
+      });
+      container.querySelectorAll('.ticket-mix').forEach(input => {
+        input.addEventListener('input', e => updateTicket(e.target.dataset.id, 'mixPct', Number(e.target.value) || 0));
+      });
+      container.querySelectorAll('.remove-ticket').forEach(btn => {
+        btn.addEventListener('click', e => removeTicket(e.target.dataset.id));
+      });
+
+      renderMixInputs();
+    }
+
+    function renderMixInputs() {
+      const container = el('mixInputs');
+      const normalized = normalizeMix(ticketTypes);
+      container.innerHTML = `
+        <div class="mix-grid">
+          ${normalized.map(t => `
+            <div class="mix-row">
+              <div><strong>${escapeHtml(t.name || 'Unnamed Ticket')}</strong></div>
+              <div class="muted">Entered mix: ${Number(t.mixPct || 0).toFixed(2)}%</div>
+              <div class="muted">Normalized mix used: ${Number(t.normalizedPct || 0).toFixed(2)}%</div>
+              <div class="muted">Unit contribution: ${fmt((Number(t.price) || 0) - (Number(t.variableCost) || 0))}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function updateTicket(id, field, value) {
+      ticketTypes = ticketTypes.map(t => t.id === id ? { ...t, [field]: value } : t);
+      update();
+    }
+
+    function removeTicket(id) {
+      ticketTypes = ticketTypes.filter(t => t.id !== id);
+      update();
+    }
+
+    function addTicketType() {
+      ticketTypes.push({
+        id: crypto.randomUUID(),
+        name: `Ticket Type ${ticketTypes.length + 1}`,
+        price: 50.00,
+        variableCost: 0.00,
+        mixPct: 0
+      });
+      update();
+    }
+
+    function resetDefaults() {
+      ticketTypes = [
+        { id: crypto.randomUUID(), name: 'Dinner + Show', price: 64.95, variableCost: 32.95, mixPct: 50 },
+        { id: crypto.randomUUID(), name: 'Show Only', price: 40.00, variableCost: 0.00, mixPct: 50 }
+      ];
+      el('showName').value = 'Princeton Station Show';
+      el('capacity').value = 225;
+      el('fixedCost').value = 650;
+      el('totalTickets').value = 100;
+      update();
+    }
+
+    function highestMarginTicket(types) {
+      return [...types].sort((a, b) => ((b.price - b.variableCost) - (a.price - a.variableCost)))[0];
+    }
+
+    function renderScenario(id, label, totalTickets, types, fixedCost) {
+      const r = computeScenario(totalTickets, types, fixedCost);
+      const mixSummary = r.allocated.map(t => `${t.count} ${t.name}`).join(' · ');
+      el(id).textContent = `${label} — ${mixSummary} · revenue ${fmt(r.grossRevenue)} · net ${fmt(r.netProfit)}`;
+    }
+
+    function update() {
+      const globals = readGlobalInputs();
+      el('resultsHeading').textContent = `${globals.showName} — Results`;
+
+      const current = computeScenario(globals.totalTickets, ticketTypes, globals.fixedCost);
+
+      el('grossRevenue').textContent = fmt(current.grossRevenue);
+      el('totalCosts').textContent = fmt(current.totalCosts);
+
+      const net = el('netProfit');
+      net.textContent = fmt(current.netProfit);
+      net.className = 'v ' + (current.netProfit > 0 ? 'good' : current.netProfit < 0 ? 'bad' : 'warn');
+
+      const ppa = el('profitPerAttendee');
+      const avg = globals.totalTickets > 0 ? current.netProfit / globals.totalTickets : 0;
+      ppa.textContent = fmt(avg);
+      ppa.className = 'v ' + (avg > 0 ? 'good' : avg < 0 ? 'bad' : 'warn');
+
+      const tbody = el('ticketSummaryBody');
+      tbody.innerHTML = current.allocated.map(t => `
+        <tr>
+          <td>${escapeHtml(t.name || 'Unnamed Ticket')}</td>
+          <td>${t.count}</td>
+          <td>${fmt(t.revenue)}</td>
+          <td>${fmt(t.variableCost)}</td>
+          <td>${fmt(t.contribution)}</td>
+        </tr>
+      `).join('');
+
+      const breakEvenTickets = current.weightedContributionPerTicket > 0
+        ? Math.ceil(globals.fixedCost / current.weightedContributionPerTicket)
+        : Infinity;
+
+      const breakEvenPercent = Number.isFinite(breakEvenTickets) && globals.capacity > 0
+        ? (breakEvenTickets / globals.capacity) * 100
+        : Infinity;
+
+      const fullCapacity = computeScenario(globals.capacity, ticketTypes, globals.fixedCost);
+      const bestType = highestMarginTicket(ticketTypes);
+      const bestCaseTypes = ticketTypes.map(t => ({
+        ...t,
+        mixPct: t.id === bestType.id ? 100 : 0
+      }));
+      const bestCase = computeScenario(globals.capacity, bestCaseTypes, globals.fixedCost);
+
+      el('breakEvenTickets').textContent = Number.isFinite(breakEvenTickets) ? breakEvenTickets : 'Never';
+      el('breakEvenPercent').textContent = Number.isFinite(breakEvenPercent) ? fmtPct(breakEvenPercent) : 'N/A';
+      el('bestCurrentMix').textContent = fmt(fullCapacity.netProfit);
+      el('bestAbsolute').textContent = fmt(bestCase.netProfit);
+      el('bestTicketType').textContent = `${bestType.name} (${fmt(bestType.price - bestType.variableCost)} contribution each)`;
+
+      renderScenario('scenario50', '50 tickets', Math.min(50, globals.capacity), ticketTypes, globals.fixedCost);
+      renderScenario('scenario100', '100 tickets', Math.min(100, globals.capacity), ticketTypes, globals.fixedCost);
+      renderScenario('scenarioCapacity', `${globals.capacity} tickets`, globals.capacity, ticketTypes, globals.fixedCost);
+      renderScenario('scenarioBestCase', `${globals.capacity} tickets, all ${bestType.name}`, globals.capacity, bestCaseTypes, globals.fixedCost);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    el('addTicketType').addEventListener('click', addTicketType);
+    el('resetDefaults').addEventListener('click', resetDefaults);
+    el('showName').addEventListener('input', update);
+    el('capacity').addEventListener('input', update);
+    el('fixedCost').addEventListener('input', update);
+    el('totalTickets').addEventListener('input', update);
+
+    renderTicketTypes();
+    update();
+  </script>
+</body>
+</html>

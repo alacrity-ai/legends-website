@@ -60,6 +60,33 @@ export function parseMailingListSignup(body: unknown): { email: string; name?: s
   return { email, name };
 }
 
+export function parseShowId(raw: string | undefined | null): string {
+  if (!raw) {
+    throw new Error('showId is required');
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    throw new Error('showId must be YYYY-MM-DD');
+  }
+  return raw;
+}
+
+export function parseCheckinPayload(body: unknown): { partyId: string } {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw new Error('Invalid request body');
+  }
+  const obj = body as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (key !== 'partyId') {
+      throw new Error(`Unexpected field: ${key}`);
+    }
+  }
+  const partyId = requireString(obj, 'partyId');
+  if (!/^[a-z0-9]{6,32}$/.test(partyId)) {
+    throw new Error('partyId is invalid');
+  }
+  return { partyId };
+}
+
 function requireString(obj: Record<string, unknown>, field: string): string {
   const value = obj[field];
   if (typeof value !== 'string' || value.trim().length === 0) {

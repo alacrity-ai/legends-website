@@ -7,3 +7,6 @@ MAILGUN_DOMAIN=mg.djkmdlegends.com
 
 # This API Key should have permissions for Google Calendar API
 GOOGLE_API_KEY=your-google-api-key
+
+# Shared passcode that gates /guestlist (Bearer token from the frontend)
+GUESTLIST_PASSCODE=your-passcode
