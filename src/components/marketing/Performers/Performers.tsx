@@ -4,6 +4,7 @@ import Container from '../../layout/Container/Container.tsx';
 import Heading from '../../shared/Heading/Heading.tsx';
 import Card from '../../shared/Card/Card.tsx';
 import { performers } from '../../../content/performers.ts';
+import { featuredActs } from '../../../content/featured-acts.ts';
 import { sectionIds } from '../../../content/site.ts';
 import styles from './Performers.module.css';
 
@@ -94,6 +95,31 @@ export default function Performers() {
             ›
           </button>
         </div>
+
+        {featuredActs.length > 0 && (
+          <div className={styles.featured}>
+            <h3 className={styles.featuredHeading}>Featured Acts</h3>
+            <div className={styles.featuredGrid}>
+              {featuredActs.map((act) => (
+                <a key={act.id} href={act.href} className={styles.featuredCard}>
+                  <div className={styles.featuredImageWrapper}>
+                    <img
+                      src={act.imageSrc}
+                      alt={act.imageAlt}
+                      className={styles.featuredImage}
+                      loading="lazy"
+                    />
+                  </div>
+                  <div className={styles.featuredBody}>
+                    <h4 className={styles.featuredName}>{act.name}</h4>
+                    <p className={styles.featuredBlurb}>{act.blurb}</p>
+                    <span className={styles.featuredLink}>Explore this act &rarr;</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </Container>
     </Section>
   );

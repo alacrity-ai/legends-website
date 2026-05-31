@@ -29,3 +29,8 @@ scratch/
 *.sw?
 
 DO_NOT_COMMIT.md
+
+# Local reference material — not part of this project
+reference_repos/
+# Wrangler local dev state
+worker/.wrangler/

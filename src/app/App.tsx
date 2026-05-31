@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import './App.css';
 import Header from '../components/layout/Header/Header.tsx';
 import Footer from '../components/layout/Footer/Footer.tsx';
@@ -10,16 +10,45 @@ import Calendar from '../components/marketing/Calendar/Calendar.tsx';
 import BookingForm from '../components/marketing/BookingForm/BookingForm.tsx';
 import MailingList from '../components/marketing/MailingList/MailingList.tsx';
 import PressKit from '../components/marketing/PressKit/PressKit.tsx';
-import Guestlist from '../components/guestlist/Guestlist.tsx';
+import Admin from '../components/admin/Admin.tsx';
 
-function isGuestlistRoute(): boolean {
+function isAdminRoute(): boolean {
   if (typeof window === 'undefined') return false;
-  return window.location.pathname.replace(/\/$/, '') === '/guestlist';
+  const path = window.location.pathname.replace(/\/$/, '');
+  // /guestlist is kept as a back-compat alias for the door check-in tool.
+  return path === '/admin' || path.startsWith('/admin/') || path === '/guestlist';
 }
 
 function MarketingSite() {
   const [showMailingList, setShowMailingList] = useState(false);
   const openMailingList = () => setShowMailingList(true);
+
+  // When the page is loaded with a hash (e.g. arriving from /sinatra at
+  // djkmdlegends.com/#book), the browser tries to scroll before React has
+  // rendered the target. Re-scroll after mount, with a couple of retries to
+  // account for the async-loading Calendar above the booking form shifting
+  // layout height.
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (!id) return;
+    let cancelled = false;
+    const scroll = () => {
+      if (cancelled) return;
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    };
+    const timers = [
+      requestAnimationFrame(scroll),
+      window.setTimeout(scroll, 400),
+      window.setTimeout(scroll, 1000),
+    ];
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(timers[0]);
+      window.clearTimeout(timers[1]);
+      window.clearTimeout(timers[2]);
+    };
+  }, []);
 
   return (
     <div className="app">
@@ -46,7 +75,7 @@ function MarketingSite() {
 }
 
 function App() {
-  return isGuestlistRoute() ? <Guestlist /> : <MarketingSite />;
+  return isAdminRoute() ? <Admin /> : <MarketingSite />;
 }
 
 export default App;

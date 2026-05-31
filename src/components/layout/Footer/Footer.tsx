@@ -37,7 +37,7 @@ export default function Footer() {
             Press Kit
           </a>
 
-          <a href="/guestlist" className={styles.pressKitLink}>
+          <a href="/admin" className={styles.pressKitLink}>
             Admin
           </a>
         </nav>

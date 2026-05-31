@@ -8,5 +8,11 @@ MAILGUN_DOMAIN=mg.djkmdlegends.com
 # This API Key should have permissions for Google Calendar API
 GOOGLE_API_KEY=your-google-api-key
 
-# Shared passcode that gates /guestlist (Bearer token from the frontend)
-GUESTLIST_PASSCODE=your-passcode
+# Shared passcode that gates the /admin area (door check-in + event form).
+# Sent as a Bearer token from the frontend.
+ADMIN_PASSCODE=your-passcode
+
+# Square (ticket_tracker app). Use SANDBOX credentials for local dev.
+SQUARE_ACCESS_TOKEN=your-square-sandbox-access-token
+SQUARE_LOCATION_ID=your-square-location-id
+SQUARE_ENVIRONMENT=sandbox
