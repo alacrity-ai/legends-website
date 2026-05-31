@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import './App.css';
 import Header from '../components/layout/Header/Header.tsx';
 import Footer from '../components/layout/Footer/Footer.tsx';
@@ -22,6 +22,33 @@ function isAdminRoute(): boolean {
 function MarketingSite() {
   const [showMailingList, setShowMailingList] = useState(false);
   const openMailingList = () => setShowMailingList(true);
+
+  // When the page is loaded with a hash (e.g. arriving from /sinatra at
+  // djkmdlegends.com/#book), the browser tries to scroll before React has
+  // rendered the target. Re-scroll after mount, with a couple of retries to
+  // account for the async-loading Calendar above the booking form shifting
+  // layout height.
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (!id) return;
+    let cancelled = false;
+    const scroll = () => {
+      if (cancelled) return;
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    };
+    const timers = [
+      requestAnimationFrame(scroll),
+      window.setTimeout(scroll, 400),
+      window.setTimeout(scroll, 1000),
+    ];
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(timers[0]);
+      window.clearTimeout(timers[1]);
+      window.clearTimeout(timers[2]);
+    };
+  }, []);
 
   return (
     <div className="app">

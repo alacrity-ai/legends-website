@@ -148,6 +148,12 @@
       .btn-secondary { border: 1px solid var(--border); color: var(--text); }
       .btn-secondary:hover { border-color: var(--gold); color: var(--gold); }
 
+      /* Ticket band */
+      .ticket-band { background: linear-gradient(90deg, rgba(212,175,55,0.10), rgba(212,175,55,0.03)); border-bottom: 1px solid var(--border); padding: 1.5rem 0; }
+      .ticket-inner { display: flex; align-items: center; justify-content: space-between; gap: 1.2rem; flex-wrap: wrap; }
+      .ticket-eyebrow { color: var(--gold); text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.78rem; font-weight: 600; margin-bottom: 0.25rem; }
+      .ticket-date { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(1.3rem, 3.2vw, 1.9rem); color: var(--text); }
+
       /* Sections */
       section { padding: 3.5rem 0; }
       .section-title { font-size: clamp(1.6rem, 3.5vw, 2.3rem); color: var(--text); margin-bottom: 0.4rem; }
@@ -214,6 +220,24 @@
         </div>
       </div>
     </div>
+
+    <!-- Upcoming show / tickets -->
+    <section class="ticket-band">
+      <div class="wrap">
+        <div class="ticket-inner">
+          <div>
+            <p class="ticket-eyebrow">Next Live Show</p>
+            <p class="ticket-date">Sunday, September 20, 2026</p>
+          </div>
+          <a
+            class="btn btn-primary"
+            href="https://checkout.square.site/merchant/MLPWE1EPSW06D/checkout/ODAFNHMVFGBCECXXR4GIIJGT"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Buy Tickets</a>
+        </div>
+      </div>
+    </section>
 
     <!-- Video -->
     <section id="video">
