@@ -26,6 +26,21 @@ export interface CreatedEvent {
   tickets: Array<{ ticketType: string; priceCents: number; checkoutUrl: string }>;
 }
 
+/** Full event record as stored in KV (returned by the admin list endpoint). */
+export interface ManagedEvent {
+  id: string;
+  showName: string;
+  description: string;
+  venueName: string;
+  venueAddress: string;
+  startTime: string;
+  endTime: string;
+  imageKey: string;
+  tickets: Array<{ ticketType: string; priceCents: number; checkoutUrl: string }>;
+  createdAt: string;
+  source: 'form' | 'google-calendar';
+}
+
 export async function createEvent(
   draft: EventDraftInput,
   image: File,
@@ -55,4 +70,33 @@ export async function createEvent(
 
   const data = (await res.json()) as { event: CreatedEvent };
   return data.event;
+}
+
+async function authedRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const passcode = getPasscode();
+  if (!passcode) throw new UnauthorizedError();
+
+  const headers = new Headers(init.headers);
+  headers.set('Authorization', `Bearer ${passcode}`);
+
+  const res = await fetch(`${apiUrl}${path}`, { ...init, headers });
+  if (res.status === 401) {
+    clearPasscode();
+    throw new UnauthorizedError();
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `Request failed (${res.status})`);
+  }
+  return res.json() as Promise<T>;
+}
+
+/** All events tracked in KV, newest start time first. */
+export async function listEvents(): Promise<ManagedEvent[]> {
+  const data = await authedRequest<{ events: ManagedEvent[] }>('/api/admin/events');
+  return data.events;
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  await authedRequest<{ ok: true }>(`/api/admin/events/${id}`, { method: 'DELETE' });
 }

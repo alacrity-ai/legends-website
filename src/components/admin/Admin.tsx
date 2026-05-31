@@ -2,15 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { clearPasscode, getPasscode } from '../../services/guestlist.ts';
 import Guestlist from '../guestlist/Guestlist.tsx';
 import EventForm from './EventForm/EventForm.tsx';
+import ManageShows from './ManageShows/ManageShows.tsx';
 import AdminSignIn from './AdminSignIn.tsx';
 import styles from './Admin.module.css';
 
-type View = 'menu' | 'checkin' | 'events';
+type View = 'menu' | 'checkin' | 'events' | 'manage';
 
 function viewFromPath(): View {
   if (typeof window === 'undefined') return 'menu';
   const path = window.location.pathname.replace(/\/$/, '');
   if (path === '/admin/events/new') return 'events';
+  if (path === '/admin/events') return 'manage';
   if (path === '/admin/checkin' || path === '/guestlist') return 'checkin';
   return 'menu';
 }
@@ -36,7 +38,13 @@ export default function Admin() {
 
   const navigate = useCallback((to: View) => {
     const path =
-      to === 'events' ? '/admin/events/new' : to === 'checkin' ? '/admin/checkin' : '/admin';
+      to === 'events'
+        ? '/admin/events/new'
+        : to === 'manage'
+          ? '/admin/events'
+          : to === 'checkin'
+            ? '/admin/checkin'
+            : '/admin';
     window.history.pushState({}, '', path);
     setView(to);
   }, []);
@@ -86,6 +94,12 @@ export default function Admin() {
                 Add a new event with ticket types — creates the Square checkout links automatically.
               </span>
             </button>
+            <button className={styles.menuCard} onClick={() => navigate('manage')} type="button">
+              <span className={styles.menuTitle}>Manage Shows</span>
+              <span className={styles.menuDesc}>
+                View all shows tracked in KV and delete them.
+              </span>
+            </button>
             <button className={styles.menuCard} onClick={() => navigate('checkin')} type="button">
               <span className={styles.menuTitle}>Door Check-in</span>
               <span className={styles.menuDesc}>
@@ -101,6 +115,15 @@ export default function Admin() {
               ← Back to menu
             </button>
             <EventForm onUnauthorized={handleUnauthorized} />
+          </>
+        )}
+
+        {view === 'manage' && (
+          <>
+            <button className={styles.back} onClick={() => navigate('menu')} type="button">
+              ← Back to menu
+            </button>
+            <ManageShows onUnauthorized={handleUnauthorized} />
           </>
         )}
       </main>

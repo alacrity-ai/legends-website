@@ -26,8 +26,8 @@ preview_id = "751f392d15924b5dbd77ad634eb4ab11"
 # then paste the printed ids below.
 [[kv_namespaces]]
 binding = "EVENTS"
-id = "REPLACE_WITH_EVENTS_KV_ID"
-preview_id = "REPLACE_WITH_EVENTS_KV_PREVIEW_ID"
+id = "b756d4fef5c44daca7c6320c8171faf1"
+preview_id = "c245b1434f82410aafc854b1531adb66"
 
 # Show images uploaded via the admin Event Form (v0.2).
 # Create with: npx wrangler r2 bucket create legends-event-images
