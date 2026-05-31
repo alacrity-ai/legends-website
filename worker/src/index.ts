@@ -400,6 +400,25 @@ function isUploadedFile(v: unknown): v is UploadedFile {
   );
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * Format an event start time for the buyer-visible Square line item, e.g.
+ * "Aug 15, 2026, 8:00 PM". Reads the authored wall-clock parts straight from
+ * the ISO string (which carries the ET offset) so the worker's UTC runtime
+ * doesn't shift the displayed time.
+ */
+function formatEventDateTime(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return iso;
+  const [, year, month, day, hh, mm] = m;
+  const monthName = MONTHS[Number(month) - 1] ?? month;
+  let hour = Number(hh);
+  const period = hour >= 12 ? 'PM' : 'AM';
+  hour = hour % 12 || 12;
+  return `${monthName} ${Number(day)}, ${year}, ${hour}:${mm} ${period}`;
+}
+
 async function handleAdminEvents(
   request: Request,
   url: URL,
@@ -482,7 +501,8 @@ async function handleCreateEvent(
       const link = await createPaymentLink(env, {
         eventId: id,
         ticketType: ticket.ticketType,
-        itemName: `${draft.showName} — ${ticket.ticketType}`,
+        // Buyer-visible checkout line item: ticket type · date/time · venue.
+        itemName: `${ticket.ticketType} · ${formatEventDateTime(draft.startTime)} · ${draft.venueName}`,
         amountCents: ticket.priceCents,
         redirectUrl,
       });
