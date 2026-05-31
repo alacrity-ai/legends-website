@@ -10,11 +10,13 @@ import Calendar from '../components/marketing/Calendar/Calendar.tsx';
 import BookingForm from '../components/marketing/BookingForm/BookingForm.tsx';
 import MailingList from '../components/marketing/MailingList/MailingList.tsx';
 import PressKit from '../components/marketing/PressKit/PressKit.tsx';
-import Guestlist from '../components/guestlist/Guestlist.tsx';
+import Admin from '../components/admin/Admin.tsx';
 
-function isGuestlistRoute(): boolean {
+function isAdminRoute(): boolean {
   if (typeof window === 'undefined') return false;
-  return window.location.pathname.replace(/\/$/, '') === '/guestlist';
+  const path = window.location.pathname.replace(/\/$/, '');
+  // /guestlist is kept as a back-compat alias for the door check-in tool.
+  return path === '/admin' || path.startsWith('/admin/') || path === '/guestlist';
 }
 
 function MarketingSite() {
@@ -46,7 +48,7 @@ function MarketingSite() {
 }
 
 function App() {
-  return isGuestlistRoute() ? <Guestlist /> : <MarketingSite />;
+  return isAdminRoute() ? <Admin /> : <MarketingSite />;
 }
 
 export default App;

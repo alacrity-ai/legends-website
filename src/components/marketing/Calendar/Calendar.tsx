@@ -73,7 +73,15 @@ export default function Calendar() {
         {!loading && !error && events.length > 0 && (
           <div className={styles.eventList}>
             {events.map((event, i) => (
-              <article key={`${event.date}-${i}`} className={styles.eventCard}>
+              <article key={event.id ?? `${event.date}-${i}`} className={styles.eventCard}>
+                {event.imageUrl && (
+                  <img
+                    src={`${import.meta.env.VITE_BOOKING_API_URL}${event.imageUrl}`}
+                    alt={`${event.title} promotional image`}
+                    className={styles.eventImage}
+                    loading="lazy"
+                  />
+                )}
                 <h3 className={styles.eventTitle}>{event.title}</h3>
                 <p className={styles.eventDateTime}>
                   {formatDate(event.date)}

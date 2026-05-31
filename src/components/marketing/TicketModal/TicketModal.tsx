@@ -9,6 +9,11 @@ interface TicketModalProps {
   onClose: () => void;
 }
 
+function formatPrice(cents: number): string {
+  const dollars = cents / 100;
+  return Number.isInteger(dollars) ? `$${dollars}` : `$${dollars.toFixed(2)}`;
+}
+
 export default function TicketModal({ selectedEvent, onClose }: TicketModalProps) {
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
@@ -26,7 +31,16 @@ export default function TicketModal({ selectedEvent, onClose }: TicketModalProps
     };
   }, [handleEscape]);
 
-  const { text, squareUrl } = parseDescription(selectedEvent.description);
+  // v0.2 form-created events carry structured tickets. Legacy calendar events
+  // still encode a single Square link inside the description.
+  const hasTickets = !!selectedEvent.tickets && selectedEvent.tickets.length > 0;
+  const { text, squareUrl } = hasTickets
+    ? { text: selectedEvent.description, squareUrl: null }
+    : parseDescription(selectedEvent.description);
+
+  const imageSrc = selectedEvent.imageUrl
+    ? `${import.meta.env.VITE_BOOKING_API_URL}${selectedEvent.imageUrl}`
+    : null;
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -35,11 +49,30 @@ export default function TicketModal({ selectedEvent, onClose }: TicketModalProps
           &times;
         </button>
 
+        {imageSrc && (
+          <img className={styles.image} src={imageSrc} alt={`${selectedEvent.title} promotional image`} />
+        )}
+
         <h2 className={styles.heading}>{selectedEvent.title}</h2>
 
         {text && <p className={styles.description}>{text}</p>}
 
-        {squareUrl ? (
+        {hasTickets ? (
+          <div className={styles.ticketButtons}>
+            {selectedEvent.tickets!.map((ticket) => (
+              <a
+                key={ticket.ticketType}
+                href={`${ticket.checkoutUrl}?src=embed`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.buyNowLink}
+                onClick={onClose}
+              >
+                {ticket.ticketType} — {formatPrice(ticket.priceCents)}
+              </a>
+            ))}
+          </div>
+        ) : squareUrl ? (
           <a
             href={`${squareUrl}?src=embed`}
             target="_blank"

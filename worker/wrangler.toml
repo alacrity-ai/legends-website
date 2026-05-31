@@ -19,7 +19,29 @@ binding = "GUESTLIST"
 id = "b52560156960470db4af905dc2e82f5d"
 preview_id = "751f392d15924b5dbd77ad634eb4ab11"
 
+# Custom events created via the admin Event Form (v0.2).
+# Create with:
+#   npx wrangler kv namespace create EVENTS
+#   npx wrangler kv namespace create EVENTS --preview
+# then paste the printed ids below.
+[[kv_namespaces]]
+binding = "EVENTS"
+id = "REPLACE_WITH_EVENTS_KV_ID"
+preview_id = "REPLACE_WITH_EVENTS_KV_PREVIEW_ID"
+
+# Show images uploaded via the admin Event Form (v0.2).
+# Create with: npx wrangler r2 bucket create legends-event-images
+[[r2_buckets]]
+binding = "EVENT_IMAGES"
+bucket_name = "legends-event-images"
+preview_bucket_name = "legends-event-images"
+
 [vars]
 BOOKING_EMAIL = "booking@djkmdlegends.com"
 ALLOWED_ORIGINS = "https://djkmdlegends.com,https://www.djkmdlegends.com,http://localhost:5173"
 GOOGLE_CALENDAR_ID = "c_f31ec573a399824b85486344a243eb27e6742ef72157c2240a8723ad89987594@group.calendar.google.com"
+# Square: API base is selected by this var. Real token/location are secrets (wrangler secret put).
+SQUARE_ENVIRONMENT = "production"
+# Legacy Google Calendar event reading. Keep "true" through the grandfathering window
+# (the 2 existing calendar shows with live bookings), then flip to "false" at cutover (~Sept 2026).
+LEGACY_CALENDAR_ENABLED = "true"

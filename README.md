@@ -85,9 +85,15 @@ cp worker/.dev.vars.example worker/.dev.vars
 | ----------------- | ------------------------------------ |
 | `MAILGUN_API_KEY` | Mailgun API key                      |
 | `MAILGUN_DOMAIN`  | Mailgun sending domain (`mg.djkmdlegends.com`) |
-| `GOOGLE_API_KEY`  | Google Calendar API key              |
+| `GOOGLE_API_KEY`  | Google Calendar API key (legacy events) |
+| `ADMIN_PASSCODE`  | Shared passcode gating the `/admin` area (check-in + event form) |
+| `SQUARE_ACCESS_TOKEN` | Square API token (use **sandbox** locally) |
+| `SQUARE_LOCATION_ID`  | Square location for payment links    |
+| `SQUARE_ENVIRONMENT`  | `sandbox` (local) / `production`     |
 
-These are read automatically by `wrangler dev`. In production they are stored as Cloudflare Worker secrets.
+These are read automatically by `wrangler dev`. In production they are stored as Cloudflare Worker secrets (`wrangler secret put`).
+
+**Worker bindings** (`worker/wrangler.toml`): KV namespaces `MAILING_LIST`, `GUESTLIST`, `EVENTS` (custom events), and R2 bucket `EVENT_IMAGES` (show images). See `docs/v0.2/event_form/` for the event-form feature.
 
 ## Build
 

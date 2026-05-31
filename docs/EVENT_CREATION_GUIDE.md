@@ -1,5 +1,10 @@
 # How to Add a New Show to the Website
 
+> ⚠️ **DEPRECATED (as of v0.2).** New shows are now added through the **admin Event Form** at
+> `https://djkmdlegends.com/admin` → **Create a Show**, which makes the Square checkout links for
+> you automatically. See `docs/resources/1-SOPS.md` → SOP 2. This Google-Calendar guide is kept
+> only for the 2 original "grandfathered" shows that still run on calendar links until ~September 2026.
+
 Hi Keith! Follow these steps every time you have a new show to add. You'll need to do two things:
 
 1. Create the event in **Google Calendar** (this puts it on the website)
