@@ -5,6 +5,7 @@ import {
   type ManagedEvent,
 } from '../../../services/admin-events.ts';
 import { UnauthorizedError } from '../../../services/guestlist.ts';
+import { downloadDataUrl, qrPngDataUrl, slugify } from '../../../utils/qr.ts';
 import styles from './ManageShows.module.css';
 
 interface ManageShowsProps {
@@ -45,6 +46,14 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
       window.prompt('Copy this checkout link:', url);
     }
   }, []);
+
+  const handleDownloadQr = useCallback(
+    (showName: string, ticketType: string, url: string) => {
+      const dataUrl = qrPngDataUrl(url);
+      downloadDataUrl(dataUrl, `qr-${slugify(showName)}-${slugify(ticketType)}.png`);
+    },
+    [],
+  );
 
   const load = useCallback(async () => {
     try {
@@ -146,6 +155,14 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
                         title={t.checkoutUrl}
                       >
                         {copiedKey === key ? 'Copied!' : 'Copy link'}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.copyButton}
+                        onClick={() => handleDownloadQr(ev.showName, t.ticketType, t.checkoutUrl)}
+                        title="Download a QR code image for this checkout link"
+                      >
+                        Download QR
                       </button>
                     </div>
                   );
