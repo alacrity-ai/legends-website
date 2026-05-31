@@ -1,6 +1,7 @@
 import type {
   CheckinRecord,
   Env,
+  EventDraft,
   EventRecord,
   EventTicket,
   Party,
@@ -451,50 +452,142 @@ async function handleAdminEvents(
   return jsonResponse(404, { error: 'Not found' }, corsHeaders);
 }
 
+interface ParsedCreate {
+  draft: EventDraft;
+  imageBytes: ArrayBuffer | ArrayBufferView;
+  imageMime: string;
+  imageExt: string;
+}
+
+/**
+ * Create an event. Accepts the admin form's multipart/form-data body OR a
+ * programmatic application/json body with the same field contract (and the
+ * image as base64 / a data URL). Both feed the same creation pipeline.
+ */
 async function handleCreateEvent(
   request: Request,
   env: Env,
   corsHeaders: Record<string, string>,
   noStore: Record<string, string>,
 ): Promise<Response> {
-  // 1. Parse multipart body (fields JSON + image file).
+  const contentType = request.headers.get('Content-Type') ?? '';
+  let parsed: ParsedCreate;
+  try {
+    parsed = contentType.includes('application/json')
+      ? await parseJsonCreate(request)
+      : await parseMultipartCreate(request);
+  } catch (err) {
+    return jsonResponse(400, { error: errorMessage(err) }, corsHeaders);
+  }
+  return finalizeEventCreation(parsed, env, corsHeaders, noStore);
+}
+
+/** Parse the admin form body: `payload` (JSON string) + `image` file. */
+async function parseMultipartCreate(request: Request): Promise<ParsedCreate> {
   let form: FormData;
   try {
     form = await request.formData();
   } catch {
-    return jsonResponse(400, { error: 'Expected multipart/form-data' }, corsHeaders);
+    throw new Error('Expected multipart/form-data');
   }
 
   const payloadRaw = form.get('payload');
+  if (typeof payloadRaw !== 'string') throw new Error('payload is required');
+  const draft = parseEventDraft(JSON.parse(payloadRaw));
+
+  // FormData.get returns an uploaded file we duck-type (worker FormDataEntryValue omits File).
   const imageEntry: unknown = form.get('image');
+  if (!isUploadedFile(imageEntry)) throw new Error('image is required');
+  const imageExt = ALLOWED_IMAGE_TYPES[imageEntry.type];
+  if (!imageExt) throw new Error('image must be JPEG, PNG, or WebP');
+  if (imageEntry.size > MAX_IMAGE_BYTES) throw new Error('image must be 5 MB or smaller');
 
-  // 2. Validate the draft fields.
-  let draft;
+  return {
+    draft,
+    imageBytes: await imageEntry.arrayBuffer(),
+    imageMime: imageEntry.type,
+    imageExt,
+  };
+}
+
+/**
+ * Parse a programmatic JSON body. The draft fields match the form exactly; the
+ * image is supplied as a base64 string or a data URL:
+ *   { ...eventFields, "image": "data:image/jpeg;base64,..." }
+ *   { ...eventFields, "image": "<base64>", "imageType": "image/jpeg" }
+ */
+async function parseJsonCreate(request: Request): Promise<ParsedCreate> {
+  let body: unknown;
   try {
-    if (typeof payloadRaw !== 'string') throw new Error('payload is required');
-    draft = parseEventDraft(JSON.parse(payloadRaw));
-  } catch (err) {
-    return jsonResponse(400, { error: errorMessage(err) }, corsHeaders);
+    body = await request.json();
+  } catch {
+    throw new Error('Invalid JSON body');
+  }
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw new Error('Invalid JSON body');
   }
 
-  // 3. Validate the image. (FormData.get returns an uploaded file we duck-type, since the
-  // worker FormDataEntryValue type doesn't include File.)
-  if (!isUploadedFile(imageEntry)) {
-    return jsonResponse(400, { error: 'image is required' }, corsHeaders);
+  // Separate the image fields; the rest must match the form's draft contract.
+  const { image, imageBase64, imageType, ...rest } = body as Record<string, unknown>;
+  const draft = parseEventDraft(rest);
+
+  const imageInput =
+    typeof image === 'string' ? image : typeof imageBase64 === 'string' ? imageBase64 : null;
+  if (!imageInput) {
+    throw new Error('image is required (a base64 string or a data URL)');
   }
-  const image = imageEntry;
-  const ext = ALLOWED_IMAGE_TYPES[image.type];
+  const decoded = decodeBase64Image(
+    imageInput,
+    typeof imageType === 'string' ? imageType : undefined,
+  );
+  return { draft, imageBytes: decoded.bytes, imageMime: decoded.mime, imageExt: decoded.ext };
+}
+
+function decodeBase64Image(
+  input: string,
+  explicitMime: string | undefined,
+): { bytes: Uint8Array; mime: string; ext: string } {
+  let mime = explicitMime;
+  let b64 = input;
+  const dataUrl = input.match(/^data:([^;,]+)(?:;base64)?,(.*)$/s);
+  if (dataUrl) {
+    mime = dataUrl[1];
+    b64 = dataUrl[2];
+  }
+  if (!mime) {
+    throw new Error('image type is required (use a data URL or set "imageType")');
+  }
+  const ext = ALLOWED_IMAGE_TYPES[mime];
   if (!ext) {
-    return jsonResponse(400, { error: 'image must be JPEG, PNG, or WebP' }, corsHeaders);
-  }
-  if (image.size > MAX_IMAGE_BYTES) {
-    return jsonResponse(400, { error: 'image must be 5 MB or smaller' }, corsHeaders);
+    throw new Error('image must be JPEG, PNG, or WebP');
   }
 
+  let binary: string;
+  try {
+    binary = atob(b64.replace(/\s/g, ''));
+  } catch {
+    throw new Error('image is not valid base64');
+  }
+  if (binary.length === 0) throw new Error('image is empty');
+  if (binary.length > MAX_IMAGE_BYTES) throw new Error('image must be 5 MB or smaller');
+
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return { bytes, mime, ext };
+}
+
+/** Shared pipeline: create Square links, store the image in R2, persist the record. */
+async function finalizeEventCreation(
+  parsed: ParsedCreate,
+  env: Env,
+  corsHeaders: Record<string, string>,
+  noStore: Record<string, string>,
+): Promise<Response> {
+  const { draft, imageBytes, imageMime, imageExt } = parsed;
   const id = crypto.randomUUID();
   const redirectUrl = primaryOrigin(env) + '/?purchase=success';
 
-  // 4. Create one Square payment link per ticket type. Abort (and clean up) on any failure.
+  // Create one Square payment link per ticket type. Abort (and clean up) on any failure.
   const created: EventTicket[] = [];
   for (const ticket of draft.tickets) {
     try {
@@ -522,11 +615,11 @@ async function handleCreateEvent(
     }
   }
 
-  // 5. Store the image in R2.
-  const imageKey = `events/${id}.${ext}`;
+  // Store the image in R2.
+  const imageKey = `events/${id}.${imageExt}`;
   try {
-    await env.EVENT_IMAGES.put(imageKey, await image.arrayBuffer(), {
-      httpMetadata: { contentType: image.type },
+    await env.EVENT_IMAGES.put(imageKey, imageBytes, {
+      httpMetadata: { contentType: imageMime },
     });
   } catch (err) {
     await Promise.all(created.map((t) => deactivatePaymentLink(env, t.squarePaymentLinkId)));
@@ -534,7 +627,7 @@ async function handleCreateEvent(
     return jsonResponse(500, { error: 'Failed to store image' }, corsHeaders);
   }
 
-  // 6. Persist the event record (commit point).
+  // Persist the event record (commit point).
   const record: EventRecord = {
     id,
     ...draft,
