@@ -10,6 +10,7 @@ import {
   sectionIds,
 } from '../../../content/site.ts';
 import { fetchUpcomingEvents } from '../../../services/events.ts';
+import { eventImageSrc } from '../../../utils/event-image.ts';
 import type { CalendarEvent } from '../../../types/event.ts';
 import styles from './Calendar.module.css';
 
@@ -72,11 +73,13 @@ export default function Calendar() {
 
         {!loading && !error && events.length > 0 && (
           <div className={styles.eventList}>
-            {events.map((event, i) => (
+            {events.map((event, i) => {
+              const imageSrc = eventImageSrc(event);
+              return (
               <article key={event.id ?? `${event.date}-${i}`} className={styles.eventCard}>
-                {event.imageUrl && (
+                {imageSrc && (
                   <img
-                    src={`${import.meta.env.VITE_BOOKING_API_URL}${event.imageUrl}`}
+                    src={imageSrc}
                     alt={`${event.title} promotional image`}
                     className={styles.eventImage}
                     loading="lazy"
@@ -107,7 +110,8 @@ export default function Calendar() {
                   Buy Tickets
                 </Button>
               </article>
-            ))}
+              );
+            })}
           </div>
         )}
         {ticketEvent && (

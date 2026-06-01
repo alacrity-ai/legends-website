@@ -5,6 +5,7 @@ import {
   type ManagedEvent,
 } from '../../../services/admin-events.ts';
 import { UnauthorizedError } from '../../../services/guestlist.ts';
+import { downloadDataUrl, qrPngDataUrl, slugify } from '../../../utils/qr.ts';
 import styles from './ManageShows.module.css';
 
 interface ManageShowsProps {
@@ -33,6 +34,26 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
   const [events, setEvents] = useState<ManagedEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopy = useCallback(async (key: string, url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedKey(key);
+      window.setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1500);
+    } catch {
+      // Clipboard API unavailable — fall back to a prompt the user can copy from.
+      window.prompt('Copy this checkout link:', url);
+    }
+  }, []);
+
+  const handleDownloadQr = useCallback(
+    (showName: string, ticketType: string, url: string) => {
+      const dataUrl = qrPngDataUrl(url);
+      downloadDataUrl(dataUrl, `qr-${slugify(showName)}-${slugify(ticketType)}.png`);
+    },
+    [],
+  );
 
   const load = useCallback(async () => {
     try {
@@ -119,11 +140,34 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
               <span className={styles.meta}>
                 {ev.venueName} · {ev.venueAddress}
               </span>
-              <span className={styles.tickets}>
-                {ev.tickets
-                  .map((t) => `${t.ticketType} ${formatPrice(t.priceCents)}`)
-                  .join('  ·  ')}
-              </span>
+              <div className={styles.tickets}>
+                {ev.tickets.map((t) => {
+                  const key = `${ev.id}:${t.ticketType}`;
+                  return (
+                    <div key={key} className={styles.ticketRow}>
+                      <span className={styles.ticketLabel}>
+                        {t.ticketType} · {formatPrice(t.priceCents)}
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.copyButton}
+                        onClick={() => void handleCopy(key, t.checkoutUrl)}
+                        title={t.checkoutUrl}
+                      >
+                        {copiedKey === key ? 'Copied!' : 'Copy link'}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.copyButton}
+                        onClick={() => handleDownloadQr(ev.showName, t.ticketType, t.checkoutUrl)}
+                        title="Download a QR code image for this checkout link"
+                      >
+                        Download QR
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
               <span className={styles.id}>id: {ev.id}</span>
             </div>
             <button
