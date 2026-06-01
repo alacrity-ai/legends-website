@@ -51,6 +51,34 @@ in a throwaway script / `curl` against the **Square sandbox**.
 
 Write findings into this file (a short "Spike results" note) before Phase 1.
 
+### Spike results (2026-05-31) — ❌ NO-GO on catalog-for-quantity
+
+Tested in sandbox **and** production (read-only; artifacts deleted):
+- ✅ Catalog item + variation with `track_inventory` creates fine; inventory set/read works.
+- ✅ Order-based payment link with a `catalog_object_id` line item creates fine.
+- ✅ `checkout_options.custom_fields` ("Full name…") renders on the checkout.
+- ✅ Production token **has** catalog + inventory scopes.
+- ❌ **The hosted checkout shows NO quantity selector** — confirmed by opening the real
+  production checkout page. So an **API-created payment link (quick_pay *or* order/catalog)
+  does not let the buyer choose quantity.** That capability appears limited to
+  dashboard/Square-Online "Sell an item" links, which we can't drive via the API.
+
+**Implication:** the catalog-items plan's main draw (quantity) doesn't hold, so it's not
+worth its lifecycle cost. **Recommended pivot → "Option E: dynamic links + our own
+quantity UI":**
+- Ticket modal gets **our own quantity stepper**. On Buy, the worker **mints a `quick_pay`
+  link priced N × unit** (name `"<ticketType> × N · <date> · <venue>"`, `payment_note`
+  carries `<eventId>:<ticketType>:<qty>`) and redirects. Buyer-chosen quantity, correct
+  total, Square stays the processor — **no catalog/inventory refactor**.
+- **Capacity** via our own KV counter (fed by the webhook), checked before minting;
+  small oversell already accepted. (Drop Square-inventory enforcement.)
+- **Auto-guestlist** unchanged: webhook → custom-field name + qty (from `payment_note`) → party.
+- **Sharing/QR** shifts from the raw Square link to a **site URL** that opens the event
+  with the stepper (branded + quantity-capable). Manage Shows' Copy-link/QR produce that.
+
+This is *simpler* than the catalog design and actually delivers quantity. **Pending your
+OK, I'll revise `1-DESIGN.md` + Phases 1–6 to Option E before building.**
+
 ---
 
 ## Phase 1 — Square catalog service 🧱
