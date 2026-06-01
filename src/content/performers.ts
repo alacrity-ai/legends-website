@@ -56,21 +56,39 @@ export const performers: Performer[] = [
     tags: ['tribute', 'live vocals', 'themed show'],
   },
   {
-    id: 'miley-cyrus',
-    name: 'Miley Mania',
-    imageSrc: '/assets/images/performer-miley.webp',
-    imageAlt: 'Miley Cyrus tribute performer on stage',
-    shortDescription:
-      'High-energy Miley Cyrus tribute bringing pop anthems, bold stage presence, and non-stop party vibes to any event.',
-    tags: ['tribute', 'live vocals', 'event-ready'],
-  },
-  {
     id: 'bruno-mars',
     name: '24K Bruno',
     imageSrc: '/assets/images/performer-bruno.webp',
     imageAlt: 'Bruno Mars tribute performer on stage',
     shortDescription:
       'A slick Bruno Mars tribute delivering chart-topping hits, dynamic choreography, and crowd-pleasing funk-pop energy.',
+    tags: ['tribute', 'live vocals', 'event-ready'],
+  },
+  {
+    id: 'stevie-nicks',
+    name: 'Stevie Nicks',
+    imageSrc: '/assets/images/performer-stevie.webp',
+    imageAlt: 'Stevie Nicks tribute performer on stage',
+    shortDescription:
+      'An enchanting Stevie Nicks tribute channeling the mystique, flowing shawls, and timeless Fleetwood Mac and solo anthems.',
+    tags: ['tribute', 'live vocals', 'themed show'],
+  },
+  {
+    id: 'tina-turner',
+    name: 'Tina Turner',
+    imageSrc: '/assets/images/performer-tina.webp',
+    imageAlt: 'Tina Turner tribute performer on stage',
+    shortDescription:
+      "A powerhouse Tina Turner tribute delivering explosive energy, show-stopping vocals, and the unstoppable spirit of the Queen of Rock 'n' Roll.",
+    tags: ['tribute', 'live vocals', 'event-ready'],
+  },
+  {
+    id: 'johnny-voices',
+    name: 'Johnny Voices',
+    imageSrc: '/assets/images/performer-johnny-voices.webp',
+    imageAlt: 'Johnny Voices rock vocal tribute performer on stage',
+    shortDescription:
+      'A vocal chameleon — Johnny Voices pays tribute to Bono, Rod Stewart, Steve Perry, and Robert Plant, channeling four legendary rock voices in one electrifying show.',
     tags: ['tribute', 'live vocals', 'event-ready'],
   }
 ];
