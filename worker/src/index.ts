@@ -447,6 +447,9 @@ async function handleAdminEvents(
 
   const idMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)$/);
   if (idMatch) {
+    if (request.method === 'GET') {
+      return handleGetEvent(idMatch[1], env, corsHeaders, noStore);
+    }
     if (request.method === 'DELETE') {
       return handleDeleteEvent(idMatch[1], env, corsHeaders, noStore);
     }
@@ -652,6 +655,25 @@ async function finalizeEventCreation(
     return jsonResponse(500, { error: 'Failed to save event' }, corsHeaders);
   }
 
+  return jsonResponse(200, { event: record }, corsHeaders, noStore);
+}
+
+async function handleGetEvent(
+  id: string,
+  env: Env,
+  corsHeaders: Record<string, string>,
+  noStore: Record<string, string>,
+): Promise<Response> {
+  const raw = await env.EVENTS.get(`event:${id}`);
+  if (!raw) {
+    return jsonResponse(404, { error: 'Event not found' }, corsHeaders);
+  }
+  let record: EventRecord;
+  try {
+    record = JSON.parse(raw) as EventRecord;
+  } catch {
+    return jsonResponse(500, { error: 'Event is malformed' }, corsHeaders);
+  }
   return jsonResponse(200, { event: record }, corsHeaders, noStore);
 }
 

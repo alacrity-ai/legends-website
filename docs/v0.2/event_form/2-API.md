@@ -139,6 +139,7 @@ curl -X DELETE https://djkmdlegends.com/api/admin/events/$ID \
 
 | Method & path | Purpose |
 | --- | --- |
-| `GET /api/admin/events` | List all event records (auth) |
-| `GET /api/events` | Public feed (KV events merged with legacy calendar) |
+| `GET /api/admin/events` | List all event records, full detail incl. payment-link ids (auth) |
+| `GET /api/admin/events/:id` | One full event record by id (auth) |
+| `GET /api/events` | Public feed (KV events merged with legacy calendar; edge-cached 60s) |
 | `GET /api/events/:id/image` | Public show image (`404` if the event has no image) |
