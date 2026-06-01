@@ -63,7 +63,7 @@ export interface EventDraft {
 
 export interface EventRecord extends EventDraft {
   id: string;
-  imageKey: string; // R2 object key
+  imageKey: string | null; // R2 object key, or null when the event has no image
   tickets: EventTicket[];
   createdAt: string;
   source: 'form' | 'google-calendar';

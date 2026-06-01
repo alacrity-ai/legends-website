@@ -11,6 +11,7 @@ import {
   parseBookingInquiry,
   parseCheckinPayload,
   parseEventDraft,
+  parseEventPatch,
   parseMailingListSignup,
   parseShowId,
 } from './validation.ts';
@@ -137,7 +138,7 @@ function eventRecordToPublic(r: EventRecord): PublicEvent {
     endTime: r.endTime.slice(11, 16),
     location: `${r.venueName}, ${r.venueAddress}`,
     description: r.description,
-    imageUrl: `/api/events/${r.id}/image`,
+    imageUrl: r.imageKey ? `/api/events/${r.id}/image` : null,
     tickets: r.tickets.map((t) => ({
       ticketType: t.ticketType,
       priceCents: t.priceCents,
@@ -445,8 +446,14 @@ async function handleAdminEvents(
   }
 
   const idMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)$/);
-  if (idMatch && request.method === 'DELETE') {
-    return handleDeleteEvent(idMatch[1], env, corsHeaders, noStore);
+  if (idMatch) {
+    if (request.method === 'DELETE') {
+      return handleDeleteEvent(idMatch[1], env, corsHeaders, noStore);
+    }
+    if (request.method === 'PATCH') {
+      return handlePatchEvent(idMatch[1], request, env, corsHeaders, noStore);
+    }
+    return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
   }
 
   return jsonResponse(404, { error: 'Not found' }, corsHeaders);
@@ -668,12 +675,158 @@ async function handleDeleteEvent(
   }
 
   await env.EVENTS.delete(`event:${id}`);
-  await env.EVENT_IMAGES.delete(record.imageKey).catch(() => {});
+  if (record.imageKey) {
+    await env.EVENT_IMAGES.delete(record.imageKey).catch(() => {});
+  }
   await Promise.all(
     record.tickets.map((t) => deactivatePaymentLink(env, t.squarePaymentLinkId)),
   );
 
   return jsonResponse(200, { ok: true }, corsHeaders, noStore);
+}
+
+/**
+ * Update an event (JSON, partial). Any subset of the create fields can be sent.
+ * - Metadata edits (name, description, venue, dates) update the record and KEEP
+ *   the existing Square checkout links (so already-shared links/QRs still work).
+ * - Sending `tickets` mints fresh Square links for the new set and deactivates
+ *   the old ones (checkout prices can't be edited in place).
+ * - Image: `image` (base64/data URL) replaces it; `image: null` or
+ *   `removeImage: true` removes it; omit to leave it unchanged.
+ */
+async function handlePatchEvent(
+  id: string,
+  request: Request,
+  env: Env,
+  corsHeaders: Record<string, string>,
+  noStore: Record<string, string>,
+): Promise<Response> {
+  const existingRaw = await env.EVENTS.get(`event:${id}`);
+  if (!existingRaw) {
+    return jsonResponse(404, { error: 'Event not found' }, corsHeaders);
+  }
+  let existing: EventRecord;
+  try {
+    existing = JSON.parse(existingRaw) as EventRecord;
+  } catch {
+    return jsonResponse(500, { error: 'Event is malformed' }, corsHeaders);
+  }
+
+  // Parse the body: metadata/ticket fields via parseEventPatch, image directives separately.
+  let patch: Partial<EventDraft>;
+  let imageAction: { type: 'none' } | { type: 'remove' } | { type: 'replace'; bytes: Uint8Array; mime: string; ext: string };
+  try {
+    const body: unknown = await request.json();
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+      throw new Error('Invalid JSON body');
+    }
+    const { image, imageBase64, imageType, removeImage, ...rest } = body as Record<string, unknown>;
+    patch = parseEventPatch(rest);
+
+    if (removeImage === true || image === null) {
+      imageAction = { type: 'remove' };
+    } else if (typeof image === 'string' || typeof imageBase64 === 'string') {
+      const input = typeof image === 'string' ? image : (imageBase64 as string);
+      const decoded = decodeBase64Image(input, typeof imageType === 'string' ? imageType : undefined);
+      imageAction = { type: 'replace', ...decoded };
+    } else {
+      imageAction = { type: 'none' };
+    }
+  } catch (err) {
+    return jsonResponse(400, { error: errorMessage(err) }, corsHeaders);
+  }
+
+  if (Object.keys(patch).length === 0 && imageAction.type === 'none') {
+    return jsonResponse(400, { error: 'No fields to update' }, corsHeaders);
+  }
+
+  // Merge metadata and validate cross-field date ordering.
+  const merged = { ...existing, ...patch };
+  if (new Date(merged.endTime).getTime() <= new Date(merged.startTime).getTime()) {
+    return jsonResponse(400, { error: 'endTime must be after startTime' }, corsHeaders);
+  }
+
+  // If tickets changed, mint new Square links (deactivate the old ones after commit).
+  let tickets = existing.tickets;
+  let oldLinkIds: string[] = [];
+  if (patch.tickets) {
+    const created: EventTicket[] = [];
+    for (const ticket of patch.tickets) {
+      try {
+        const link = await createPaymentLink(env, {
+          eventId: id,
+          ticketType: ticket.ticketType,
+          itemName: `${ticket.ticketType} · ${formatEventDateTime(merged.startTime)} · ${merged.venueName}`,
+          amountCents: ticket.priceCents,
+          redirectUrl: primaryOrigin(env) + '/?purchase=success',
+        });
+        created.push({
+          ...ticket,
+          checkoutUrl: link.checkoutUrl,
+          squarePaymentLinkId: link.paymentLinkId,
+          squareOrderId: link.orderId,
+        });
+      } catch (err) {
+        await Promise.all(created.map((t) => deactivatePaymentLink(env, t.squarePaymentLinkId)));
+        return jsonResponse(
+          502,
+          { error: `Square: "${ticket.ticketType}" failed: ${errorMessage(err)}` },
+          corsHeaders,
+        );
+      }
+    }
+    tickets = created;
+    oldLinkIds = existing.tickets.map((t) => t.squarePaymentLinkId);
+  }
+
+  // Resolve the image change. New image stored before commit; old removed after.
+  let imageKey = existing.imageKey;
+  let oldImageKeyToDelete: string | null = null;
+  let storedNewKey: string | null = null;
+  if (imageAction.type === 'remove') {
+    oldImageKeyToDelete = existing.imageKey;
+    imageKey = null;
+  } else if (imageAction.type === 'replace') {
+    const newKey = `events/${id}.${imageAction.ext}`;
+    try {
+      await env.EVENT_IMAGES.put(newKey, imageAction.bytes, {
+        httpMetadata: { contentType: imageAction.mime },
+      });
+      storedNewKey = newKey;
+    } catch (err) {
+      if (patch.tickets) {
+        await Promise.all(tickets.map((t) => deactivatePaymentLink(env, t.squarePaymentLinkId)));
+      }
+      console.error('Image upload failed:', errorMessage(err));
+      return jsonResponse(500, { error: 'Failed to store image' }, corsHeaders);
+    }
+    if (existing.imageKey && existing.imageKey !== newKey) {
+      oldImageKeyToDelete = existing.imageKey;
+    }
+    imageKey = newKey;
+  }
+
+  // Commit the updated record.
+  const updated: EventRecord = { ...existing, ...patch, tickets, imageKey };
+  try {
+    await env.EVENTS.put(`event:${id}`, JSON.stringify(updated));
+  } catch (err) {
+    // Roll back resources created for this (failed) update.
+    if (patch.tickets) {
+      await Promise.all(tickets.map((t) => deactivatePaymentLink(env, t.squarePaymentLinkId)));
+    }
+    if (storedNewKey) await env.EVENT_IMAGES.delete(storedNewKey).catch(() => {});
+    console.error('Event KV write failed:', errorMessage(err));
+    return jsonResponse(500, { error: 'Failed to save event' }, corsHeaders);
+  }
+
+  // Best-effort cleanup of resources the old record referenced.
+  await Promise.all(oldLinkIds.map((linkId) => deactivatePaymentLink(env, linkId)));
+  if (oldImageKeyToDelete) {
+    await env.EVENT_IMAGES.delete(oldImageKeyToDelete).catch(() => {});
+  }
+
+  return jsonResponse(200, { event: updated }, corsHeaders, noStore);
 }
 
 async function handleEventImage(
@@ -692,6 +845,9 @@ async function handleEventImage(
     return jsonResponse(500, { error: 'Event is malformed' }, corsHeaders);
   }
 
+  if (!record.imageKey) {
+    return jsonResponse(404, { error: 'Image not found' }, corsHeaders);
+  }
   const object = await env.EVENT_IMAGES.get(record.imageKey);
   if (!object) {
     return jsonResponse(404, { error: 'Image not found' }, corsHeaders);
@@ -743,7 +899,7 @@ function getCorsHeaders(request: Request, allowedOrigins: string): Record<string
   const allowed = allowedOrigins.split(',').map((o) => o.trim());
 
   const headers: Record<string, string> = {
-    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
 

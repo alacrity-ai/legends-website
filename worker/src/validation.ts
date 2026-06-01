@@ -129,6 +129,46 @@ export function parseEventDraft(body: unknown): EventDraft {
   return { showName, description, venueName, venueAddress, startTime, endTime, tickets };
 }
 
+/**
+ * Parse a partial event update. Only the keys present in the body are returned,
+ * each validated with the same rules as create. Cross-field checks (endTime
+ * after startTime) are done by the caller against the merged record. Image
+ * directives are handled separately by the caller. Returns {} if no draft
+ * fields are present (an image-only patch is valid).
+ */
+export function parseEventPatch(body: unknown): Partial<EventDraft> {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw new Error('Invalid request body');
+  }
+  const obj = body as Record<string, unknown>;
+
+  const allowedKeys = new Set([
+    'showName',
+    'description',
+    'venueName',
+    'venueAddress',
+    'startTime',
+    'endTime',
+    'tickets',
+  ]);
+  for (const key of Object.keys(obj)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`Unexpected field: ${key}`);
+    }
+  }
+
+  const patch: Partial<EventDraft> = {};
+  if ('showName' in obj) patch.showName = boundedString(obj, 'showName', 200);
+  if ('description' in obj) patch.description = boundedString(obj, 'description', MAX_FIELD_LENGTH);
+  if ('venueName' in obj) patch.venueName = boundedString(obj, 'venueName', 200);
+  if ('venueAddress' in obj) patch.venueAddress = boundedString(obj, 'venueAddress', 500);
+  if ('startTime' in obj) patch.startTime = parseIsoDateTime(obj, 'startTime');
+  if ('endTime' in obj) patch.endTime = parseIsoDateTime(obj, 'endTime');
+  if ('tickets' in obj) patch.tickets = parseTickets(obj.tickets);
+
+  return patch;
+}
+
 function parseTickets(value: unknown): TicketConfig[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new Error('At least one ticket type is required');

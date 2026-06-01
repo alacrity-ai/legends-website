@@ -80,11 +80,65 @@ curl -sS -X POST https://djkmdlegends.com/api/admin/events \
 The returned `event.id` and per-ticket `checkoutUrl`s can be managed/deleted from
 `/admin` → Manage Shows (which also offers Copy link / Download QR per ticket).
 
-## Other admin endpoints (unchanged)
+## Update an event — `PATCH /api/admin/events/:id`
+
+`application/json`, partial. Send only the fields you want to change; the rest
+stay as they are. Same auth (`Authorization: Bearer <ADMIN_PASSCODE>`). Returns
+`{ "event": <updated record> }`.
+
+Updatable fields: `showName`, `description`, `venueName`, `venueAddress`,
+`startTime`, `endTime`, `tickets`, and the image (below). At least one change is
+required (`400 No fields to update` otherwise).
+
+**Checkout links:**
+- Metadata edits (name, description, venue, dates) **keep the existing Square
+  links** — so links/QR codes you've already shared keep working.
+- Sending `tickets` **mints fresh Square links** for the new set and deactivates
+  the old ones (Square checkout prices can't be edited in place). This changes
+  the `checkoutUrl`s — re-share / re-print QRs after a price change.
+
+**Image:**
+- `"image": "data:image/png;base64,..."` (or base64 + `"imageType"`) — replace
+- `"image": null`  or  `"removeImage": true` — remove the image entirely
+- omit — leave the image unchanged
+
+Examples:
+```bash
+# Change just the description (checkout links untouched)
+curl -X PATCH https://djkmdlegends.com/api/admin/events/$ID \
+  -H "Authorization: Bearer $ADMIN_PASSCODE" -H "Content-Type: application/json" \
+  --data '{"description":"New blurb with a special guest!"}'
+
+# Change prices / ticket types (mints new checkout links)
+curl -X PATCH .../api/admin/events/$ID -H "Authorization: Bearer $ADMIN_PASSCODE" \
+  -H "Content-Type: application/json" \
+  --data '{"tickets":[{"ticketType":"Dinner & Show","price":69.95}]}'
+
+# Replace the image
+IMG="data:image/webp;base64,$(base64 -w0 poster.webp)"
+jq -n --arg img "$IMG" '{image:$img}' | curl -X PATCH .../api/admin/events/$ID \
+  -H "Authorization: Bearer $ADMIN_PASSCODE" -H "Content-Type: application/json" --data @-
+
+# Remove the image
+curl -X PATCH .../api/admin/events/$ID -H "Authorization: Bearer $ADMIN_PASSCODE" \
+  -H "Content-Type: application/json" --data '{"removeImage":true}'
+```
+
+## Delete an event — `DELETE /api/admin/events/:id`
+
+Auth required. Removes the KV record, deactivates the event's Square payment
+link(s), and deletes its R2 image. Returns `{ "ok": true }` (or `404` if the id
+isn't found). Also available from `/admin → Manage Shows`.
+
+```bash
+curl -X DELETE https://djkmdlegends.com/api/admin/events/$ID \
+  -H "Authorization: Bearer $ADMIN_PASSCODE"
+```
+
+## Other endpoints
 
 | Method & path | Purpose |
 | --- | --- |
 | `GET /api/admin/events` | List all event records (auth) |
-| `DELETE /api/admin/events/:id` | Delete an event; deactivates its Square links + removes the R2 image (auth) |
 | `GET /api/events` | Public feed (KV events merged with legacy calendar) |
-| `GET /api/events/:id/image` | Public show image |
+| `GET /api/events/:id/image` | Public show image (`404` if the event has no image) |

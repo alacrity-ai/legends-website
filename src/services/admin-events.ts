@@ -35,7 +35,7 @@ export interface ManagedEvent {
   venueAddress: string;
   startTime: string;
   endTime: string;
-  imageKey: string;
+  imageKey: string | null;
   tickets: Array<{ ticketType: string; priceCents: number; checkoutUrl: string }>;
   createdAt: string;
   source: 'form' | 'google-calendar';
