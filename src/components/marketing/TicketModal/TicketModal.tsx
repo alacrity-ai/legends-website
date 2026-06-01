@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react';
 import type { CalendarEvent } from '../../../types/event.ts';
 import { ticketComingSoonMessage } from '../../../content/site.ts';
 import { parseDescription } from '../../../utils/parse-description.ts';
+import { eventImageSrc } from '../../../utils/event-image.ts';
 import styles from './TicketModal.module.css';
 
 interface TicketModalProps {
@@ -38,9 +39,7 @@ export default function TicketModal({ selectedEvent, onClose }: TicketModalProps
     ? { text: selectedEvent.description, squareUrl: null }
     : parseDescription(selectedEvent.description);
 
-  const imageSrc = selectedEvent.imageUrl
-    ? `${import.meta.env.VITE_BOOKING_API_URL}${selectedEvent.imageUrl}`
-    : null;
+  const imageSrc = eventImageSrc(selectedEvent);
 
   return (
     <div className={styles.overlay} onClick={onClose}>
