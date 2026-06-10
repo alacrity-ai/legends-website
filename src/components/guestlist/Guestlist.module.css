@@ -74,3 +74,70 @@
 .error {
   color: var(--color-error);
 }
+
+/* ── Event picker (v0.3 multi-event check-in) ──────────────── */
+
+.pickerSection {
+  padding: 0.75rem 1rem 0;
+}
+
+.pickerHeading {
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin: 0 0 0.5rem;
+}
+
+.pickerHeadingToggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0 0 0.5rem;
+}
+
+.pickerList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pickerItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.pickerItem:hover,
+.pickerItem:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.pickerName {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.pickerMeta {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

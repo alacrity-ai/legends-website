@@ -39,7 +39,18 @@ export default function Calendar() {
 
   useEffect(() => {
     fetchUpcomingEvents()
-      .then(setEvents)
+      .then((evs) => {
+        setEvents(evs);
+        // Deep link: arriving at /?event=<id> opens that show's ticket modal once
+        // the feed loads. Shared links and QR codes point here (see ManageShows).
+        const eventId = new URLSearchParams(window.location.search).get('event');
+        if (!eventId) return;
+        const match = evs.find((e) => e.id === eventId);
+        if (match) {
+          setTicketEvent(match);
+          document.getElementById(sectionIds.calendar)?.scrollIntoView({ behavior: 'smooth' });
+        }
+      })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
@@ -85,6 +96,7 @@ export default function Calendar() {
                     loading="lazy"
                   />
                 )}
+                {event.soldOut && <span className={styles.soldOutBadge}>Sold Out</span>}
                 <h3 className={styles.eventTitle}>{event.title}</h3>
                 <p className={styles.eventDateTime}>
                   {formatDate(event.date)}
@@ -107,7 +119,7 @@ export default function Calendar() {
                   className={styles.cardButton}
                   onClick={() => setTicketEvent(event)}
                 >
-                  Buy Tickets
+                  {event.soldOut ? 'Sold Out' : 'Buy Tickets'}
                 </Button>
               </article>
               );

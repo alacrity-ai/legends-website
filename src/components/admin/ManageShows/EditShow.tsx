@@ -1,45 +1,58 @@
 import { useState, type FormEvent } from 'react';
-import { createEvent } from '../../../services/admin-events.ts';
+import {
+  updateEvent,
+  type EventPatchInput,
+  type ManagedEvent,
+} from '../../../services/admin-events.ts';
 import { UnauthorizedError } from '../../../services/guestlist.ts';
-import { toEasternIso } from '../../../utils/eastern-time.ts';
-import styles from './EventForm.module.css';
-
-type Status = 'idle' | 'submitting' | 'success' | 'error';
+import { easternIsoToLocalInput, toEasternIso } from '../../../utils/eastern-time.ts';
+import styles from '../EventForm/EventForm.module.css';
 
 interface TicketRow {
   ticketType: string;
   price: string;
 }
 
-interface EventFormProps {
+interface EditShowProps {
+  event: ManagedEvent;
+  onCancel: () => void;
+  onSaved: (updated: ManagedEvent) => void;
   onUnauthorized: () => void;
 }
 
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
-export default function EventForm({ onUnauthorized }: EventFormProps) {
-  const [showName, setShowName] = useState('');
-  const [description, setDescription] = useState('');
-  const [venueName, setVenueName] = useState('');
-  const [venueAddress, setVenueAddress] = useState('');
-  const [startLocal, setStartLocal] = useState('');
-  const [endLocal, setEndLocal] = useState('');
-  const [tickets, setTickets] = useState<TicketRow[]>([{ ticketType: '', price: '' }]);
-  const [capacity, setCapacity] = useState('');
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Could not read the image file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+export default function EditShow({ event, onCancel, onSaved, onUnauthorized }: EditShowProps) {
+  const [showName, setShowName] = useState(event.showName);
+  const [description, setDescription] = useState(event.description);
+  const [venueName, setVenueName] = useState(event.venueName);
+  const [venueAddress, setVenueAddress] = useState(event.venueAddress);
+  const [startLocal, setStartLocal] = useState(easternIsoToLocalInput(event.startTime));
+  const [endLocal, setEndLocal] = useState(easternIsoToLocalInput(event.endTime));
+  const [tickets, setTickets] = useState<TicketRow[]>(
+    event.tickets.map((t) => ({ ticketType: t.ticketType, price: String(t.priceCents / 100) })),
+  );
+  const [capacity, setCapacity] = useState(event.capacity != null ? String(event.capacity) : '');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  const [status, setStatus] = useState<Status>('idle');
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [createdName, setCreatedName] = useState('');
 
-  const updateTicket = (i: number, patch: Partial<TicketRow>) => {
+  const updateTicket = (i: number, patch: Partial<TicketRow>) =>
     setTickets((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  };
   const addTicket = () => setTickets((rows) => [...rows, { ticketType: '', price: '' }]);
-  const removeTicket = (i: number) =>
-    setTickets((rows) => rows.filter((_, idx) => idx !== i));
+  const removeTicket = (i: number) => setTickets((rows) => rows.filter((_, idx) => idx !== i));
 
   const onImageChange = (file: File | null) => {
     setImageFile(file);
@@ -54,8 +67,6 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
     if (!venueAddress.trim()) return 'Venue address is required.';
     if (!startLocal) return 'Start time is required.';
     if (!endLocal) return 'End time is required.';
-    if (new Date(toEasternIso(startLocal)).getTime() <= Date.now())
-      return 'Start time must be in the future.';
     if (new Date(toEasternIso(endLocal)).getTime() <= new Date(toEasternIso(startLocal)).getTime())
       return 'End time must be after the start time.';
 
@@ -76,10 +87,11 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
         return 'Capacity must be a positive whole number (or leave it blank for unlimited).';
     }
 
-    if (!imageFile) return 'A show image is required.';
-    if (!ACCEPTED_IMAGE_TYPES.includes(imageFile.type))
-      return 'Image must be a JPEG, PNG, or WebP file.';
-    if (imageFile.size > MAX_IMAGE_BYTES) return 'Image must be 5 MB or smaller.';
+    if (imageFile) {
+      if (!ACCEPTED_IMAGE_TYPES.includes(imageFile.type))
+        return 'Image must be a JPEG, PNG, or WebP file.';
+      if (imageFile.size > MAX_IMAGE_BYTES) return 'Image must be 5 MB or smaller.';
+    }
     return null;
   };
 
@@ -87,79 +99,41 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
     e.preventDefault();
     const validationError = validate();
     if (validationError) {
-      setStatus('error');
       setError(validationError);
       return;
     }
 
-    setStatus('submitting');
+    setSubmitting(true);
     setError('');
     try {
-      const created = await createEvent(
-        {
-          showName: showName.trim(),
-          description: description.trim(),
-          venueName: venueName.trim(),
-          venueAddress: venueAddress.trim(),
-          startTime: toEasternIso(startLocal),
-          endTime: toEasternIso(endLocal),
-          tickets: tickets.map((t) => ({
-            ticketType: t.ticketType.trim(),
-            price: Number(t.price),
-          })),
-          capacity: capacity.trim() ? Number(capacity) : null,
-        },
-        imageFile as File,
-      );
-      setCreatedName(created.showName);
-      setStatus('success');
+      const patch: EventPatchInput = {
+        showName: showName.trim(),
+        description: description.trim(),
+        venueName: venueName.trim(),
+        venueAddress: venueAddress.trim(),
+        startTime: toEasternIso(startLocal),
+        endTime: toEasternIso(endLocal),
+        tickets: tickets.map((t) => ({ ticketType: t.ticketType.trim(), price: Number(t.price) })),
+        capacity: capacity.trim() ? Number(capacity) : null,
+      };
+      if (imageFile) patch.image = await readAsDataUrl(imageFile);
+
+      const updated = await updateEvent(event.id, patch);
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+      onSaved(updated);
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         onUnauthorized();
         return;
       }
-      setStatus('error');
-      setError(err instanceof Error ? err.message : 'Failed to create the show.');
+      setError(err instanceof Error ? err.message : 'Failed to update the show.');
+      setSubmitting(false);
     }
   };
 
-  const resetForm = () => {
-    setShowName('');
-    setDescription('');
-    setVenueName('');
-    setVenueAddress('');
-    setStartLocal('');
-    setEndLocal('');
-    setTickets([{ ticketType: '', price: '' }]);
-    setCapacity('');
-    onImageChange(null);
-    setStatus('idle');
-    setError('');
-    setCreatedName('');
-  };
-
-  if (status === 'success') {
-    return (
-      <div className={styles.success}>
-        <h2 className={styles.successHeading}>✅ "{createdName}" is live</h2>
-        <p>The show now appears under Upcoming Shows with its Buy buttons.</p>
-        <div className={styles.successActions}>
-          <a className={styles.linkButton} href="/#calendar">
-            View on site
-          </a>
-          <button type="button" className={styles.linkButton} onClick={resetForm}>
-            Create another
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const submitting = status === 'submitting';
-
   return (
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
-      <h1 className={styles.title}>Create a Show</h1>
+      <h1 className={styles.title}>Edit “{event.showName}”</h1>
 
       <label className={styles.field}>
         <span className={styles.label}>Show name</span>
@@ -167,7 +141,6 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
           className={styles.input}
           value={showName}
           onChange={(e) => setShowName(e.target.value)}
-          placeholder="DJKMD Presents Legends — Summer Spectacular"
           disabled={submitting}
         />
       </label>
@@ -179,7 +152,6 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
           rows={5}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Come see Legends perform live! This show features tributes to Frank Sinatra, Cher, and more…"
           disabled={submitting}
         />
       </label>
@@ -191,7 +163,6 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
             className={styles.input}
             value={venueName}
             onChange={(e) => setVenueName(e.target.value)}
-            placeholder="The Blue Note"
             disabled={submitting}
           />
         </label>
@@ -201,7 +172,6 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
             className={styles.input}
             value={venueAddress}
             onChange={(e) => setVenueAddress(e.target.value)}
-            placeholder="123 Main St, Springfield, MA"
             disabled={submitting}
           />
         </label>
@@ -283,14 +253,10 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
           placeholder="Leave blank for unlimited"
           disabled={submitting}
         />
-        <span className={styles.hint}>
-          Total tickets across all types. The show flips to “Sold Out” automatically once this
-          many are sold.
-        </span>
       </label>
 
       <label className={styles.field}>
-        <span className={styles.label}>Show image</span>
+        <span className={styles.label}>Replace image (optional)</span>
         <input
           className={styles.fileInput}
           type="file"
@@ -299,22 +265,30 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
           disabled={submitting}
         />
         {imagePreview && (
-          <img className={styles.preview} src={imagePreview} alt="Selected show preview" />
+          <img className={styles.preview} src={imagePreview} alt="New show preview" />
         )}
       </label>
 
-      {status === 'error' && (
+      {error && (
         <p className={styles.error} role="alert">
           {error}
         </p>
       )}
 
-      <button type="submit" className={styles.submit} disabled={submitting}>
-        {submitting ? 'Creating show…' : 'Create Show'}
-      </button>
-      {submitting && (
-        <p className={styles.hint}>Saving the show — this just takes a moment.</p>
-      )}
+      <div className={styles.row}>
+        <button type="submit" className={styles.submit} disabled={submitting}>
+          {submitting ? 'Saving…' : 'Save changes'}
+        </button>
+        <button
+          type="button"
+          className={styles.submit}
+          onClick={onCancel}
+          disabled={submitting}
+          style={{ background: 'transparent' }}
+        >
+          Cancel
+        </button>
+      </div>
     </form>
   );
 }

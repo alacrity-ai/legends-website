@@ -1,19 +1,34 @@
 .wrap {
-  max-width: 720px;
+  max-width: 760px;
   margin: 0 auto;
 }
 
-.title {
-  font-size: var(--text-2xl);
+/* ── Page header ──────────────────────────────────────────── */
+
+.overline {
+  display: block;
+  font-size: var(--text-xs);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
   color: var(--color-accent);
+  margin: 0 0 var(--space-xs);
+}
+
+.title {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
   margin: 0 0 var(--space-xs);
 }
 
 .subtitle {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
-  margin: 0 0 var(--space-lg);
+  margin: 0 0 var(--space-xl);
 }
+
+/* ── Card list ────────────────────────────────────────────── */
 
 .list {
   list-style: none;
@@ -21,102 +36,239 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-lg);
 }
 
-.row {
+.card {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(212, 175, 55, 0.05), transparent 120px),
+    var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+/* A thin gilt edge along the top of each card. */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+  opacity: 0.5;
+}
+
+.card:hover {
+  border-color: rgba(212, 175, 55, 0.4);
+  transform: translateY(-2px);
+}
+
+/* ── Card header ──────────────────────────────────────────── */
+
+.cardHead {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-md);
-  background: var(--color-surface-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-md) var(--space-lg);
 }
 
-.info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.headText {
   min-width: 0;
 }
 
 .name {
-  font-size: var(--text-lg);
-  font-weight: 600;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.2;
   color: var(--color-text);
+  margin: 0 0 4px;
 }
 
-.meta {
+.when {
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  margin: 0 0 2px;
+}
+
+.where {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* Status chip (Live / Sold Out) */
+.status {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px var(--space-sm);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.statusLive {
+  color: var(--color-success);
+  border: 1px solid rgba(63, 165, 91, 0.45);
+  background: rgba(63, 165, 91, 0.08);
+}
+
+.statusSold {
+  color: #f3d9d9;
+  border: 1px solid var(--color-error);
+  background: rgba(217, 92, 92, 0.18);
+}
+
+/* ── Capacity meter ───────────────────────────────────────── */
+
+.capacity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meter {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-primary-light));
+  transition: width 0.4s ease;
+}
+
+.meterFillFull {
+  background: linear-gradient(90deg, var(--color-error), #e88);
+}
+
+.capacityText {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
 
-.tickets {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  margin-top: var(--space-xs);
+.capacityText strong {
+  color: var(--color-text);
+  font-weight: 700;
 }
 
-.ticketRow {
+/* ── Ticket pills ─────────────────────────────────────────── */
+
+.tickets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.ticketPill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 4px var(--space-sm);
+}
+
+.ticketPrice {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* ── Toolbar (one consistent button system) ───────────────── */
+
+.toolbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.toolGroup {
+  display: flex;
   gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
-.ticketLabel {
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 var(--space-md);
   font-size: var(--text-sm);
-  color: var(--color-accent);
-}
-
-.copyButton {
-  background: none;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  border-radius: var(--radius-sm);
-  padding: 1px var(--space-sm);
-  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: border-color 0.2s, color 0.2s;
+  white-space: nowrap;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
-.copyButton:hover {
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btnGhost {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.btnGhost:hover:not(:disabled) {
   color: var(--color-text);
   border-color: var(--color-accent);
 }
 
+.btnPrimary {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--btn-primary-hover-bg);
+}
+
+.btnDanger {
+  background: transparent;
+  border-color: rgba(217, 92, 92, 0.5);
+  color: var(--color-error);
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: var(--color-error);
+  border-color: var(--color-error);
+  color: #fff;
+}
+
+/* ── Footer id ────────────────────────────────────────────── */
+
 .id {
   font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  font-family: monospace;
-  margin-top: 2px;
+  color: rgba(191, 181, 163, 0.6);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   word-break: break-all;
 }
 
-.deleteButton {
-  flex-shrink: 0;
-  background: none;
-  border: 1px solid var(--color-error);
-  color: var(--color-error);
-  border-radius: var(--radius-md);
-  padding: 0.45rem 0.9rem;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.deleteButton:hover:not(:disabled) {
-  background: var(--color-error);
-  color: var(--color-bg);
-}
-
-.deleteButton:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+/* ── States ───────────────────────────────────────────────── */
 
 .empty {
   color: var(--color-text-muted);
@@ -138,4 +290,21 @@
   border-radius: var(--radius-md);
   padding: 0.45rem 0.9rem;
   cursor: pointer;
+}
+
+/* ── Mobile ───────────────────────────────────────────────── */
+
+@media (max-width: 560px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolGroup {
+    width: 100%;
+  }
+
+  .toolGroup .btn {
+    flex: 1;
+  }
 }

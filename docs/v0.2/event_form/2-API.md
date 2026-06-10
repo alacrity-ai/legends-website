@@ -1,5 +1,13 @@
 # v0.2 — Event Creation API
 
+> **⚠️ Superseded by v0.3 ("Option E").** As of v0.3, **create makes no Square calls** —
+> it stores ticket price configs + an optional `capacity`; checkout links are minted on
+> demand by `POST /api/events/:id/checkout` (priced for the buyer's chosen quantity), and
+> the share/QR target is the site URL `https://djkmdlegends.com/?event=<id>`. The current
+> contract lives in `public/openapi.json` (served at `/docs`) and the
+> `docs/agents/*` runbooks; see `docs/v0.3/DESIGN_V2.md`. The text below describes the
+> retired v0.2 link-per-ticket behavior and is kept for history.
+
 `POST /api/admin/events` creates a show. It powers the admin form **and** can be
 called programmatically — same URL, same auth, same field contract. Two body
 formats are accepted, chosen by `Content-Type`:
@@ -139,6 +147,7 @@ curl -X DELETE https://djkmdlegends.com/api/admin/events/$ID \
 
 | Method & path | Purpose |
 | --- | --- |
-| `GET /api/admin/events` | List all event records (auth) |
-| `GET /api/events` | Public feed (KV events merged with legacy calendar) |
+| `GET /api/admin/events` | List all event records, full detail incl. payment-link ids (auth) |
+| `GET /api/admin/events/:id` | One full event record by id (auth) |
+| `GET /api/events` | Public feed (KV events merged with legacy calendar; edge-cached 60s) |
 | `GET /api/events/:id/image` | Public show image (`404` if the event has no image) |

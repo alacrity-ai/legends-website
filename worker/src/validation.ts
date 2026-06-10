@@ -89,6 +89,24 @@ export function parseCheckinPayload(body: unknown): { partyId: string } {
   return { partyId };
 }
 
+/** Check-in payload for the v0.3 multi-event roster, keyed by Square payment id. */
+export function parseCheckinPaymentPayload(body: unknown): { paymentId: string } {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw new Error('Invalid request body');
+  }
+  const obj = body as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (key !== 'paymentId') {
+      throw new Error(`Unexpected field: ${key}`);
+    }
+  }
+  const paymentId = requireString(obj, 'paymentId');
+  if (!/^[A-Za-z0-9_-]{6,64}$/.test(paymentId)) {
+    throw new Error('paymentId is invalid');
+  }
+  return { paymentId };
+}
+
 export function parseEventDraft(body: unknown): EventDraft {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     throw new Error('Invalid request body');
@@ -103,6 +121,7 @@ export function parseEventDraft(body: unknown): EventDraft {
     'startTime',
     'endTime',
     'tickets',
+    'capacity',
   ]);
   for (const key of Object.keys(obj)) {
     if (!allowedKeys.has(key)) {
@@ -125,8 +144,18 @@ export function parseEventDraft(body: unknown): EventDraft {
   }
 
   const tickets = parseTickets(obj.tickets);
+  const capacity = parseCapacity(obj.capacity);
 
-  return { showName, description, venueName, venueAddress, startTime, endTime, tickets };
+  return { showName, description, venueName, venueAddress, startTime, endTime, tickets, capacity };
+}
+
+/** Optional positive-integer capacity; `null`/absent means uncapped. */
+function parseCapacity(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+    throw new Error('capacity must be a positive whole number');
+  }
+  return value;
 }
 
 /**
@@ -136,7 +165,7 @@ export function parseEventDraft(body: unknown): EventDraft {
  * directives are handled separately by the caller. Returns {} if no draft
  * fields are present (an image-only patch is valid).
  */
-export function parseEventPatch(body: unknown): Partial<EventDraft> {
+export function parseEventPatch(body: unknown): Partial<EventDraft> & { soldOut?: boolean } {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     throw new Error('Invalid request body');
   }
@@ -150,6 +179,8 @@ export function parseEventPatch(body: unknown): Partial<EventDraft> {
     'startTime',
     'endTime',
     'tickets',
+    'capacity',
+    'soldOut',
   ]);
   for (const key of Object.keys(obj)) {
     if (!allowedKeys.has(key)) {
@@ -157,7 +188,7 @@ export function parseEventPatch(body: unknown): Partial<EventDraft> {
     }
   }
 
-  const patch: Partial<EventDraft> = {};
+  const patch: Partial<EventDraft> & { soldOut?: boolean } = {};
   if ('showName' in obj) patch.showName = boundedString(obj, 'showName', 200);
   if ('description' in obj) patch.description = boundedString(obj, 'description', MAX_FIELD_LENGTH);
   if ('venueName' in obj) patch.venueName = boundedString(obj, 'venueName', 200);
@@ -165,6 +196,11 @@ export function parseEventPatch(body: unknown): Partial<EventDraft> {
   if ('startTime' in obj) patch.startTime = parseIsoDateTime(obj, 'startTime');
   if ('endTime' in obj) patch.endTime = parseIsoDateTime(obj, 'endTime');
   if ('tickets' in obj) patch.tickets = parseTickets(obj.tickets);
+  if ('capacity' in obj) patch.capacity = parseCapacity(obj.capacity);
+  if ('soldOut' in obj) {
+    if (typeof obj.soldOut !== 'boolean') throw new Error('soldOut must be a boolean');
+    patch.soldOut = obj.soldOut;
+  }
 
   return patch;
 }
