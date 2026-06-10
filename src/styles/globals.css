@@ -16,18 +16,30 @@
 
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 72px; /* sticky header height (64px) + breathing room */
+  scroll-padding-top: 84px; /* sticky header height + breathing room */
 }
 
 body {
   margin: 0;
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   font-size: var(--text-base);
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--color-text);
   background-color: var(--color-bg);
+  /* Fixed warm-gold atmosphere over near-black — gives the page depth
+     instead of a flat fill. Layered radial glows from tokens. */
+  background-image: var(--bg-atmosphere);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern' 1, 'liga' 1;
+}
+
+::selection {
+  background-color: rgba(212, 175, 55, 0.3);
+  color: var(--color-text);
 }
 
 img {
@@ -64,19 +76,42 @@ h4,
 h5,
 h6 {
   font-family: var(--font-heading);
-  line-height: 1.2;
+  font-weight: 600;
+  line-height: 1.12;
   color: var(--color-primary);
+  letter-spacing: var(--tracking-wide);
+  text-wrap: balance;
 }
 
 h1 {
   font-size: var(--text-5xl);
+  font-weight: 700;
 }
 
 h2 {
   font-size: var(--text-3xl);
+  font-weight: 600;
 }
 
 h3 {
   font-size: var(--text-2xl);
+}
+
+/* Links inside body copy get the gold treatment with an animated underline */
+p a,
+li a {
+  color: var(--color-accent);
+  text-decoration: none;
+  background-image: linear-gradient(var(--color-accent), var(--color-accent));
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.3s var(--ease-out, ease), color 0.2s;
+}
+
+p a:hover,
+li a:hover {
+  color: var(--color-accent-hover);
+  background-size: 100% 1px;
 }
 

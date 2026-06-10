@@ -1,17 +1,24 @@
 .button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
   padding: var(--space-md) var(--space-xl);
-  font-size: var(--text-base);
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
   line-height: 1;
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
   text-decoration: none;
-  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  overflow: hidden;
+  transition: background-color 0.25s var(--ease-out), border-color 0.25s var(--ease-out),
+    color 0.25s var(--ease-out), transform 0.25s var(--ease-out),
+    box-shadow 0.25s var(--ease-out);
   min-height: 48px;
 }
 
@@ -20,26 +27,43 @@
   outline-offset: 2px;
 }
 
-/* Primary variant */
+/* Primary variant — gilded with a soft top sheen and a glow on lift */
 .primary {
-  background-color: var(--btn-primary-bg);
+  background-image: linear-gradient(
+    180deg,
+    var(--color-primary-light),
+    var(--color-accent) 55%,
+    #c79a2e
+  );
   color: var(--btn-primary-text);
-  border-color: var(--btn-primary-bg);
+  border-color: rgba(255, 224, 138, 0.6);
+  box-shadow: 0 6px 18px -8px rgba(212, 175, 55, 0.55);
 }
 
 .primary:hover {
-  background-color: var(--btn-primary-hover-bg);
-  border-color: var(--btn-primary-hover-bg);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px -10px rgba(212, 175, 55, 0.6);
 }
 
-/* Secondary variant */
+.primary:active {
+  transform: translateY(0);
+}
+
+/* Secondary variant — gold hairline ghost button */
 .secondary {
-  background-color: var(--btn-secondary-bg);
-  color: var(--btn-secondary-text);
-  border-color: var(--btn-secondary-border);
+  background-color: rgba(212, 175, 55, 0.04);
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
 }
 
 .secondary:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(212, 175, 55, 0.12);
+  border-color: var(--color-accent);
+  color: var(--color-primary-light);
+  transform: translateY(-2px);
+}
+
+.secondary:active {
+  transform: translateY(0);
 }
 

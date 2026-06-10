@@ -21,9 +21,12 @@
 }
 
 .siteName {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
   color: var(--color-primary);
-  font-weight: 700;
-  letter-spacing: 0.03em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
 }
 
 .email {

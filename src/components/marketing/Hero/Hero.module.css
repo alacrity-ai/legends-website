@@ -1,56 +1,105 @@
 .hero {
-  background-color: var(--color-primary);
+  position: relative;
+  background-color: var(--color-bg-dark);
+  /* Warm theatrical scrim aligned to the gold palette (was a cool blue tint
+     that fought the brand). Darkest at the bottom-left where the copy sits,
+     plus a soft top vignette for legibility. */
   background-image:
-    linear-gradient(to right, rgba(26, 26, 46, 0.85), rgba(26, 26, 46, 0.45)),
+    linear-gradient(
+      105deg,
+      rgba(5, 4, 7, 0.92) 0%,
+      rgba(5, 4, 7, 0.72) 38%,
+      rgba(11, 10, 15, 0.4) 70%,
+      rgba(58, 31, 51, 0.35) 100%
+    ),
     url('/assets/images/hero.webp');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  color: var(--color-text-inverse);
+  color: var(--color-text);
   padding-top: var(--space-4xl);
   padding-bottom: var(--space-4xl);
-  min-height: 70vh;
+  min-height: 78vh;
   display: flex;
   align-items: center;
+  overflow: hidden;
+}
+
+/* Vignette + thin gold baseline to seat the hero against the next section */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 -60px 80px -40px rgba(5, 4, 7, 0.9),
+    inset 0 0 160px 20px rgba(5, 4, 7, 0.5);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .content {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
-  max-width: 720px;
+  max-width: 760px;
 }
 
 .headline {
+  font-family: var(--font-display);
   font-size: var(--text-4xl);
-  font-weight: 800;
-  line-height: 1.1;
-  color: var(--color-accent);
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  line-height: 1.08;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--color-primary);
+  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.6);
 }
 
 .subcopy {
   font-size: var(--text-lg);
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.65;
+  color: rgba(245, 240, 230, 0.86);
   max-width: 600px;
 }
 
 /* ── Next event card ───────────────────────────────────── */
 
 .nextEvent {
-  background-color: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--color-border);
+  position: relative;
+  background-color: rgba(5, 4, 7, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
   padding: var(--space-lg) var(--space-xl);
   max-width: 540px;
+  box-shadow: var(--shadow-md);
+}
+
+/* "On Stage Next" gilt ribbon along the top edge of the card */
+.nextEvent::before {
+  content: 'On Stage Next';
+  position: absolute;
+  top: 0;
+  left: var(--space-xl);
+  transform: translateY(-50%);
+  padding: 3px var(--space-sm);
+  font-family: var(--font-display);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--btn-primary-text);
+  background-color: var(--color-accent);
+  border-radius: var(--radius-sm);
 }
 
 .nextEventTitle {
+  font-family: var(--font-display);
   font-size: var(--text-2xl);
-  font-weight: 700;
-  color: var(--color-accent);
+  font-weight: 600;
+  color: var(--color-primary);
   margin: 0 0 var(--space-xs);
 }
 

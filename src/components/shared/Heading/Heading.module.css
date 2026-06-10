@@ -1,15 +1,34 @@
 .heading {
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-2xl);
+}
+
+/* Short gold rule above each section title — a small marquee flourish that
+   ties the sections together without adding markup. */
+.heading::before {
+  content: '';
+  display: block;
+  width: 56px;
+  height: 2px;
+  margin-bottom: var(--space-md);
+  background: linear-gradient(
+    90deg,
+    var(--color-accent),
+    rgba(212, 175, 55, 0)
+  );
 }
 
 .title {
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-md);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
 }
 
 .subtitle {
+  font-family: var(--font-body);
   font-size: var(--text-lg);
   color: var(--color-text-muted);
-  line-height: 1.5;
-  max-width: 640px;
+  line-height: 1.6;
+  max-width: 600px;
+  text-wrap: pretty;
 }
 
