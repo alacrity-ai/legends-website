@@ -82,7 +82,9 @@ export default function BookingForm() {
   return (
     <Section id={sectionIds.book} className={styles.section}>
       <Container>
-        <Heading subtitle={bookingIntroCopy}>Book a Show</Heading>
+        <Heading align="center" subtitle={bookingIntroCopy}>
+          Book a Show
+        </Heading>
 
         <form className={styles.form} onSubmit={handleSubmit} noValidate>
           <div className={styles.fieldGroup}>

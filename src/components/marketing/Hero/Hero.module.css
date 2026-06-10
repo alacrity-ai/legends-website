@@ -47,9 +47,11 @@
 
 .headline {
   font-family: var(--font-display);
-  font-size: var(--text-4xl);
+  /* Dialed down from the 4xl/5xl display tier — engraved caps read large, so
+     a smaller ceiling keeps the headline elegant rather than shouty. */
+  font-size: clamp(1.9rem, 1.4rem + 2.4vw, 3rem);
   font-weight: 700;
-  line-height: 1.08;
+  line-height: 1.12;
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
   color: var(--color-primary);
@@ -143,10 +145,6 @@
     padding-top: var(--space-4xl);
     padding-bottom: var(--space-4xl);
     min-height: 80vh;
-  }
-
-  .headline {
-    font-size: var(--text-5xl);
   }
 
   .subcopy {

@@ -13,7 +13,7 @@ export default function About() {
   return (
     <Section id={sectionIds.about}>
       <Container>
-        <Heading>
+        <Heading align="center">
           {aboutHeadingParts.map((part, index) => {
             if (part.type === 'text') {
               return <span key={index}>{part.value}</span>;

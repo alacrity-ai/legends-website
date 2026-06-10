@@ -58,7 +58,9 @@ export default function Calendar() {
   return (
     <Section id={sectionIds.calendar}>
       <Container>
-        <Heading subtitle={calendarCopy}>Upcoming Shows</Heading>
+        <Heading align="center" subtitle={calendarCopy}>
+          Upcoming Shows
+        </Heading>
 
         {loading && (
           <p className={styles.statusText}>Loading upcoming shows...</p>

@@ -32,3 +32,21 @@
   text-wrap: pretty;
 }
 
+/* ── Centered variant ───────────────────────────────────── */
+
+.center {
+  text-align: center;
+}
+
+/* Center the gold marquee rule above the title */
+.center::before {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Center the (max-width-constrained) subtitle under the title */
+.center .subtitle {
+  margin-left: auto;
+  margin-right: auto;
+}
+
