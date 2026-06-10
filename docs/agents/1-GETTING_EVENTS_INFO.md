@@ -10,9 +10,10 @@ contract: `docs/v0.2/event_form/2-API.md`.
 
 | Need | Endpoint | Auth | Notes |
 | --- | --- | --- | --- |
-| **Everything** about all shows (payment-link ids, orderId, imageKey, source) | `GET /api/admin/events` | yes | Authoritative, **never cached** (`no-store`). Default choice. |
+| **Everything** about all shows (capacity/sold/soldOut/remaining, imageKey, source) | `GET /api/admin/events` | yes | Authoritative, **never cached** (`no-store`). Default choice. |
 | Everything about **one** show | `GET /api/admin/events/:id` | yes | Same fields, single record. |
-| What the **public site** shows | `GET /api/events` | no | Merged KV + legacy calendar. **Edge-cached 60s.** Limited ticket fields (`checkoutUrl`, no link ids). |
+| What the **public site** shows | `GET /api/events` | no | Merged KV + legacy calendar. **Edge-cached 60s.** Carries `soldOut`; tickets are `{ticketType, priceCents}` (no static link on v0.3 shows). |
+| A show's **auto roster + check-ins** | `GET /api/admin/events/:id/guests` | yes | `{ parties, checkedIn }`, built from completed purchases via the webhook. |
 | A show's **image bytes** | `GET /api/events/:id/image` | no | `404` if the show has no image. |
 
 **Rule of thumb:** for anything operational (payment links, management, "is it
@@ -39,34 +40,40 @@ Admin GETs need `Authorization: Bearer <ADMIN_PASSCODE>` — the passcode you
   "endTime":   "2026-08-28T19:00:00-04:00",
   "imageKey":  "events/43c4f19d-….webp",       // null if no image
   "tickets": [
-    { "ticketType": "Dinner & Show", "priceCents": 6495,
-      "checkoutUrl": "https://square.link/u/Zr2JB2UE",   // the buyer-facing payment link
-      "squarePaymentLinkId": "BJ6UYIKBWXD3WLXQ",         // Square ids (management/reconciliation)
-      "squareOrderId": "9JIM0vw7i7dGNguolk8kbOZ3a47YY" }
+    { "ticketType": "Dinner & Show", "priceCents": 6495 }   // v0.3: just price configs.
+    // (v0.2 shows may also carry legacy checkoutUrl/squarePaymentLinkId/squareOrderId.)
   ],
+  "capacity": 120,        // null = unlimited
+  "sold": 0,              // advanced by the Square webhook on each completed purchase
+  "soldOut": false,       // true at capacity, or set manually
+  "remaining": 120,       // capacity − sold (admin list only); null when uncapped
   "createdAt": "2026-05-31T…Z",
   "source": "form"
 }
 ```
 
-Prices are **integer cents** (`priceCents`) — divide by 100 for dollars.
+Prices are **integer cents** (`priceCents`) — divide by 100 for dollars. v0.3 shows
+have **no static `checkoutUrl`** — buyers get a link from `POST /api/events/:id/checkout`.
+The shareable per-show URL is `https://djkmdlegends.com/?event=<id>`.
 
 ## Recipes
 
 ```bash
-# All shows, readable summary
+# All shows, readable summary (capacity/sold + ticket prices)
 curl -s https://djkmdlegends.com/api/admin/events -H "Authorization: Bearer $PASSCODE" \
 | python3 -c "
 import sys,json
 for e in json.load(sys.stdin)['events']:
-    print(e['id'], '|', e['startTime'][:16], '|', e['showName'], '|', e['venueName'])
+    cap = e.get('capacity'); sold = e.get('sold',0)
+    print(e['id'], '|', e['startTime'][:16], '|', e['showName'], '|', e['venueName'],
+          '| sold %d/%s%s' % (sold, cap if cap is not None else '∞', ' SOLD OUT' if e.get('soldOut') else ''))
     for t in e['tickets']:
-        print('    ', t['ticketType'], '\$%.2f'%(t['priceCents']/100), t['checkoutUrl'])
+        print('    ', t['ticketType'], '\$%.2f'%(t['priceCents']/100))
 "
 
-# Just the payment links
+# Share links to hand out (the site URL that opens each show with the stepper)
 curl -s https://djkmdlegends.com/api/admin/events -H "Authorization: Bearer $PASSCODE" \
-| python3 -c "import sys,json; [print(e['showName'],'—',t['ticketType'],t['checkoutUrl']) for e in json.load(sys.stdin)['events'] for t in e['tickets']]"
+| python3 -c "import sys,json; [print(e['showName'],'—','https://djkmdlegends.com/?event='+e['id']) for e in json.load(sys.stdin)['events']]"
 
 # Find a show's id by name (then use it for PATCH/DELETE/GET-one)
 curl -s https://djkmdlegends.com/api/admin/events -H "Authorization: Bearer $PASSCODE" \
@@ -88,10 +95,13 @@ curl -s "https://djkmdlegends.com/api/events?cb=$(date +%s)" \
   mean a just-created show may be missing from `GET /api/events`. The admin list is
   `no-store` and authoritative — trust it. (If you must hit the public one fresh,
   add `?cb=$(date +%s)`.)
-- **Public vs admin shape differ:** public `tickets[]` have only `checkoutUrl`
-  (no `squarePaymentLinkId`/`squareOrderId`); public events also carry `imageUrl`
-  and split `date`/`time`, while admin records carry raw `startTime`/`endTime` +
-  `imageKey`. Pick the endpoint whose shape matches what you need.
+- **No static checkout link on v0.3 shows:** don't expect `tickets[].checkoutUrl`. Buyers
+  mint a link via `POST /api/events/:id/checkout` `{ticketType, quantity}`; to hand someone a
+  link, give the **share URL** `https://djkmdlegends.com/?event=<id>`. (The 2 v0.2 shows still
+  carry a legacy `checkoutUrl`, but the site ignores it and uses the stepper anyway.)
+- **Public vs admin shape differ:** public events carry `imageUrl`, `soldOut`, and split
+  `date`/`time`; admin records carry raw `startTime`/`endTime` + `imageKey` + `capacity`/`sold`/
+  `soldOut`/`remaining`. Pick the endpoint whose shape matches what you need.
 - **Legacy calendar events** appear only in the public feed (not the admin list) —
   they're the 2 grandfathered Google Calendar shows, have no `id`/`tickets[]`
   structure, and carry their Square link inside `description`.

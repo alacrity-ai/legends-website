@@ -1,15 +1,17 @@
 import type {
+  CachedLink,
   CheckinRecord,
   Env,
   EventDraft,
   EventRecord,
-  EventTicket,
   Party,
+  PartyRecord,
   PublicEvent,
 } from './types.ts';
 import {
   parseBookingInquiry,
   parseCheckinPayload,
+  parseCheckinPaymentPayload,
   parseEventDraft,
   parseEventPatch,
   parseMailingListSignup,
@@ -19,10 +21,17 @@ import { sendEmail } from './services/mailgun.ts';
 import { buildNotificationEmail } from './templates/notification.ts';
 import { buildConfirmationEmail } from './templates/confirmation.ts';
 import { fetchUpcomingEvents } from './services/google-calendar.ts';
-import { createPaymentLink, deactivatePaymentLink } from './services/square.ts';
+import {
+  createPaymentLink,
+  deactivatePaymentLink,
+  getOrderDetails,
+  verifyWebhookSignature,
+} from './services/square.ts';
+
+const MAX_CHECKOUT_QTY = 20;
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const corsHeaders = getCorsHeaders(request, env.ALLOWED_ORIGINS);
 
     if (request.method === 'OPTIONS') {
@@ -36,6 +45,21 @@ export default {
         return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
       }
       return handleEvents(env, corsHeaders);
+    }
+
+    if (url.pathname === '/api/square/webhook') {
+      if (request.method !== 'POST') {
+        return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+      }
+      return handleSquareWebhook(request, url, env, ctx, corsHeaders);
+    }
+
+    const checkoutMatch = url.pathname.match(/^\/api\/events\/([a-f0-9-]+)\/checkout$/);
+    if (checkoutMatch) {
+      if (request.method !== 'POST') {
+        return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+      }
+      return handleCheckout(checkoutMatch[1], request, env, corsHeaders);
     }
 
     if (url.pathname === '/api/booking') {
@@ -139,12 +163,241 @@ function eventRecordToPublic(r: EventRecord): PublicEvent {
     location: `${r.venueName}, ${r.venueAddress}`,
     description: r.description,
     imageUrl: r.imageKey ? `/api/events/${r.id}/image` : null,
+    soldOut: r.soldOut ?? false,
     tickets: r.tickets.map((t) => ({
       ticketType: t.ticketType,
       priceCents: t.priceCents,
-      checkoutUrl: t.checkoutUrl,
+      // Legacy v0.2 shows still carry a static link; new shows mint on demand.
+      ...(t.checkoutUrl ? { checkoutUrl: t.checkoutUrl } : {}),
     })),
   };
+}
+
+/* ── Public dynamic checkout (Option E) ───────────────────────── */
+
+/**
+ * Mint (or reuse) a Square checkout link priced for N tickets of one type.
+ * Body: `{ ticketType, quantity }`. The buyer picks the quantity on our own
+ * stepper, so Square's missing quantity selector doesn't matter — we set the
+ * price to `unit × quantity`.
+ */
+async function handleCheckout(
+  id: string,
+  request: Request,
+  env: Env,
+  corsHeaders: Record<string, string>,
+): Promise<Response> {
+  const noStore = { 'Cache-Control': 'no-store' };
+
+  let body: { ticketType?: unknown; quantity?: unknown };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return jsonResponse(400, { error: 'Invalid JSON body' }, corsHeaders);
+  }
+  const ticketType = typeof body.ticketType === 'string' ? body.ticketType.trim() : '';
+  const quantity = typeof body.quantity === 'number' ? body.quantity : NaN;
+  if (!ticketType) {
+    return jsonResponse(400, { error: 'ticketType is required' }, corsHeaders);
+  }
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_CHECKOUT_QTY) {
+    return jsonResponse(400, { error: `quantity must be between 1 and ${MAX_CHECKOUT_QTY}` }, corsHeaders);
+  }
+
+  const raw = await env.EVENTS.get(`event:${id}`);
+  if (!raw) return jsonResponse(404, { error: 'Event not found' }, corsHeaders);
+  let event: EventRecord;
+  try {
+    event = JSON.parse(raw) as EventRecord;
+  } catch {
+    return jsonResponse(500, { error: 'Event is malformed' }, corsHeaders);
+  }
+
+  const ticket = event.tickets.find((t) => t.ticketType === ticketType);
+  if (!ticket) return jsonResponse(404, { error: 'Unknown ticket type' }, corsHeaders);
+
+  // Capacity gate. Small oversell is acceptable, so we only block once fully sold out.
+  if (event.soldOut || (event.capacity != null && (event.sold ?? 0) >= event.capacity)) {
+    return jsonResponse(409, { error: 'Sold out' }, corsHeaders);
+  }
+
+  // Reuse a cached link for this (type, qty) if we've already minted one.
+  const cacheKey = `link:${id}:${ticketType}:${quantity}`;
+  const cachedRaw = await env.EVENTS.get(cacheKey);
+  if (cachedRaw) {
+    try {
+      const cached = JSON.parse(cachedRaw) as CachedLink;
+      if (cached.checkoutUrl) {
+        return jsonResponse(200, { checkoutUrl: cached.checkoutUrl }, corsHeaders, noStore);
+      }
+    } catch {
+      // fall through and re-mint
+    }
+  }
+
+  let link;
+  try {
+    link = await createPaymentLink(env, {
+      itemName: `${ticketType} × ${quantity} · ${formatEventDateTime(event.startTime)} · ${event.venueName}`,
+      amountCents: ticket.priceCents * quantity,
+      redirectUrl: primaryOrigin(env) + '/?purchase=success',
+      paymentNote: `legends-event:${id}:${ticketType}:${quantity}`,
+      customFieldTitle: 'Full name (for the guest list)',
+    });
+  } catch (err) {
+    return jsonResponse(502, { error: `Square: ${errorMessage(err)}` }, corsHeaders);
+  }
+
+  const cached: CachedLink = {
+    checkoutUrl: link.checkoutUrl,
+    squarePaymentLinkId: link.paymentLinkId,
+    squareOrderId: link.orderId,
+  };
+  await env.EVENTS.put(cacheKey, JSON.stringify(cached));
+
+  return jsonResponse(200, { checkoutUrl: link.checkoutUrl }, corsHeaders, noStore);
+}
+
+/* ── Square webhook → auto-roster + sold counter ──────────────── */
+
+interface SquareWebhookEvent {
+  type: string;
+  event_id?: string;
+  data?: { object?: { payment?: { id: string; status: string; order_id?: string } } };
+}
+
+async function handleSquareWebhook(
+  request: Request,
+  url: URL,
+  env: Env,
+  ctx: ExecutionContext,
+  corsHeaders: Record<string, string>,
+): Promise<Response> {
+  if (!env.SQUARE_WEBHOOK_SIGNATURE_KEY) {
+    console.error('[webhook] SQUARE_WEBHOOK_SIGNATURE_KEY not configured');
+    return jsonResponse(500, { error: 'Webhook not configured' }, corsHeaders);
+  }
+
+  const signature = request.headers.get('x-square-hmacsha256-signature');
+  if (!signature) {
+    return jsonResponse(401, { error: 'Missing signature' }, corsHeaders);
+  }
+
+  const rawBody = await request.text();
+  const notificationUrl = `${url.origin}/api/square/webhook`;
+  const valid = await verifyWebhookSignature(
+    env.SQUARE_WEBHOOK_SIGNATURE_KEY,
+    notificationUrl,
+    rawBody,
+    signature,
+  );
+  if (!valid) {
+    console.warn('[webhook] signature mismatch', {
+      notificationUrl,
+      sigPrefix: signature.slice(0, 8),
+    });
+    return jsonResponse(401, { error: 'Invalid signature' }, corsHeaders);
+  }
+
+  let event: SquareWebhookEvent;
+  try {
+    event = JSON.parse(rawBody) as SquareWebhookEvent;
+  } catch {
+    return jsonResponse(400, { error: 'Invalid JSON' }, corsHeaders);
+  }
+
+  const payment = event.data?.object?.payment;
+  if (event.type !== 'payment.updated' || !payment) {
+    return jsonResponse(200, { ignored: true, type: event.type }, corsHeaders);
+  }
+  if (payment.status !== 'COMPLETED') {
+    return jsonResponse(200, { ignored: true, status: payment.status }, corsHeaders);
+  }
+  if (!payment.order_id) {
+    return jsonResponse(200, { ignored: true, reason: 'no order_id' }, corsHeaders);
+  }
+
+  // Return 200 fast; do the order fetch + KV writes in the background.
+  ctx.waitUntil(
+    processCompletedPayment(env, payment.id, payment.order_id).catch((err) => {
+      console.error('[webhook] processing failed', errorMessage(err));
+    }),
+  );
+
+  return jsonResponse(200, { ok: true }, corsHeaders);
+}
+
+/** Parse `legends-event:<id>:<ticketType>:<qty>` (ticketType may contain colons). */
+function parsePaymentNote(
+  note: string | null,
+): { eventId: string; ticketType: string; quantity: number } | null {
+  if (!note) return null;
+  const m = note.match(/^legends-event:([^:]+):(.+):(\d+)$/);
+  if (!m) return null;
+  return { eventId: m[1], ticketType: m[2], quantity: Number(m[3]) };
+}
+
+function splitName(full: string | null): { firstName: string; lastName: string } {
+  const trimmed = (full ?? '').trim();
+  if (!trimmed) return { firstName: '', lastName: '' };
+  const parts = trimmed.split(/\s+/);
+  return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+}
+
+/**
+ * Build a roster entry from a completed payment and advance the sold counter.
+ * Idempotent on `paymentId`: the party key doubles as the dedupe marker, so a
+ * duplicate webhook delivery sees the existing party and bails before
+ * double-counting `sold`.
+ */
+async function processCompletedPayment(
+  env: Env,
+  paymentId: string,
+  orderId: string,
+): Promise<void> {
+  const details = await getOrderDetails(env, orderId);
+  const parsed = parsePaymentNote(details?.note ?? null);
+  if (!parsed) {
+    console.warn('[webhook] no/unparseable payment_note for order', orderId);
+    return;
+  }
+  const { eventId, ticketType, quantity } = parsed;
+
+  const partyKey = `party:${eventId}:${paymentId}`;
+  if (await env.GUESTLIST.get(partyKey)) {
+    return; // already processed this payment
+  }
+
+  const { firstName, lastName } = splitName(details?.customFieldName ?? details?.recipientName ?? null);
+  const party: PartyRecord = {
+    paymentId,
+    firstName,
+    lastName,
+    email: details?.email ?? '',
+    phone: details?.phone ?? null,
+    quantity,
+    ticketType,
+    purchasedAt: new Date().toISOString(),
+  };
+  await env.GUESTLIST.put(partyKey, JSON.stringify(party));
+
+  // Advance the sold counter and flip sold-out if capacity is now reached.
+  const raw = await env.EVENTS.get(`event:${eventId}`);
+  if (!raw) return;
+  let record: EventRecord;
+  try {
+    record = JSON.parse(raw) as EventRecord;
+  } catch {
+    return;
+  }
+  record.sold = (record.sold ?? 0) + quantity;
+  const nowSoldOut = record.capacity != null && record.sold >= record.capacity;
+  if (nowSoldOut) record.soldOut = true;
+  await env.EVENTS.put(`event:${eventId}`, JSON.stringify(record));
+
+  if (nowSoldOut) {
+    await clearLinkCache(env, eventId);
+  }
 }
 
 async function handleBooking(
@@ -440,7 +693,37 @@ async function handleAdminEvents(
     if (request.method === 'GET') {
       const records = await listEventRecords(env);
       records.sort((a, b) => b.startTime.localeCompare(a.startTime));
-      return jsonResponse(200, { events: records }, corsHeaders, noStore);
+      const events = records.map((r) => {
+        const sold = r.sold ?? 0;
+        const capacity = r.capacity ?? null;
+        return {
+          ...r,
+          sold,
+          capacity,
+          soldOut: r.soldOut ?? false,
+          remaining: capacity === null ? null : Math.max(0, capacity - sold),
+        };
+      });
+      return jsonResponse(200, { events }, corsHeaders, noStore);
+    }
+    return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+  }
+
+  const guestsMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/guests$/);
+  if (guestsMatch) {
+    if (request.method !== 'GET') {
+      return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+    }
+    return handleGetEventGuests(guestsMatch[1], env, corsHeaders, noStore);
+  }
+
+  const checkinMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/checkin$/);
+  if (checkinMatch) {
+    if (request.method === 'POST') {
+      return handleEventCheckin(checkinMatch[1], request, env, corsHeaders);
+    }
+    if (request.method === 'DELETE') {
+      return handleEventUncheck(checkinMatch[1], request, env, corsHeaders);
     }
     return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
   }
@@ -460,6 +743,105 @@ async function handleAdminEvents(
   }
 
   return jsonResponse(404, { error: 'Not found' }, corsHeaders);
+}
+
+/* ── Admin: auto-roster + door check-in (v0.3) ────────────────── */
+
+function partyRecordToParty(r: PartyRecord): Party {
+  return {
+    id: r.paymentId,
+    firstName: r.firstName,
+    lastName: r.lastName,
+    email: r.email,
+    phone: r.phone,
+    quantity: r.quantity,
+    purchases: [{ variation: 'Unknown', quantity: r.quantity }],
+    orderDate: r.purchasedAt,
+    notes: r.ticketType || null,
+  };
+}
+
+async function handleGetEventGuests(
+  id: string,
+  env: Env,
+  corsHeaders: Record<string, string>,
+  noStore: Record<string, string>,
+): Promise<Response> {
+  const [partyList, checkinList] = await Promise.all([
+    env.GUESTLIST.list({ prefix: `party:${id}:` }),
+    env.GUESTLIST.list({ prefix: `checkin:${id}:` }),
+  ]);
+
+  const partyRaws = await Promise.all(partyList.keys.map((k) => env.GUESTLIST.get(k.name)));
+  const parties: Party[] = [];
+  for (const raw of partyRaws) {
+    if (!raw) continue;
+    try {
+      parties.push(partyRecordToParty(JSON.parse(raw) as PartyRecord));
+    } catch {
+      // skip malformed entry
+    }
+  }
+  parties.sort((a, b) =>
+    `${a.lastName} ${a.firstName}`.toLowerCase().localeCompare(`${b.lastName} ${b.firstName}`.toLowerCase()),
+  );
+
+  const prefix = `checkin:${id}:`;
+  const checkedInIds = checkinList.keys.map((k) => k.name.slice(prefix.length));
+  const checkinValues = await Promise.all(
+    checkedInIds.map((cid) => env.GUESTLIST.get(`${prefix}${cid}`)),
+  );
+  const checkedIn: Record<string, string> = {};
+  for (let i = 0; i < checkedInIds.length; i++) {
+    const raw = checkinValues[i];
+    if (!raw) continue;
+    try {
+      checkedIn[checkedInIds[i]] = (JSON.parse(raw) as CheckinRecord).checkedInAt;
+    } catch {
+      // skip malformed entry
+    }
+  }
+
+  return jsonResponse(200, { parties, checkedIn }, corsHeaders, noStore);
+}
+
+async function handleEventCheckin(
+  id: string,
+  request: Request,
+  env: Env,
+  corsHeaders: Record<string, string>,
+): Promise<Response> {
+  let payload: { paymentId: string };
+  try {
+    payload = parseCheckinPaymentPayload(await request.json());
+  } catch (err) {
+    return jsonResponse(400, { error: errorMessage(err) }, corsHeaders);
+  }
+
+  const exists = await env.GUESTLIST.get(`party:${id}:${payload.paymentId}`);
+  if (!exists) {
+    return jsonResponse(404, { error: 'Party not found in show' }, corsHeaders);
+  }
+
+  const record: CheckinRecord = { checkedInAt: new Date().toISOString() };
+  await env.GUESTLIST.put(`checkin:${id}:${payload.paymentId}`, JSON.stringify(record));
+  return jsonResponse(200, { ok: true, checkedInAt: record.checkedInAt }, corsHeaders);
+}
+
+async function handleEventUncheck(
+  id: string,
+  request: Request,
+  env: Env,
+  corsHeaders: Record<string, string>,
+): Promise<Response> {
+  let payload: { paymentId: string };
+  try {
+    payload = parseCheckinPaymentPayload(await request.json());
+  } catch (err) {
+    return jsonResponse(400, { error: errorMessage(err) }, corsHeaders);
+  }
+  await env.GUESTLIST.delete(`checkin:${id}:${payload.paymentId}`);
+  return jsonResponse(200, { ok: true }, corsHeaders);
 }
 
 interface ParsedCreate {
@@ -586,7 +968,11 @@ function decodeBase64Image(
   return { bytes, mime, ext };
 }
 
-/** Shared pipeline: create Square links, store the image in R2, persist the record. */
+/**
+ * Shared pipeline: store the image in R2, persist the record. Under Option E
+ * creation makes ZERO Square calls — tickets are stored as price configs and
+ * checkout links are minted on demand at purchase time.
+ */
 async function finalizeEventCreation(
   parsed: ParsedCreate,
   env: Env,
@@ -595,35 +981,6 @@ async function finalizeEventCreation(
 ): Promise<Response> {
   const { draft, imageBytes, imageMime, imageExt } = parsed;
   const id = crypto.randomUUID();
-  const redirectUrl = primaryOrigin(env) + '/?purchase=success';
-
-  // Create one Square payment link per ticket type. Abort (and clean up) on any failure.
-  const created: EventTicket[] = [];
-  for (const ticket of draft.tickets) {
-    try {
-      const link = await createPaymentLink(env, {
-        eventId: id,
-        ticketType: ticket.ticketType,
-        // Buyer-visible checkout line item: ticket type · date/time · venue.
-        itemName: `${ticket.ticketType} · ${formatEventDateTime(draft.startTime)} · ${draft.venueName}`,
-        amountCents: ticket.priceCents,
-        redirectUrl,
-      });
-      created.push({
-        ...ticket,
-        checkoutUrl: link.checkoutUrl,
-        squarePaymentLinkId: link.paymentLinkId,
-        squareOrderId: link.orderId,
-      });
-    } catch (err) {
-      await Promise.all(created.map((t) => deactivatePaymentLink(env, t.squarePaymentLinkId)));
-      return jsonResponse(
-        502,
-        { error: `Square: "${ticket.ticketType}" failed: ${errorMessage(err)}` },
-        corsHeaders,
-      );
-    }
-  }
 
   // Store the image in R2.
   const imageKey = `events/${id}.${imageExt}`;
@@ -632,7 +989,6 @@ async function finalizeEventCreation(
       httpMetadata: { contentType: imageMime },
     });
   } catch (err) {
-    await Promise.all(created.map((t) => deactivatePaymentLink(env, t.squarePaymentLinkId)));
     console.error('Image upload failed:', errorMessage(err));
     return jsonResponse(500, { error: 'Failed to store image' }, corsHeaders);
   }
@@ -641,8 +997,10 @@ async function finalizeEventCreation(
   const record: EventRecord = {
     id,
     ...draft,
-    tickets: created,
+    tickets: draft.tickets, // stored as {ticketType, priceCents} configs
     imageKey,
+    sold: 0,
+    soldOut: false,
     createdAt: new Date().toISOString(),
     source: 'form',
   };
@@ -650,7 +1008,6 @@ async function finalizeEventCreation(
     await env.EVENTS.put(`event:${id}`, JSON.stringify(record));
   } catch (err) {
     await env.EVENT_IMAGES.delete(imageKey).catch(() => {});
-    await Promise.all(created.map((t) => deactivatePaymentLink(env, t.squarePaymentLinkId)));
     console.error('Event KV write failed:', errorMessage(err));
     return jsonResponse(500, { error: 'Failed to save event' }, corsHeaders);
   }
@@ -700,19 +1057,50 @@ async function handleDeleteEvent(
   if (record.imageKey) {
     await env.EVENT_IMAGES.delete(record.imageKey).catch(() => {});
   }
+  // Deactivate any legacy per-ticket links and any on-demand cached links.
   await Promise.all(
-    record.tickets.map((t) => deactivatePaymentLink(env, t.squarePaymentLinkId)),
+    record.tickets
+      .map((t) => t.squarePaymentLinkId)
+      .filter((linkId): linkId is string => Boolean(linkId))
+      .map((linkId) => deactivatePaymentLink(env, linkId)),
   );
+  await clearLinkCache(env, id);
 
   return jsonResponse(200, { ok: true }, corsHeaders, noStore);
 }
 
 /**
- * Update an event (JSON, partial). Any subset of the create fields can be sent.
- * - Metadata edits (name, description, venue, dates) update the record and KEEP
- *   the existing Square checkout links (so already-shared links/QRs still work).
- * - Sending `tickets` mints fresh Square links for the new set and deactivates
- *   the old ones (checkout prices can't be edited in place).
+ * List the on-demand checkout links cached for an event, deactivate each on
+ * Square, and delete the cache keys. Best-effort and safe to call repeatedly.
+ */
+async function clearLinkCache(env: Env, id: string): Promise<void> {
+  const prefix = `link:${id}:`;
+  const list = await env.EVENTS.list({ prefix });
+  await Promise.all(
+    list.keys.map(async (k) => {
+      const raw = await env.EVENTS.get(k.name);
+      if (raw) {
+        try {
+          const cached = JSON.parse(raw) as CachedLink;
+          if (cached.squarePaymentLinkId) {
+            await deactivatePaymentLink(env, cached.squarePaymentLinkId);
+          }
+        } catch {
+          // ignore malformed cache entry
+        }
+      }
+      await env.EVENTS.delete(k.name);
+    }),
+  );
+}
+
+/**
+ * Update an event (JSON, partial). Any subset of the create fields can be sent,
+ * plus `capacity` and `soldOut`.
+ * - Metadata edits (name, description, venue, dates, capacity, soldOut) update
+ *   the record in place. No Square calls.
+ * - Sending `tickets` (new types or prices) clears the on-demand link cache so
+ *   the next checkout re-mints at the new price. No upfront minting.
  * - Image: `image` (base64/data URL) replaces it; `image: null` or
  *   `removeImage: true` removes it; omit to leave it unchanged.
  */
@@ -735,7 +1123,7 @@ async function handlePatchEvent(
   }
 
   // Parse the body: metadata/ticket fields via parseEventPatch, image directives separately.
-  let patch: Partial<EventDraft>;
+  let patch: Partial<EventDraft> & { soldOut?: boolean };
   let imageAction: { type: 'none' } | { type: 'remove' } | { type: 'replace'; bytes: Uint8Array; mime: string; ext: string };
   try {
     const body: unknown = await request.json();
@@ -768,38 +1156,12 @@ async function handlePatchEvent(
     return jsonResponse(400, { error: 'endTime must be after startTime' }, corsHeaders);
   }
 
-  // If tickets changed, mint new Square links (deactivate the old ones after commit).
-  let tickets = existing.tickets;
-  let oldLinkIds: string[] = [];
-  if (patch.tickets) {
-    const created: EventTicket[] = [];
-    for (const ticket of patch.tickets) {
-      try {
-        const link = await createPaymentLink(env, {
-          eventId: id,
-          ticketType: ticket.ticketType,
-          itemName: `${ticket.ticketType} · ${formatEventDateTime(merged.startTime)} · ${merged.venueName}`,
-          amountCents: ticket.priceCents,
-          redirectUrl: primaryOrigin(env) + '/?purchase=success',
-        });
-        created.push({
-          ...ticket,
-          checkoutUrl: link.checkoutUrl,
-          squarePaymentLinkId: link.paymentLinkId,
-          squareOrderId: link.orderId,
-        });
-      } catch (err) {
-        await Promise.all(created.map((t) => deactivatePaymentLink(env, t.squarePaymentLinkId)));
-        return jsonResponse(
-          502,
-          { error: `Square: "${ticket.ticketType}" failed: ${errorMessage(err)}` },
-          corsHeaders,
-        );
-      }
-    }
-    tickets = created;
-    oldLinkIds = existing.tickets.map((t) => t.squarePaymentLinkId);
-  }
+  // If tickets (types or prices) changed, the cached on-demand links are stale —
+  // clear them so the next checkout re-mints at the new price. Done after commit.
+  const ticketsChanged =
+    !!patch.tickets &&
+    JSON.stringify(patch.tickets.map((t) => [t.ticketType, t.priceCents])) !==
+      JSON.stringify(existing.tickets.map((t) => [t.ticketType, t.priceCents]));
 
   // Resolve the image change. New image stored before commit; old removed after.
   let imageKey = existing.imageKey;
@@ -816,9 +1178,6 @@ async function handlePatchEvent(
       });
       storedNewKey = newKey;
     } catch (err) {
-      if (patch.tickets) {
-        await Promise.all(tickets.map((t) => deactivatePaymentLink(env, t.squarePaymentLinkId)));
-      }
       console.error('Image upload failed:', errorMessage(err));
       return jsonResponse(500, { error: 'Failed to store image' }, corsHeaders);
     }
@@ -828,22 +1187,23 @@ async function handlePatchEvent(
     imageKey = newKey;
   }
 
-  // Commit the updated record.
-  const updated: EventRecord = { ...existing, ...patch, tickets, imageKey };
+  // Commit the updated record. `tickets` are stored as plain price configs.
+  const updated: EventRecord = {
+    ...existing,
+    ...patch,
+    tickets: patch.tickets ?? existing.tickets,
+    imageKey,
+  };
   try {
     await env.EVENTS.put(`event:${id}`, JSON.stringify(updated));
   } catch (err) {
-    // Roll back resources created for this (failed) update.
-    if (patch.tickets) {
-      await Promise.all(tickets.map((t) => deactivatePaymentLink(env, t.squarePaymentLinkId)));
-    }
     if (storedNewKey) await env.EVENT_IMAGES.delete(storedNewKey).catch(() => {});
     console.error('Event KV write failed:', errorMessage(err));
     return jsonResponse(500, { error: 'Failed to save event' }, corsHeaders);
   }
 
   // Best-effort cleanup of resources the old record referenced.
-  await Promise.all(oldLinkIds.map((linkId) => deactivatePaymentLink(env, linkId)));
+  if (ticketsChanged) await clearLinkCache(env, id);
   if (oldImageKeyToDelete) {
     await env.EVENT_IMAGES.delete(oldImageKeyToDelete).catch(() => {});
   }

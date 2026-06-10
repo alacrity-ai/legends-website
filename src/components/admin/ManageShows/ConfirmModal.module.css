@@ -1,0 +1,119 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  background: rgba(5, 4, 7, 0.72);
+  backdrop-filter: blur(4px);
+  animation: fade 0.18s ease;
+}
+
+.modal {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  max-width: 420px;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(217, 92, 92, 0.12), transparent 60%),
+    var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl) var(--space-lg) var(--space-lg);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+  animation: rise 0.2s ease;
+}
+
+.modal::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-error), transparent);
+  opacity: 0.6;
+}
+
+.icon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto var(--space-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-error);
+  border-radius: 999px;
+  border: 1px solid rgba(217, 92, 92, 0.5);
+  background: rgba(217, 92, 92, 0.12);
+}
+
+.title {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 var(--space-sm);
+}
+
+.message {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-lg);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.btn {
+  flex: 1;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-base);
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cancel {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.cancel:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.confirm {
+  background: var(--color-error);
+  color: #fff;
+}
+
+.confirm:hover:not(:disabled) {
+  background: #c44a4a;
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}

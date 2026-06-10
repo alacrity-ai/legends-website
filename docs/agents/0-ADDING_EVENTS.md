@@ -6,14 +6,18 @@ for the design see `docs/v0.2/event_form/0-DESIGN.md`.
 
 ## What you're doing
 
-Shows live in Cloudflare KV and are sold through Square payment links the worker
-creates for you. To add a show you **POST JSON to the live API** — you do **not**
-deploy anything, and you do **not** edit the repo. The show appears on
+Shows live in Cloudflare KV. As of **v0.3 ("Option E")**, creating a show makes
+**no Square calls** — it stores ticket *price configs* and an optional capacity.
+Checkout links are minted **on demand** when a buyer picks a quantity on the site
+(`POST /api/events/:id/checkout`). To add a show you **POST JSON to the live API** —
+you do **not** deploy anything, and you do **not** edit the repo. The show appears on
 `djkmdlegends.com` (Upcoming Shows) within ~60s.
 
 - Endpoint: `POST https://djkmdlegends.com/api/admin/events` (`Content-Type: application/json`)
 - Update: `PATCH /api/admin/events/:id` · Remove: `DELETE /api/admin/events/:id`
 - All require `Authorization: Bearer <ADMIN_PASSCODE>`.
+- **Share link / QR for a show is the site URL** `https://djkmdlegends.com/?event=<id>` —
+  it opens the show with the quantity stepper. Do **not** share a raw `square.link` URL.
 
 ## Step 0 — Get the passcode (you cannot read it)
 
@@ -50,6 +54,8 @@ which orchestra size, etc.) — see the "discrepancies" note below.
     New England shows: a June/Aug/Sep/Oct show is `-04:00`; a Dec/Jan/Feb show is `-05:00`.
   - Time is the wall-clock start, e.g. 4:30 PM → `T16:30:00`.
 - `tickets`: 1–10 items, unique `ticketType`, `price` in **US dollars** (e.g. `64.95`).
+- `capacity` *(optional)*: positive integer = total tickets across all types; omit or `null`
+  for unlimited. At capacity the show auto-flips to **Sold Out** (via the Square webhook).
 - `image`: JPEG/PNG/WebP, ≤5 MB, sent as a **base64 data URL** (see Step 2). Required at create.
 
 ## Step 2 — Build the request body (image as a data URL)
@@ -69,6 +75,7 @@ body = {
   "startTime": "2026-08-28T16:00:00-04:00",   # 4:00 PM EDT, future
   "endTime":   "2026-08-28T19:00:00-04:00",   # 7:00 PM
   "tickets": [{"ticketType": "Dinner & Show", "price": 64.95}],
+  "capacity": 120,                            # optional; omit/None for unlimited
   "image": "data:image/jpeg;base64," + img,   # mime must match the file
 }
 json.dump(body, open('/tmp/show.json','w'))
@@ -86,10 +93,10 @@ curl -s -X POST https://djkmdlegends.com/api/admin/events \
   --data @/tmp/show.json -w "\n[HTTP %{http_code}]\n"
 ```
 
-`200` → `{ "event": { "id": "...", "tickets": [ { "checkoutUrl": "https://square.link/u/...", ... } ] } }`.
-The `checkoutUrl`s are **real, live** Square links (production token) — ready to take money.
-Errors: `400` validation (message names the field), `401` auth, `502` Square rejected a ticket
-(nothing saved), `500` storage.
+`200` → `{ "event": { "id": "...", "tickets": [ { "ticketType": "...", "priceCents": 6495 } ],
+"capacity": 120, "sold": 0, "soldOut": false } }`. No `checkoutUrl` at create — links are minted
+on demand at purchase time. Errors: `400` validation (message names the field), `401` auth, `500` storage.
+(Create no longer calls Square, so there's no `502` on create.)
 
 ## Step 4 — Verify (mind the cache)
 
@@ -107,10 +114,18 @@ curl -s -o /dev/null -w "image: %{http_code} %{content_type}\n" "https://djkmdle
 
 ## Updating a show — `PATCH /api/admin/events/:id`
 
-JSON, partial — send only what changes.
-- **Metadata** (name, description, venue, dates) → **keeps the existing checkout links** (shared links/QRs stay valid).
-- **`tickets`** → mints **new** Square links, deactivates the old (prices can't be edited in place). Re-share QRs.
+JSON, partial — send only what changes. The share link (`/?event=<id>`) is stable across all edits.
+- **Metadata** (name, description, venue, dates) → updated in place.
+- **`capacity`** (int/null) and **`soldOut`** (bool, manual override) are patchable.
+- **`tickets`** → clears the cached on-demand links so the next checkout re-mints at the new price.
 - **Image**: `"image": "data:..."` replaces; `"image": null` (or `"removeImage": true`) removes; omit = unchanged.
+
+```bash
+# mark a show sold out manually (or set false to re-open)
+curl -s -X PATCH https://djkmdlegends.com/api/admin/events/$ID \
+  -H "Authorization: Bearer $PASSCODE" -H "Content-Type: application/json" \
+  --data '{"soldOut":true}' -w "\n[%{http_code}]\n"
+```
 
 ```bash
 # change a description only
@@ -129,17 +144,22 @@ curl -s -X PATCH https://djkmdlegends.com/api/admin/events/$ID \
 ```bash
 curl -s -X DELETE https://djkmdlegends.com/api/admin/events/$ID -H "Authorization: Bearer $PASSCODE"
 ```
-Removes the KV record, deactivates the Square link(s), deletes the R2 image.
+Removes the KV record, deactivates any cached/legacy Square link(s), deletes the R2 image.
 
 ## Gotchas (learned the hard way)
 
 - **Shell quoting:** never do `H="Authorization: Bearer x"; curl $H` — the space splits the
   word and the token is dropped → silent `401`. Quote it: `-H "$AUTH"`, or inline `-H "Authorization: Bearer $PASSCODE"`.
+- **Cloudflare bot block (HTTP `403`, body `error code: 1010`):** the default `python-urllib`
+  user-agent is banned at the edge, so a Python `urllib`/`requests` POST fails before it ever
+  reaches the worker. `curl` is fine. If you script the create in Python, send a browser UA:
+  `req.add_header("User-Agent", "Mozilla/5.0 ... Chrome/124.0 Safari/537.36")`. A `1010` is the
+  edge rejecting you, *not* a validation/auth error from our API.
 - **Edge cache:** if a new/edited show "isn't showing", it's the 60s cache. Cache-bust or check the admin list before concluding anything's wrong.
 - **Future-dated:** create rejects a past `startTime`. (PATCH does not require future, so you can fix/backfill.)
-- **Real money:** production `checkoutUrl`s are live. When testing logic, use the Square **sandbox** via local `wrangler dev` (`SQUARE_ENVIRONMENT=sandbox`, sandbox token + location `LXEVF5FVYSZSC` from `DO_NOT_COMMIT.md`) — never test-spam the production endpoint.
+- **Real money:** the `/checkout` endpoint mints **live** production Square links. When testing logic, use the Square **sandbox** via local `wrangler dev` (`SQUARE_ENVIRONMENT=sandbox`, sandbox token + location `LXEVF5FVYSZSC` from `DO_NOT_COMMIT.md`) — never test-spam the production checkout endpoint.
 - **Source discrepancies:** owner blurbs are messy (missing year, "12-piece" vs "18-piece", etc.). Verify weekdays with `date -d YYYY-MM-DD +%A`, and surface mismatches to the user instead of guessing.
-- **Manage in UI:** humans can list/copy-link/QR/delete at `/admin → Manage Shows`. You use the API.
+- **Manage in UI:** humans can list, copy the **share link** (`/?event=<id>`), download its QR, toggle Sold Out, and delete at `/admin → Manage Shows`. You use the API.
 
 ## Don't
 

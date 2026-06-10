@@ -71,7 +71,7 @@ export default function Admin() {
 
   // The check-in tool is self-contained (its own header + sign out).
   if (view === 'checkin') {
-    return <Guestlist />;
+    return <Guestlist onBack={() => navigate('menu')} />;
   }
 
   return (
@@ -91,7 +91,7 @@ export default function Admin() {
             <button className={styles.menuCard} onClick={() => navigate('events')} type="button">
               <span className={styles.menuTitle}>Create a Show</span>
               <span className={styles.menuDesc}>
-                Add a new event with ticket types — creates the Square checkout links automatically.
+                Add a new event with ticket types, prices, and an optional capacity.
               </span>
             </button>
             <button className={styles.menuCard} onClick={() => navigate('manage')} type="button">

@@ -16,3 +16,8 @@ ADMIN_PASSCODE=your-passcode
 SQUARE_ACCESS_TOKEN=your-square-sandbox-access-token
 SQUARE_LOCATION_ID=your-square-location-id
 SQUARE_ENVIRONMENT=sandbox
+
+# Signature key from the Square webhook subscription (Developer Dashboard →
+# Webhooks). Required for POST /api/square/webhook (auto-roster + auto sold-out).
+# Set in prod with: npx wrangler secret put SQUARE_WEBHOOK_SIGNATURE_KEY
+SQUARE_WEBHOOK_SIGNATURE_KEY=your-square-webhook-signature-key

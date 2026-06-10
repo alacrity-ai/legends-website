@@ -1,11 +1,12 @@
 export interface EventTicket {
   ticketType: string;
   priceCents: number;
-  checkoutUrl: string;
+  /** Legacy v0.2 static link. New events mint checkout links on demand. */
+  checkoutUrl?: string;
 }
 
 export interface CalendarEvent {
-  /** Present on form-created (v0.2) events; absent on legacy calendar events. */
+  /** Present on form-created (v0.2+) events; absent on legacy calendar events. */
   id?: string;
   title: string;
   date: string;
@@ -14,5 +15,6 @@ export interface CalendarEvent {
   location: string | null;
   description: string | null;
   imageUrl?: string | null;
+  soldOut?: boolean;
   tickets?: EventTicket[];
 }

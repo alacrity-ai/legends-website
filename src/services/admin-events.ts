@@ -1,4 +1,5 @@
 import { clearPasscode, getPasscode, UnauthorizedError } from './guestlist.ts';
+import type { CheckinMap, Party } from '../types/guestlist.ts';
 
 const apiUrl = import.meta.env.VITE_BOOKING_API_URL;
 
@@ -16,6 +17,7 @@ export interface EventDraftInput {
   startTime: string; // ISO 8601 with offset
   endTime: string; // ISO 8601 with offset
   tickets: TicketInput[];
+  capacity?: number | null;
 }
 
 export interface CreatedEvent {
@@ -23,7 +25,7 @@ export interface CreatedEvent {
   showName: string;
   startTime: string;
   endTime: string;
-  tickets: Array<{ ticketType: string; priceCents: number; checkoutUrl: string }>;
+  tickets: Array<{ ticketType: string; priceCents: number }>;
 }
 
 /** Full event record as stored in KV (returned by the admin list endpoint). */
@@ -36,7 +38,11 @@ export interface ManagedEvent {
   startTime: string;
   endTime: string;
   imageKey: string | null;
-  tickets: Array<{ ticketType: string; priceCents: number; checkoutUrl: string }>;
+  tickets: Array<{ ticketType: string; priceCents: number; checkoutUrl?: string }>;
+  capacity: number | null;
+  sold: number;
+  soldOut: boolean;
+  remaining: number | null;
   createdAt: string;
   source: 'form' | 'google-calendar';
 }
@@ -99,4 +105,65 @@ export async function listEvents(): Promise<ManagedEvent[]> {
 
 export async function deleteEvent(id: string): Promise<void> {
   await authedRequest<{ ok: true }>(`/api/admin/events/${id}`, { method: 'DELETE' });
+}
+
+/* ── Auto-roster door check-in (v0.3) ─────────────────────────── */
+
+export interface EventGuests {
+  parties: Party[];
+  checkedIn: CheckinMap;
+}
+
+/** Auto-built roster + check-in state for one event. */
+export async function getEventGuests(id: string): Promise<EventGuests> {
+  return authedRequest<EventGuests>(`/api/admin/events/${id}/guests`);
+}
+
+export async function eventCheckIn(id: string, paymentId: string): Promise<string> {
+  const data = await authedRequest<{ checkedInAt: string }>(`/api/admin/events/${id}/checkin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paymentId }),
+  });
+  return data.checkedInAt;
+}
+
+export async function eventUncheck(id: string, paymentId: string): Promise<void> {
+  await authedRequest<{ ok: true }>(`/api/admin/events/${id}/checkin`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paymentId }),
+  });
+}
+
+/** Fields accepted by a partial event update (PATCH). All optional. */
+export interface EventPatchInput {
+  showName?: string;
+  description?: string;
+  venueName?: string;
+  venueAddress?: string;
+  startTime?: string;
+  endTime?: string;
+  tickets?: TicketInput[];
+  capacity?: number | null;
+  soldOut?: boolean;
+  /** Base64 data URL to replace the image. */
+  image?: string;
+  /** Set true to remove the existing image. */
+  removeImage?: boolean;
+}
+
+/** Apply a partial update to a show. */
+export async function updateEvent(id: string, patch: EventPatchInput): Promise<ManagedEvent> {
+  const data = await authedRequest<{ event: ManagedEvent }>(`/api/admin/events/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  return data.event;
+}
+
+/** Toggle a show's manual sold-out flag. */
+export function setSoldOut(id: string, soldOut: boolean): Promise<ManagedEvent> {
+  return updateEvent(id, { soldOut });
 }

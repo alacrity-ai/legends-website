@@ -2,14 +2,26 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   deleteEvent,
   listEvents,
+  setSoldOut,
   type ManagedEvent,
 } from '../../../services/admin-events.ts';
 import { UnauthorizedError } from '../../../services/guestlist.ts';
 import { downloadDataUrl, qrPngDataUrl, slugify } from '../../../utils/qr.ts';
+import EditShow from './EditShow.tsx';
+import ConfirmModal from './ConfirmModal.tsx';
 import styles from './ManageShows.module.css';
 
 interface ManageShowsProps {
   onUnauthorized: () => void;
+}
+
+/** The on-site share/QR target that opens a show with the quantity stepper. */
+function shareUrl(id: string): string {
+  const origin =
+    typeof window !== 'undefined' && window.location.origin
+      ? window.location.origin
+      : 'https://djkmdlegends.com';
+  return `${origin}/?event=${id}`;
 }
 
 function formatDateTime(iso: string): string {
@@ -35,6 +47,19 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [editingEvent, setEditingEvent] = useState<ManagedEvent | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<ManagedEvent | null>(null);
+
+  const handleSaved = useCallback((updated: ManagedEvent) => {
+    const withRemaining: ManagedEvent = {
+      ...updated,
+      remaining:
+        updated.capacity != null ? Math.max(0, updated.capacity - (updated.sold ?? 0)) : null,
+    };
+    setEvents((prev) => (prev ? prev.map((e) => (e.id === updated.id ? withRemaining : e)) : prev));
+    setEditingEvent(null);
+  }, []);
 
   const handleCopy = useCallback(async (key: string, url: string) => {
     try {
@@ -43,16 +68,34 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
       window.setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1500);
     } catch {
       // Clipboard API unavailable — fall back to a prompt the user can copy from.
-      window.prompt('Copy this checkout link:', url);
+      window.prompt('Copy this share link:', url);
     }
   }, []);
 
-  const handleDownloadQr = useCallback(
-    (showName: string, ticketType: string, url: string) => {
-      const dataUrl = qrPngDataUrl(url);
-      downloadDataUrl(dataUrl, `qr-${slugify(showName)}-${slugify(ticketType)}.png`);
+  const handleDownloadQr = useCallback((showName: string, url: string) => {
+    const dataUrl = qrPngDataUrl(url);
+    downloadDataUrl(dataUrl, `qr-${slugify(showName)}.png`);
+  }, []);
+
+  const handleToggleSoldOut = useCallback(
+    async (ev: ManagedEvent) => {
+      setTogglingId(ev.id);
+      try {
+        const updated = await setSoldOut(ev.id, !ev.soldOut);
+        setEvents((prev) =>
+          prev ? prev.map((e) => (e.id === ev.id ? { ...e, soldOut: updated.soldOut } : e)) : prev,
+        );
+      } catch (err) {
+        if (err instanceof UnauthorizedError) {
+          onUnauthorized();
+          return;
+        }
+        alert(err instanceof Error ? err.message : 'Failed to update sold-out status');
+      } finally {
+        setTogglingId(null);
+      }
     },
-    [],
+    [onUnauthorized],
   );
 
   const load = useCallback(async () => {
@@ -73,28 +116,37 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
     void load();
   }, [load]);
 
-  const handleDelete = useCallback(
-    async (ev: ManagedEvent) => {
-      const ok = window.confirm(
-        `Delete "${ev.showName}"? This removes it from the site and deactivates its Square checkout link(s). This cannot be undone.`,
-      );
-      if (!ok) return;
-      setDeletingId(ev.id);
-      try {
-        await deleteEvent(ev.id);
-        setEvents((prev) => (prev ? prev.filter((e) => e.id !== ev.id) : prev));
-      } catch (err) {
-        if (err instanceof UnauthorizedError) {
-          onUnauthorized();
-          return;
-        }
-        alert(err instanceof Error ? err.message : 'Failed to delete show');
-      } finally {
-        setDeletingId(null);
+  const handleConfirmDelete = useCallback(async () => {
+    const ev = confirmTarget;
+    if (!ev) return;
+    setDeletingId(ev.id);
+    try {
+      await deleteEvent(ev.id);
+      setEvents((prev) => (prev ? prev.filter((e) => e.id !== ev.id) : prev));
+      setConfirmTarget(null);
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        onUnauthorized();
+        return;
       }
-    },
-    [onUnauthorized],
-  );
+      alert(err instanceof Error ? err.message : 'Failed to delete show');
+    } finally {
+      setDeletingId(null);
+    }
+  }, [confirmTarget, onUnauthorized]);
+
+  if (editingEvent) {
+    return (
+      <div className={styles.wrap}>
+        <EditShow
+          event={editingEvent}
+          onCancel={() => setEditingEvent(null)}
+          onSaved={handleSaved}
+          onUnauthorized={onUnauthorized}
+        />
+      </div>
+    );
+  }
 
   if (error) {
     return (
@@ -126,61 +178,131 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
 
   return (
     <div className={styles.wrap}>
+      <span className={styles.overline}>Box Office</span>
       <h1 className={styles.title}>Manage Shows</h1>
       <p className={styles.subtitle}>
-        {events.length} show{events.length === 1 ? '' : 's'} tracked in KV.
+        {events.length} show{events.length === 1 ? '' : 's'} on the books.
       </p>
 
       <ul className={styles.list}>
-        {events.map((ev) => (
-          <li key={ev.id} className={styles.row}>
-            <div className={styles.info}>
-              <span className={styles.name}>{ev.showName}</span>
-              <span className={styles.meta}>{formatDateTime(ev.startTime)}</span>
-              <span className={styles.meta}>
-                {ev.venueName} · {ev.venueAddress}
-              </span>
-              <div className={styles.tickets}>
-                {ev.tickets.map((t) => {
-                  const key = `${ev.id}:${t.ticketType}`;
-                  return (
-                    <div key={key} className={styles.ticketRow}>
-                      <span className={styles.ticketLabel}>
-                        {t.ticketType} · {formatPrice(t.priceCents)}
-                      </span>
-                      <button
-                        type="button"
-                        className={styles.copyButton}
-                        onClick={() => void handleCopy(key, t.checkoutUrl)}
-                        title={t.checkoutUrl}
-                      >
-                        {copiedKey === key ? 'Copied!' : 'Copy link'}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.copyButton}
-                        onClick={() => handleDownloadQr(ev.showName, t.ticketType, t.checkoutUrl)}
-                        title="Download a QR code image for this checkout link"
-                      >
-                        Download QR
-                      </button>
-                    </div>
-                  );
-                })}
+        {events.map((ev) => {
+          const sold = ev.sold ?? 0;
+          const capped = ev.capacity != null;
+          const pct = capped ? Math.min(100, Math.round((sold / ev.capacity!) * 100)) : 0;
+          const full = capped && sold >= ev.capacity!;
+          return (
+            <li key={ev.id} className={styles.card}>
+              <div className={styles.cardHead}>
+                <div className={styles.headText}>
+                  <h2 className={styles.name}>{ev.showName}</h2>
+                  <p className={styles.when}>{formatDateTime(ev.startTime)}</p>
+                  <p className={styles.where}>
+                    {ev.venueName} · {ev.venueAddress}
+                  </p>
+                </div>
+                <span
+                  className={`${styles.status} ${ev.soldOut ? styles.statusSold : styles.statusLive}`}
+                >
+                  {ev.soldOut ? 'Sold Out' : 'Live'}
+                </span>
               </div>
-              <span className={styles.id}>id: {ev.id}</span>
-            </div>
-            <button
-              className={styles.deleteButton}
-              onClick={() => void handleDelete(ev)}
-              disabled={deletingId === ev.id}
-              type="button"
-            >
-              {deletingId === ev.id ? 'Deleting…' : 'Delete'}
-            </button>
-          </li>
-        ))}
+
+              <div className={styles.capacity}>
+                {capped ? (
+                  <>
+                    <div className={styles.meter}>
+                      <div
+                        className={`${styles.meterFill} ${full ? styles.meterFillFull : ''}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className={styles.capacityText}>
+                      <strong>{sold}</strong> / {ev.capacity} sold
+                      {ev.remaining != null && <> · {ev.remaining} left</>}
+                    </span>
+                  </>
+                ) : (
+                  <span className={styles.capacityText}>
+                    <strong>{sold}</strong> sold · unlimited capacity
+                  </span>
+                )}
+              </div>
+
+              <div className={styles.tickets}>
+                {ev.tickets.map((t) => (
+                  <span key={t.ticketType} className={styles.ticketPill}>
+                    {t.ticketType}
+                    <span className={styles.ticketPrice}>{formatPrice(t.priceCents)}</span>
+                  </span>
+                ))}
+              </div>
+
+              <div className={styles.toolbar}>
+                <div className={styles.toolGroup}>
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.btnGhost}`}
+                    onClick={() => void handleCopy(ev.id, shareUrl(ev.id))}
+                    title={shareUrl(ev.id)}
+                  >
+                    {copiedKey === ev.id ? 'Copied!' : 'Copy link'}
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.btnGhost}`}
+                    onClick={() => handleDownloadQr(ev.showName, shareUrl(ev.id))}
+                    title="Download a QR code that opens this show on the site"
+                  >
+                    QR code
+                  </button>
+                </div>
+                <div className={styles.toolGroup}>
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.btnPrimary}`}
+                    onClick={() => setEditingEvent(ev)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.btnGhost}`}
+                    onClick={() => void handleToggleSoldOut(ev)}
+                    disabled={togglingId === ev.id}
+                  >
+                    {togglingId === ev.id
+                      ? 'Saving…'
+                      : ev.soldOut
+                        ? 'Mark available'
+                        : 'Mark sold out'}
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.btnDanger}`}
+                    onClick={() => setConfirmTarget(ev)}
+                    disabled={deletingId === ev.id}
+                  >
+                    {deletingId === ev.id ? 'Deleting…' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+
+              <span className={styles.id}>{ev.id}</span>
+            </li>
+          );
+        })}
       </ul>
+
+      {confirmTarget && (
+        <ConfirmModal
+          title={`Delete “${confirmTarget.showName}”?`}
+          message="This removes the show from the site, deactivates its Square checkout link(s), and deletes its image. This cannot be undone."
+          confirmLabel="Delete show"
+          busy={deletingId === confirmTarget.id}
+          onConfirm={() => void handleConfirmDelete()}
+          onCancel={() => setConfirmTarget(null)}
+        />
+      )}
     </div>
   );
 }

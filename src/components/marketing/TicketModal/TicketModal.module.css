@@ -91,6 +91,126 @@
   background-color: var(--btn-primary-hover-bg);
 }
 
+/* ── Quantity stepper + dynamic buy (v0.3) ─────────────── */
+
+.ticketList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.ticketRow {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.ticketHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.ticketName {
+  color: var(--color-text);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.ticketUnit {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.ticketControls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.stepButton {
+  background: var(--color-surface);
+  border: none;
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  line-height: 1;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.stepButton:hover:not(:disabled) {
+  background: var(--color-surface-elevated);
+}
+
+.stepButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.qty {
+  min-width: 2.5rem;
+  text-align: center;
+  color: var(--color-text);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.buyButton {
+  flex: 1;
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--text-base);
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.buyButton:hover:not(:disabled) {
+  background-color: var(--btn-primary-hover-bg);
+}
+
+.buyButton:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.soldOut {
+  text-align: center;
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--text-base);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.checkoutError {
+  color: var(--color-error, #ff6b6b);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
 /* ── Coming soon message ────────────────────────────────── */
 
 .comingSoon {

@@ -1,5 +1,13 @@
 # v0.2 — Event Creation API
 
+> **⚠️ Superseded by v0.3 ("Option E").** As of v0.3, **create makes no Square calls** —
+> it stores ticket price configs + an optional `capacity`; checkout links are minted on
+> demand by `POST /api/events/:id/checkout` (priced for the buyer's chosen quantity), and
+> the share/QR target is the site URL `https://djkmdlegends.com/?event=<id>`. The current
+> contract lives in `public/openapi.json` (served at `/docs`) and the
+> `docs/agents/*` runbooks; see `docs/v0.3/DESIGN_V2.md`. The text below describes the
+> retired v0.2 link-per-ticket behavior and is kept for history.
+
 `POST /api/admin/events` creates a show. It powers the admin form **and** can be
 called programmatically — same URL, same auth, same field contract. Two body
 formats are accepted, chosen by `Content-Type`:

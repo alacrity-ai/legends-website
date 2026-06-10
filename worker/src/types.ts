@@ -35,6 +35,7 @@ export interface Env {
   SQUARE_ACCESS_TOKEN: string;
   SQUARE_LOCATION_ID: string;
   SQUARE_ENVIRONMENT: 'sandbox' | 'production';
+  SQUARE_WEBHOOK_SIGNATURE_KEY?: string;
   LEGACY_CALENDAR_ENABLED: string;
 }
 
@@ -45,10 +46,16 @@ export interface TicketConfig {
   priceCents: number;
 }
 
+/**
+ * A stored ticket. Going forward (Option E) a ticket is just a price config;
+ * checkout links are minted on demand. The Square link fields are legacy —
+ * the 2 v0.2 shows minted a link per ticket up front, so they're kept
+ * optional for back-compat reads only.
+ */
 export interface EventTicket extends TicketConfig {
-  checkoutUrl: string;
-  squarePaymentLinkId: string;
-  squareOrderId: string;
+  checkoutUrl?: string;
+  squarePaymentLinkId?: string;
+  squareOrderId?: string;
 }
 
 export interface EventDraft {
@@ -59,14 +66,24 @@ export interface EventDraft {
   startTime: string; // ISO 8601 with offset
   endTime: string; // ISO 8601 with offset
   tickets: TicketConfig[];
+  capacity: number | null; // null = uncapped
 }
 
 export interface EventRecord extends EventDraft {
   id: string;
   imageKey: string | null; // R2 object key, or null when the event has no image
   tickets: EventTicket[];
+  sold: number; // tickets sold so far (driven by the Square webhook)
+  soldOut: boolean; // capacity reached, or manually toggled
   createdAt: string;
   source: 'form' | 'google-calendar';
+}
+
+/** Cached on-demand checkout link, keyed `link:<eventId>:<ticketType>:<qty>`. */
+export interface CachedLink {
+  checkoutUrl: string;
+  squarePaymentLinkId: string;
+  squareOrderId: string;
 }
 
 /** Public shape returned by GET /api/events (extends the legacy CalendarEvent). */
@@ -74,7 +91,8 @@ export interface PublicEvent extends CalendarEvent {
   id?: string;
   endTime?: string | null;
   imageUrl?: string | null;
-  tickets?: Array<{ ticketType: string; priceCents: number; checkoutUrl: string }>;
+  soldOut?: boolean;
+  tickets?: Array<{ ticketType: string; priceCents: number; checkoutUrl?: string }>;
 }
 
 export type TicketVariation = 'Show and Meal' | 'Show Only' | 'Unknown';
@@ -98,4 +116,20 @@ export interface Party {
 
 export interface CheckinRecord {
   checkedInAt: string;
+}
+
+/**
+ * Auto-roster entry built by the Square webhook, stored at
+ * `party:<eventId>:<paymentId>` in the GUESTLIST namespace. The check-in app
+ * maps these into the `Party` shape it already renders.
+ */
+export interface PartyRecord {
+  paymentId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string | null;
+  quantity: number;
+  ticketType: string;
+  purchasedAt: string;
 }
