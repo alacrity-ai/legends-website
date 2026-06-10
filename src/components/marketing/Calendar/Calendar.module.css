@@ -27,9 +27,15 @@
 
 .eventImage {
   width: 100%;
-  max-height: 240px;
+  /* Show the full poster (these run ~3:2/16:9 landscape) instead of cropping it
+     to a short band. height:auto lets each image keep its own aspect ratio; the
+     max-height + object-fit only engage as a safety cap for unusually tall
+     (portrait) uploads so one can't dominate the column. */
+  height: auto;
+  max-height: 70vh;
   object-fit: cover;
   border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
   margin-bottom: var(--space-md);
   display: block;
 }
