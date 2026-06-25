@@ -221,20 +221,12 @@ async function handleCheckout(
     return jsonResponse(409, { error: 'Sold out' }, corsHeaders);
   }
 
-  // Reuse a cached link for this (type, qty) if we've already minted one.
-  const cacheKey = `link:${id}:${ticketType}:${quantity}`;
-  const cachedRaw = await env.EVENTS.get(cacheKey);
-  if (cachedRaw) {
-    try {
-      const cached = JSON.parse(cachedRaw) as CachedLink;
-      if (cached.checkoutUrl) {
-        return jsonResponse(200, { checkoutUrl: cached.checkoutUrl }, corsHeaders, noStore);
-      }
-    } catch {
-      // fall through and re-mint
-    }
-  }
-
+  // IMPORTANT: never reuse a previously minted link. A Square quick_pay link is
+  // backed by a single order; once a buyer pays, that order is settled and any
+  // later visit to the same link is bounced straight to `redirect_url`
+  // (…/?purchase=success). Reusing a paid link is exactly the "opens Square for a
+  // moment, then jumps back to the site" bug. So we mint a fresh link/order on
+  // every checkout click — a buyer always lands on their own unpaid order.
   let link;
   try {
     link = await createPaymentLink(env, {
@@ -248,12 +240,20 @@ async function handleCheckout(
     return jsonResponse(502, { error: `Square: ${errorMessage(err)}` }, corsHeaders);
   }
 
-  const cached: CachedLink = {
+  // Record the minted link under a UNIQUE key (…:<paymentLinkId>) — not a shared
+  // (type,qty) key — so multiple outstanding links accumulate rather than
+  // overwrite. clearLinkCache lists the `link:<id>:` prefix and deactivates every
+  // one of them on ticket edits, sell-out, and event deletion. We never read
+  // these back to serve a buyer; they exist purely for cleanup bookkeeping.
+  const minted: CachedLink = {
     checkoutUrl: link.checkoutUrl,
     squarePaymentLinkId: link.paymentLinkId,
     squareOrderId: link.orderId,
   };
-  await env.EVENTS.put(cacheKey, JSON.stringify(cached));
+  await env.EVENTS.put(
+    `link:${id}:${ticketType}:${quantity}:${link.paymentLinkId}`,
+    JSON.stringify(minted),
+  );
 
   return jsonResponse(200, { checkoutUrl: link.checkoutUrl }, corsHeaders, noStore);
 }
