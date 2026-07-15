@@ -127,6 +127,11 @@ export interface SquareOrderDetails {
  * Fetch an order and extract everything we need to build a roster entry: the
  * correlation note, the buyer's typed name (checkout custom field), and the
  * fulfillment recipient as a fallback. Returns null on a failed fetch.
+ *
+ * On payment-link orders the buyer's custom-field answer does NOT come back
+ * under `checkout_options` — Square stores it as a DIGITAL fulfillment whose
+ * `delivery_details.note` reads `"<field title>: <buyer's answer>"`
+ * (verified against production order 7antz7Q7e2Ujx… on 2026-07-15).
  */
 export async function getOrderDetails(
   env: Env,
@@ -145,11 +150,10 @@ export async function getOrderDetails(
       tenders?: Array<{ note?: string }>;
       metadata?: Record<string, string>;
       fulfillments?: Array<{
-        pickup_details?: { recipient?: SquareRecipient };
-        shipment_details?: { recipient?: SquareRecipient };
-        delivery_details?: { recipient?: SquareRecipient };
+        pickup_details?: SquareFulfillmentDetails;
+        shipment_details?: SquareFulfillmentDetails;
+        delivery_details?: SquareFulfillmentDetails;
       }>;
-      checkout_options?: { custom_fields?: Array<{ title?: string }> };
     };
   };
   const order = json.order;
@@ -158,21 +162,27 @@ export async function getOrderDetails(
   const note =
     order.tenders?.find((t) => t.note)?.note ?? order.metadata?.payment_note ?? null;
 
-  const recipient =
-    order.fulfillments?.map(
-      (f) =>
-        f.pickup_details?.recipient ??
-        f.shipment_details?.recipient ??
-        f.delivery_details?.recipient,
-    ).find(Boolean) ?? null;
+  const details =
+    order.fulfillments?.flatMap((f) =>
+      [f.pickup_details, f.shipment_details, f.delivery_details].filter(
+        (d): d is SquareFulfillmentDetails => Boolean(d),
+      ),
+    ) ?? [];
+  const recipient = details.map((d) => d.recipient).find(Boolean) ?? null;
+  const fulfillmentNote = details.map((d) => d.note).find((n) => n && n.trim()) ?? null;
 
   return {
     note,
-    customFieldName: extractCustomFieldName(order.checkout_options?.custom_fields),
+    customFieldName: extractCustomFieldAnswer(fulfillmentNote),
     recipientName: recipient?.display_name ?? null,
     email: recipient?.email_address ?? null,
     phone: recipient?.phone_number ?? null,
   };
+}
+
+interface SquareFulfillmentDetails {
+  recipient?: SquareRecipient;
+  note?: string;
 }
 
 interface SquareRecipient {
@@ -181,23 +191,125 @@ interface SquareRecipient {
   phone_number?: string;
 }
 
+/** Title passed to createPaymentLink; Square prefixes the buyer's answer with it. */
+const CUSTOM_FIELD_TITLE = 'Full name (for the guest list)';
+
 /**
- * The attendee name is collected via a checkout custom field. Square's order
- * representation of custom-field *values* has shifted across API versions, so
- * read defensively from the shapes seen in practice (a `text`/`value` on the
- * field object). Returns null if no readable value is present — the webhook
- * then falls back to the fulfillment recipient.
+ * Pull the buyer's answer out of the fulfillment note, which Square writes as
+ * `"<field title>: <answer>"`. Strips our known title first; otherwise falls
+ * back to whatever follows the first ": " (a renamed title), then to the raw
+ * note. Returns null when there is nothing usable.
  */
-function extractCustomFieldName(
-  fields: Array<{ title?: string }> | undefined,
-): string | null {
-  if (!fields || fields.length === 0) return null;
-  for (const f of fields) {
-    const v = f as { text?: unknown; value?: unknown };
-    const candidate = typeof v.text === 'string' ? v.text : typeof v.value === 'string' ? v.value : null;
-    if (candidate && candidate.trim()) return candidate.trim();
+function extractCustomFieldAnswer(note: string | null): string | null {
+  if (!note) return null;
+  const trimmed = note.trim();
+  if (!trimmed) return null;
+  if (trimmed.toLowerCase().startsWith(`${CUSTOM_FIELD_TITLE.toLowerCase()}:`)) {
+    const answer = trimmed.slice(CUSTOM_FIELD_TITLE.length + 1).trim();
+    return answer || null;
   }
-  return null;
+  const sep = trimmed.indexOf(': ');
+  if (sep !== -1) {
+    const answer = trimmed.slice(sep + 2).trim();
+    return answer || null;
+  }
+  return trimmed;
+}
+
+export interface SquarePaymentDetails {
+  /** payment note (same correlation string as the order tender note). */
+  note: string | null;
+  buyerEmail: string | null;
+  /** Cardholder name from the billing/shipping address, if Square captured one. */
+  buyerName: string | null;
+  customerId: string | null;
+}
+
+/**
+ * Fetch a payment. Quick-pay orders carry no recipient, but the Payment object
+ * has `buyer_email_address`, a billing/shipping name, and a `customer_id`
+ * pointing at the instant profile that holds the buyer's phone number.
+ */
+export async function getPaymentDetails(
+  env: Env,
+  paymentId: string,
+): Promise<SquarePaymentDetails | null> {
+  const { token } = requireSecrets(env);
+  const res = await fetch(`${apiBase(env)}/v2/payments/${paymentId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Square-Version': SQUARE_API_VERSION,
+    },
+  });
+  if (!res.ok) return null;
+  const json = (await res.json()) as {
+    payment?: {
+      note?: string;
+      buyer_email_address?: string;
+      billing_address?: SquareAddressName;
+      shipping_address?: SquareAddressName;
+      customer_id?: string;
+    };
+  };
+  const payment = json.payment;
+  if (!payment) return null;
+
+  const addr = pickNamedAddress(payment.billing_address) ?? pickNamedAddress(payment.shipping_address);
+  return {
+    note: payment.note ?? null,
+    buyerEmail: payment.buyer_email_address ?? null,
+    buyerName: addr,
+    customerId: payment.customer_id ?? null,
+  };
+}
+
+interface SquareAddressName {
+  first_name?: string;
+  last_name?: string;
+}
+
+function pickNamedAddress(addr: SquareAddressName | undefined): string | null {
+  if (!addr) return null;
+  const name = [addr.first_name, addr.last_name].filter(Boolean).join(' ').trim();
+  return name || null;
+}
+
+export interface SquareCustomerContact {
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
+/** Fetch the customer (instant profile) a payment points at — the only place Square exposes the buyer's phone. */
+export async function getCustomerContact(
+  env: Env,
+  customerId: string,
+): Promise<SquareCustomerContact | null> {
+  const { token } = requireSecrets(env);
+  const res = await fetch(`${apiBase(env)}/v2/customers/${customerId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Square-Version': SQUARE_API_VERSION,
+    },
+  });
+  if (!res.ok) return null;
+  const json = (await res.json()) as {
+    customer?: {
+      given_name?: string;
+      family_name?: string;
+      email_address?: string;
+      phone_number?: string;
+    };
+  };
+  const customer = json.customer;
+  if (!customer) return null;
+
+  const name = [customer.given_name, customer.family_name].filter(Boolean).join(' ').trim();
+  return {
+    name: name || null,
+    email: customer.email_address ?? null,
+    phone: customer.phone_number ?? null,
+  };
 }
 
 /**
