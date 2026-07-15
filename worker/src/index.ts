@@ -24,7 +24,9 @@ import { fetchUpcomingEvents } from './services/google-calendar.ts';
 import {
   createPaymentLink,
   deactivatePaymentLink,
+  getCustomerContact,
   getOrderDetails,
+  getPaymentDetails,
   verifyWebhookSignature,
 } from './services/square.ts';
 
@@ -355,8 +357,15 @@ async function processCompletedPayment(
   paymentId: string,
   orderId: string,
 ): Promise<void> {
-  const details = await getOrderDetails(env, orderId);
-  const parsed = parsePaymentNote(details?.note ?? null);
+  // Buyer identity is spread across three Square objects (verified against
+  // production data, LGD-2): the order's DIGITAL fulfillment note carries the
+  // typed guest-list name, the payment carries buyer_email_address plus a
+  // billing-address name, and the customer instant profile holds the phone.
+  const [order, payment] = await Promise.all([
+    getOrderDetails(env, orderId),
+    getPaymentDetails(env, paymentId),
+  ]);
+  const parsed = parsePaymentNote(order?.note ?? payment?.note ?? null);
   if (!parsed) {
     console.warn('[webhook] no/unparseable payment_note for order', orderId);
     return;
@@ -368,13 +377,23 @@ async function processCompletedPayment(
     return; // already processed this payment
   }
 
-  const { firstName, lastName } = splitName(details?.customFieldName ?? details?.recipientName ?? null);
+  const customer = payment?.customerId
+    ? await getCustomerContact(env, payment.customerId)
+    : null;
+
+  const { firstName, lastName } = splitName(
+    order?.customFieldName ??
+      customer?.name ??
+      payment?.buyerName ??
+      order?.recipientName ??
+      null,
+  );
   const party: PartyRecord = {
     paymentId,
     firstName,
     lastName,
-    email: details?.email ?? '',
-    phone: details?.phone ?? null,
+    email: payment?.buyerEmail ?? customer?.email ?? order?.email ?? '',
+    phone: customer?.phone ?? order?.phone ?? null,
     quantity,
     ticketType,
     purchasedAt: new Date().toISOString(),
