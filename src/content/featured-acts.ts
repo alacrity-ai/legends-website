@@ -16,4 +16,14 @@ export const featuredActs: FeaturedAct[] = [
     imageAlt:
       'Joey Chiarenza performing as Frank Sinatra alongside Dean Martin and Sammy Davis Jr. tributes with a live orchestra',
   },
+  {
+    id: 'ladies-legends',
+    name: 'Ladies Legends',
+    blurb:
+      'Singers paying tribute to the greatest ladies ever — Cher, Madonna, Tina Turner, Stevie Nicks, Shania Twain, Pat Benatar, Amy Winehouse, Aretha Franklin, Alanis Morissette, and ABBA in one dazzling night.',
+    href: '/ladies-legends/',
+    imageSrc: '/ladies-legends/ladies-legends-card.webp',
+    imageAlt:
+      'Ladies Legends show poster — neon marquee lettering over a purple stage with a disco ball and spotlights',
+  },
 ];
