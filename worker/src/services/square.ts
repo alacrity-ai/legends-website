@@ -24,6 +24,12 @@ export interface CreatePaymentLinkInput {
   paymentNote: string;
   /** When set, Square collects this as a free-text field on the checkout page. */
   customFieldTitle?: string;
+  /**
+   * Square location to create the order at. Buyer receipts render the
+   * location's address and map, so this should be the show's venue (LGD-3).
+   * Falls back to the account's default location when omitted.
+   */
+  locationId?: string;
 }
 
 export interface CreatePaymentLinkResult {
@@ -51,7 +57,7 @@ export async function createPaymentLink(
         amount: input.amountCents,
         currency: 'USD',
       },
-      location_id: locationId,
+      location_id: input.locationId ?? locationId,
     },
     checkout_options: {
       redirect_url: input.redirectUrl,
@@ -108,6 +114,92 @@ export async function deactivatePaymentLink(env: Env, paymentLinkId: string): Pr
   } catch {
     // best-effort
   }
+}
+
+/* ── Venue locations (LGD-3) ──────────────────────────────────── */
+
+export interface ParsedVenueAddress {
+  line1: string;
+  locality: string;
+  state: string;
+  postalCode: string;
+}
+
+/**
+ * Parse a free-text venue address as entered in the admin event form, e.g.
+ * "147 Princeton St, North Chelmsford, MA 01863" or "300 Littleton Rd,
+ * Chelmsford, MA 01824, USA". Returns null when the text doesn't fit
+ * "street, city, ST zip" — callers then fall back to the default location.
+ * The zip is required because Square's CreateLocation rejects US addresses
+ * without a postal_code.
+ */
+export function parseVenueAddress(venueAddress: string): ParsedVenueAddress | null {
+  const parts = venueAddress
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length > 0 && /^(usa|us|united states)$/i.test(parts[parts.length - 1])) {
+    parts.pop();
+  }
+  if (parts.length < 3) return null;
+
+  const stateZip = parts[parts.length - 1].match(/^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  if (!stateZip) return null;
+
+  return {
+    line1: parts.slice(0, parts.length - 2).join(', '),
+    locality: parts[parts.length - 2],
+    state: stateZip[1].toUpperCase(),
+    postalCode: stateZip[2],
+  };
+}
+
+/**
+ * Create a Square location for a show venue so buyer receipts render the
+ * venue's address and map instead of the account's default location.
+ * `name` is the dashboard nickname; `business_name` is what receipts show,
+ * so it stays "DJKMD Legends". Returns the new location id.
+ */
+export async function createVenueLocation(
+  env: Env,
+  venueName: string,
+  address: ParsedVenueAddress,
+): Promise<string> {
+  const { token } = requireSecrets(env);
+
+  const res = await fetch(`${apiBase(env)}/v2/locations`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Square-Version': SQUARE_API_VERSION,
+    },
+    body: JSON.stringify({
+      location: {
+        name: `DJKMD Legends — ${venueName}`,
+        business_name: 'DJKMD Legends',
+        type: 'PHYSICAL',
+        timezone: 'America/New_York',
+        address: {
+          address_line_1: address.line1,
+          locality: address.locality,
+          administrative_district_level_1: address.state,
+          postal_code: address.postalCode,
+          country: 'US',
+        },
+      },
+    }),
+  });
+
+  const json = (await res.json()) as {
+    location?: { id: string };
+    errors?: Array<{ detail: string; code?: string }>;
+  };
+  if (!res.ok || !json.location) {
+    const message = json.errors?.map((e) => e.detail).join('; ') ?? `Square error ${res.status}`;
+    throw new Error(message);
+  }
+  return json.location.id;
 }
 
 /* ── Webhook support ──────────────────────────────────────────── */

@@ -23,10 +23,12 @@ import { buildConfirmationEmail } from './templates/confirmation.ts';
 import { fetchUpcomingEvents } from './services/google-calendar.ts';
 import {
   createPaymentLink,
+  createVenueLocation,
   deactivatePaymentLink,
   getCustomerContact,
   getOrderDetails,
   getPaymentDetails,
+  parseVenueAddress,
   verifyWebhookSignature,
 } from './services/square.ts';
 
@@ -223,6 +225,18 @@ async function handleCheckout(
     return jsonResponse(409, { error: 'Sold out' }, corsHeaders);
   }
 
+  // Buyer receipts render the order's location (address + map), so mint the
+  // link at a Square location matching the show's venue — never the account
+  // default, whose registered address is not a public venue (LGD-3).
+  let venueLocationId: string | null = null;
+  try {
+    venueLocationId = await resolveVenueLocationId(env, event);
+  } catch (err) {
+    // Never block a sale on venue-location plumbing; the default location's
+    // address is kept pointing at a public venue as the safe fallback.
+    console.error('[checkout] venue location resolution failed:', errorMessage(err));
+  }
+
   // IMPORTANT: never reuse a previously minted link. A Square quick_pay link is
   // backed by a single order; once a buyer pays, that order is settled and any
   // later visit to the same link is bounced straight to `redirect_url`
@@ -237,6 +251,7 @@ async function handleCheckout(
       redirectUrl: primaryOrigin(env) + '/?purchase=success',
       paymentNote: `legends-event:${id}:${ticketType}:${quantity}`,
       customFieldTitle: 'Full name (for the guest list)',
+      ...(venueLocationId ? { locationId: venueLocationId } : {}),
     });
   } catch (err) {
     return jsonResponse(502, { error: `Square: ${errorMessage(err)}` }, corsHeaders);
@@ -258,6 +273,39 @@ async function handleCheckout(
   );
 
   return jsonResponse(200, { checkoutUrl: link.checkoutUrl }, corsHeaders, noStore);
+}
+
+/**
+ * Resolve (or create) the Square location for an event's venue, cached in KV
+ * under `sqloc:<venue name|address>`. One Square location exists per distinct
+ * venue string; all events at the same venue share it. Returns null when the
+ * venue address can't be parsed — the caller then uses the default location.
+ */
+async function resolveVenueLocationId(env: Env, event: EventRecord): Promise<string | null> {
+  const parsed = parseVenueAddress(event.venueAddress);
+  if (!parsed) {
+    console.warn('[checkout] unparseable venue address, using default location:', event.venueAddress);
+    return null;
+  }
+
+  const cacheKey =
+    'sqloc:' + `${event.venueName}|${event.venueAddress}`.toLowerCase().replace(/\s+/g, ' ').trim();
+  const cached = await env.EVENTS.get(cacheKey);
+  if (cached) {
+    try {
+      const entry = JSON.parse(cached) as { locationId?: string };
+      if (entry.locationId) return entry.locationId;
+    } catch {
+      // fall through and re-create
+    }
+  }
+
+  const locationId = await createVenueLocation(env, event.venueName, parsed);
+  await env.EVENTS.put(
+    cacheKey,
+    JSON.stringify({ locationId, venueName: event.venueName, venueAddress: event.venueAddress }),
+  );
+  return locationId;
 }
 
 /* ── Square webhook → auto-roster + sold counter ──────────────── */
