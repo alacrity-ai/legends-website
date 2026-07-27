@@ -38,15 +38,6 @@ export const performers: Performer[] = [
     tags: ['tribute', 'live vocals', 'event-ready'],
   },
   {
-    id: 'dolly-parton',
-    name: 'Dolly Parton',
-    imageSrc: '/assets/images/performer-dolly.webp',
-    imageAlt: 'Dolly Parton tribute performer on stage',
-    shortDescription:
-      'A dazzling Dolly Parton tribute packed with country charm, powerhouse vocals, and all the rhinestone glamour your audience deserves.',
-    tags: ['tribute', 'live vocals', 'event-ready'],
-  },
-  {
     id: 'sinatra-tribute',
     name: 'Sinatra Under the Stars',
     imageSrc: '/assets/images/performer-sinatra.webp',
