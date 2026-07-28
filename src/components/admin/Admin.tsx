@@ -3,16 +3,18 @@ import { clearPasscode, getPasscode } from '../../services/guestlist.ts';
 import Guestlist from '../guestlist/Guestlist.tsx';
 import EventForm from './EventForm/EventForm.tsx';
 import ManageShows from './ManageShows/ManageShows.tsx';
+import MailingList from './MailingList/MailingList.tsx';
 import AdminSignIn from './AdminSignIn.tsx';
 import styles from './Admin.module.css';
 
-type View = 'menu' | 'checkin' | 'events' | 'manage';
+type View = 'menu' | 'checkin' | 'events' | 'manage' | 'mailing';
 
 function viewFromPath(): View {
   if (typeof window === 'undefined') return 'menu';
   const path = window.location.pathname.replace(/\/$/, '');
   if (path === '/admin/events/new') return 'events';
   if (path === '/admin/events') return 'manage';
+  if (path === '/admin/mailing-list') return 'mailing';
   if (path === '/admin/checkin' || path === '/guestlist') return 'checkin';
   return 'menu';
 }
@@ -42,9 +44,11 @@ export default function Admin() {
         ? '/admin/events/new'
         : to === 'manage'
           ? '/admin/events'
-          : to === 'checkin'
-            ? '/admin/checkin'
-            : '/admin';
+          : to === 'mailing'
+            ? '/admin/mailing-list'
+            : to === 'checkin'
+              ? '/admin/checkin'
+              : '/admin';
     window.history.pushState({}, '', path);
     setView(to);
   }, []);
@@ -106,6 +110,12 @@ export default function Admin() {
                 Look up and check in guests at the door for a show.
               </span>
             </button>
+            <button className={styles.menuCard} onClick={() => navigate('mailing')} type="button">
+              <span className={styles.menuTitle}>Mailing List</span>
+              <span className={styles.menuDesc}>
+                Everyone we can email — signups, ticket buyers, and imports. Search and export.
+              </span>
+            </button>
           </nav>
         )}
 
@@ -124,6 +134,15 @@ export default function Admin() {
               ← Back to menu
             </button>
             <ManageShows onUnauthorized={handleUnauthorized} />
+          </>
+        )}
+
+        {view === 'mailing' && (
+          <>
+            <button className={styles.back} onClick={() => navigate('menu')} type="button">
+              ← Back to menu
+            </button>
+            <MailingList onUnauthorized={handleUnauthorized} />
           </>
         )}
       </main>
