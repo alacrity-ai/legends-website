@@ -20,6 +20,7 @@ import SignIn from './SignIn.tsx';
 import SearchBar from './SearchBar.tsx';
 import PartyList from './PartyList.tsx';
 import CheckInModal from './CheckInModal.tsx';
+import { printCheckinSheet } from './print-sheet.ts';
 import styles from './Guestlist.module.css';
 
 type AuthState = 'signed-out' | 'signed-in';
@@ -218,6 +219,30 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
     [selection],
   );
 
+  // Print a paper door sheet for the selected show (Keith's checklist).
+  const handlePrint = useCallback(() => {
+    if (!selection || !parties) return;
+    let subtitle: string | null = null;
+    if (selection.kind === 'event') {
+      const ev = events?.find((e) => e.id === selection.id);
+      if (ev) {
+        const d = new Date(ev.startTime);
+        const when = Number.isNaN(d.getTime())
+          ? ev.startTime
+          : d.toLocaleString(undefined, {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            });
+        subtitle = `${when} · ${ev.venueName}, ${ev.venueAddress}`;
+      }
+    }
+    printCheckinSheet({ title: selection.label, subtitle, parties, checkedIn });
+  }, [selection, parties, events, checkedIn]);
+
   const handleUncheck = useCallback(
     async (party: Party) => {
       if (!selection) return;
@@ -363,9 +388,19 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
           <button className={styles.signOut} onClick={() => chooseSelection(null)} type="button">
             ← Shows
           </button>
-          <button className={styles.signOut} onClick={handleSignOut} type="button">
-            Sign out
-          </button>
+          <div className={styles.headerActions}>
+            <button
+              className={styles.signOut}
+              onClick={handlePrint}
+              type="button"
+              disabled={!parties || parties.length === 0}
+            >
+              Print list
+            </button>
+            <button className={styles.signOut} onClick={handleSignOut} type="button">
+              Sign out
+            </button>
+          </div>
         </div>
         <h1 className={styles.title}>{selection.label}</h1>
         <SearchBar value={query} onChange={setQuery} />
