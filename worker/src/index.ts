@@ -18,6 +18,7 @@ import {
   parseShowId,
 } from './validation.ts';
 import { sendEmail } from './services/mailgun.ts';
+import { upsertMailingListEntry } from './services/mailing-list.ts';
 import { buildNotificationEmail } from './templates/notification.ts';
 import { buildConfirmationEmail } from './templates/confirmation.ts';
 import { fetchUpcomingEvents } from './services/google-calendar.ts';
@@ -448,6 +449,20 @@ async function processCompletedPayment(
   };
   await env.GUESTLIST.put(partyKey, JSON.stringify(party));
 
+  // Every buyer joins the mailing list; never let this break the sale flow.
+  if (party.email) {
+    try {
+      await upsertMailingListEntry(
+        env.MAILING_LIST,
+        party.email,
+        `${firstName} ${lastName}`.trim() || null,
+        'purchase',
+      );
+    } catch (err) {
+      console.error('[webhook] mailing-list upsert failed', errorMessage(err));
+    }
+  }
+
   // Advance the sold counter and flip sold-out if capacity is now reached.
   const raw = await env.EVENTS.get(`event:${eventId}`);
   if (!raw) return;
@@ -536,10 +551,7 @@ async function handleMailingList(
   }
 
   try {
-    await env.MAILING_LIST.put(
-      signup.email.toLowerCase(),
-      JSON.stringify({ name: signup.name ?? null, signedUpAt: new Date().toISOString() }),
-    );
+    await upsertMailingListEntry(env.MAILING_LIST, signup.email, signup.name ?? null, 'signup');
   } catch (err) {
     console.error('Failed to save signup:', err instanceof Error ? err.message : err);
     return jsonResponse(500, { error: 'Failed to save signup' }, corsHeaders);
