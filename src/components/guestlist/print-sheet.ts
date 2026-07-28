@@ -20,15 +20,6 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-function typeLabel(party: Party): string {
-  if (party.purchases.length === 0) return 'Ticket';
-  if (party.purchases.length > 1) return 'Mixed';
-  const v = party.purchases[0].variation;
-  if (v === 'Show and Meal') return 'Meal + Show';
-  if (v === 'Show Only') return 'Show Only';
-  return 'Ticket';
-}
-
 function breakdownWord(v: TicketVariation): string {
   if (v === 'Show and Meal') return 'meal';
   if (v === 'Show Only') return 'show';
@@ -74,7 +65,6 @@ function partyRow(party: Party, checkedInAt: string | undefined): string {
         <td class="box-cell"><span class="box">${checkedInAt ? '&#10003;' : ''}</span></td>
         <td class="name">${escapeHtml(name)}</td>
         <td class="qty">${party.quantity}</td>
-        <td>${typeLabel(party)}</td>
         <td class="arrived"><span class="blank"></span> of ${party.quantity}</td>
         <td class="notes">${escapeHtml(noteBits.join(' · '))}</td>
       </tr>`;
@@ -84,7 +74,6 @@ function walkUpRow(): string {
   return `
       <tr>
         <td class="box-cell"><span class="box"></span></td>
-        <td></td>
         <td></td>
         <td></td>
         <td class="arrived"><span class="blank"></span> of ___</td>
@@ -140,10 +129,9 @@ export function buildSheetHtml(opts: PrintSheetOptions): string {
   }
   tr { break-inside: avoid; }
   .col-in { width: 0.5in; }
-  .col-qty { width: 0.65in; }
-  .col-type { width: 1.05in; }
+  .col-qty { width: 0.45in; }
   .col-arrived { width: 0.95in; }
-  .col-name { width: 2.1in; }
+  .col-name { width: 2.5in; }
   .box-cell, .qty { text-align: center; }
   .name { font-weight: 600; }
   .box {
@@ -182,14 +170,13 @@ export function buildSheetHtml(opts: PrintSheetOptions): string {
       <tr>
         <th class="col-in">In</th>
         <th class="col-name">Guest (last, first)</th>
-        <th class="col-qty">Tickets</th>
-        <th class="col-type">Type</th>
+        <th class="col-qty">#</th>
         <th class="col-arrived">Arrived</th>
         <th>Notes</th>
       </tr>
     </thead>
     <tbody>${parties.map((p) => partyRow(p, opts.checkedIn[p.id])).join('')}
-      <tr class="walkups"><td colspan="6">Walk-ups / door sales</td></tr>${Array.from({ length: WALK_UP_ROWS }, walkUpRow).join('')}
+      <tr class="walkups"><td colspan="5">Walk-ups / door sales</td></tr>${Array.from({ length: WALK_UP_ROWS }, walkUpRow).join('')}
     </tbody>
   </table>
 </body>
