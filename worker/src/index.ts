@@ -18,7 +18,11 @@ import {
   parseShowId,
 } from './validation.ts';
 import { sendEmail } from './services/mailgun.ts';
-import { upsertMailingListEntry } from './services/mailing-list.ts';
+import {
+  normalizeExisting,
+  upsertMailingListEntry,
+  type MailingListEntry,
+} from './services/mailing-list.ts';
 import { buildNotificationEmail } from './templates/notification.ts';
 import { buildConfirmationEmail } from './templates/confirmation.ts';
 import { fetchUpcomingEvents } from './services/google-calendar.ts';
@@ -87,6 +91,13 @@ export default {
 
     if (url.pathname.startsWith('/api/admin/events')) {
       return handleAdminEvents(request, url, env, corsHeaders);
+    }
+
+    if (url.pathname === '/api/admin/mailing-list') {
+      if (request.method !== 'GET') {
+        return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+      }
+      return handleAdminMailingList(request, env, corsHeaders);
     }
 
     const imageMatch = url.pathname.match(/^\/api\/events\/([a-f0-9-]+)\/image$/);
@@ -558,6 +569,36 @@ async function handleMailingList(
   }
 
   return jsonResponse(200, { success: true }, corsHeaders);
+}
+
+/** Admin: the full mailing list (form signups + ticket buyers + imports). */
+async function handleAdminMailingList(
+  request: Request,
+  env: Env,
+  corsHeaders: Record<string, string>,
+): Promise<Response> {
+  if (!isAuthorized(request, adminPasscode(env))) {
+    return jsonResponse(401, { error: 'Unauthorized' }, corsHeaders);
+  }
+
+  const keys: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await env.MAILING_LIST.list({ cursor });
+    keys.push(...page.keys.map((k) => k.name));
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+
+  const values = await Promise.all(
+    keys.map((k) => env.MAILING_LIST.get<Partial<MailingListEntry>>(k, 'json')),
+  );
+  const subscribers = keys.flatMap((email, i) => {
+    const entry = normalizeExisting(values[i]);
+    return entry ? [{ email, ...entry }] : [];
+  });
+  subscribers.sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email, undefined, { sensitivity: 'base' }));
+
+  return jsonResponse(200, { subscribers }, corsHeaders, { 'Cache-Control': 'no-store' });
 }
 
 async function handleGuestlist(
