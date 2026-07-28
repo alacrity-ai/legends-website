@@ -18,6 +18,12 @@ export interface MailingListEntry {
   signedUpAt?: string;
   addedAt: string;
   updatedAt: string;
+  /**
+   * Suppression: set when the person unsubscribed. Entries are kept (not
+   * deleted) so a later ticket purchase can't silently resubscribe them.
+   * Only a fresh explicit form signup clears it.
+   */
+  unsubscribedAt?: string;
 }
 
 const SOURCE_RANK: Record<MailingListSource, number> = {
@@ -35,6 +41,7 @@ export function normalizeExisting(raw: Partial<MailingListEntry> | null): Mailin
     signedUpAt: raw.signedUpAt,
     addedAt: raw.addedAt ?? raw.signedUpAt ?? new Date().toISOString(),
     updatedAt: raw.updatedAt ?? raw.signedUpAt ?? new Date().toISOString(),
+    ...(raw.unsubscribedAt ? { unsubscribedAt: raw.unsubscribedAt } : {}),
   };
 }
 
@@ -68,6 +75,10 @@ export function mergeMailingListEntry(
     ...(signedUpAt ? { signedUpAt } : {}),
     addedAt: existing.addedAt <= incoming.at ? existing.addedAt : incoming.at,
     updatedAt: existing.updatedAt >= incoming.at ? existing.updatedAt : incoming.at,
+    // A fresh explicit signup is a re-opt-in; anything else keeps suppression.
+    ...(existing.unsubscribedAt && incoming.source !== 'signup'
+      ? { unsubscribedAt: existing.unsubscribedAt }
+      : {}),
   };
 }
 
@@ -96,4 +107,45 @@ export async function upsertMailingListEntry(
     at: new Date().toISOString(),
   });
   await kv.put(key, JSON.stringify(merged));
+}
+
+/**
+ * Per-recipient unsubscribe token: HMAC-SHA256(lowercased email) under the
+ * UNSUBSCRIBE_SECRET, hex-encoded. The campaign send script mints the same
+ * token with node:crypto; keep the two in sync.
+ */
+export async function unsubscribeToken(secret: string, email: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(email.trim().toLowerCase()));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Suppress an address. The entry is created if it doesn't exist yet so a
+ * future ticket purchase can't re-add someone who already opted out.
+ */
+export async function markUnsubscribed(kv: KVNamespace, email: string): Promise<void> {
+  const key = email.trim().toLowerCase();
+  if (!key.includes('@')) return;
+  let raw: Partial<MailingListEntry> | null = null;
+  try {
+    raw = await kv.get<Partial<MailingListEntry>>(key, 'json');
+  } catch {
+    raw = null;
+  }
+  const now = new Date().toISOString();
+  const entry =
+    normalizeExisting(raw) ??
+    ({ name: null, source: 'import', addedAt: now, updatedAt: now } as MailingListEntry);
+  if (entry.unsubscribedAt) return; // already suppressed — keep the original date
+  entry.updatedAt = now;
+  entry.unsubscribedAt = now;
+  await kv.put(key, JSON.stringify(entry));
 }

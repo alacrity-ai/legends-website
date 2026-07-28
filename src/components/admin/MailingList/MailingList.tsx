@@ -133,6 +133,11 @@ export default function MailingList({ onUnauthorized }: MailingListProps) {
                 <span className={styles.email}>{s.email}</span>
               </div>
               <div className={styles.meta}>
+                {s.unsubscribedAt && (
+                  <span className={`${styles.badge} ${styles.badge_unsubscribed}`}>
+                    Unsubscribed
+                  </span>
+                )}
                 <span className={`${styles.badge} ${styles[`badge_${s.source}`]}`}>
                   {SOURCE_LABELS[s.source]}
                 </span>

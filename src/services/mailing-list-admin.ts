@@ -12,6 +12,8 @@ export interface Subscriber {
   signedUpAt?: string;
   addedAt: string;
   updatedAt: string;
+  /** Present when the person unsubscribed — never email them. */
+  unsubscribedAt?: string;
 }
 
 export async function listSubscribers(): Promise<Subscriber[]> {
@@ -39,8 +41,16 @@ export async function listSubscribers(): Promise<Subscriber[]> {
 export function subscribersToCsv(subscribers: Subscriber[]): string {
   const quote = (v: string | null | undefined) => `"${(v ?? '').replace(/"/g, '""')}"`;
   const rows = [
-    ['name', 'email', 'source', 'signed_up_at', 'added_at', 'updated_at'],
-    ...subscribers.map((s) => [s.name, s.email, s.source, s.signedUpAt, s.addedAt, s.updatedAt]),
+    ['name', 'email', 'source', 'signed_up_at', 'added_at', 'updated_at', 'unsubscribed_at'],
+    ...subscribers.map((s) => [
+      s.name,
+      s.email,
+      s.source,
+      s.signedUpAt,
+      s.addedAt,
+      s.updatedAt,
+      s.unsubscribedAt,
+    ]),
   ];
   return rows.map((r) => r.map(quote).join(',')).join('\r\n');
 }
