@@ -74,6 +74,15 @@ export const performers: Performer[] = [
     tags: ['tribute', 'live vocals', 'event-ready'],
   },
   {
+    id: 'madonna',
+    name: 'Madonna',
+    imageSrc: '/assets/images/performer-madonna.webp',
+    imageAlt: 'Madonna tribute performer in lace gloves and tulle under stage lights',
+    shortDescription:
+      'The Queen of Pop brought to life — a Madonna tribute serving iconic looks, dance-floor anthems, and pure Material Girl attitude.',
+    tags: ['tribute', 'live vocals', 'themed show'],
+  },
+  {
     id: 'johnny-voices',
     name: 'Johnny Voices',
     imageSrc: '/assets/images/performer-johnny-voices.webp',
