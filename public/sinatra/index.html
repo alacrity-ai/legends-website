@@ -150,9 +150,11 @@
 
       /* Ticket band */
       .ticket-band { background: linear-gradient(90deg, rgba(212,175,55,0.10), rgba(212,175,55,0.03)); border-bottom: 1px solid var(--border); padding: 1.5rem 0; }
-      .ticket-inner { display: flex; align-items: center; justify-content: space-between; gap: 1.2rem; flex-wrap: wrap; }
       .ticket-eyebrow { color: var(--gold); text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.78rem; font-weight: 600; margin-bottom: 0.25rem; }
+      .ticket-show { display: flex; align-items: center; justify-content: space-between; gap: 1.2rem; flex-wrap: wrap; padding: 1rem 0; }
+      .ticket-show + .ticket-show { border-top: 1px solid var(--border); }
       .ticket-date { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(1.3rem, 3.2vw, 1.9rem); color: var(--text); }
+      .ticket-meta { color: var(--muted); font-size: 0.98rem; margin-top: 0.15rem; }
 
       /* Sections */
       section { padding: 3.5rem 0; }
@@ -221,19 +223,40 @@
       </div>
     </div>
 
-    <!-- Upcoming show / tickets -->
+    <!-- Upcoming shows / tickets -->
     <section class="ticket-band">
       <div class="wrap">
-        <div class="ticket-inner">
+        <p class="ticket-eyebrow">Upcoming Live Shows</p>
+        <div class="ticket-show">
           <div>
-            <p class="ticket-eyebrow">Next Live Show</p>
+            <p class="ticket-date">Friday, August 28, 2026</p>
+            <p class="ticket-meta">The Rat Pack with a 12-Piece Orchestra &middot; The Irish American, Malden MA</p>
+          </div>
+          <a
+            class="btn btn-primary"
+            href="https://djkmdlegends.com/?event=43c4f19d-766a-4824-8741-e0ad684643a6"
+          >Buy Tickets</a>
+        </div>
+        <div class="ticket-show">
+          <div>
             <p class="ticket-date">Sunday, September 20, 2026</p>
+            <p class="ticket-meta">Sinatra, Martin, and Sammy Davis &middot; Chelmsford Elks, Chelmsford MA</p>
           </div>
           <a
             class="btn btn-primary"
             href="https://checkout.square.site/merchant/MLPWE1EPSW06D/checkout/ODAFNHMVFGBCECXXR4GIIJGT"
             target="_blank"
             rel="noopener noreferrer"
+          >Buy Tickets</a>
+        </div>
+        <div class="ticket-show">
+          <div>
+            <p class="ticket-date">Saturday, October 17, 2026</p>
+            <p class="ticket-meta">The Rat Pack with an 18-Piece Orchestra &middot; Holy Ghost Society, Peabody MA</p>
+          </div>
+          <a
+            class="btn btn-primary"
+            href="https://djkmdlegends.com/?event=10ce0cc2-2aa8-413b-ab3e-86f9bf2be90c"
           >Buy Tickets</a>
         </div>
       </div>
