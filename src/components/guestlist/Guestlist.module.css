@@ -46,6 +46,16 @@
   border-color: var(--color-accent);
 }
 
+.signOut:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.headerActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .stats {
   display: flex;
   gap: 1rem;
