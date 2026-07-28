@@ -53,7 +53,11 @@ export function mergeMailingListEntry(
     };
   }
   const keepExistingSource = SOURCE_RANK[existing.source] >= SOURCE_RANK[incoming.source];
-  const entry: MailingListEntry = {
+  const signedUpAt =
+    existing.signedUpAt ?? (incoming.source === 'signup' ? incoming.at : undefined);
+  // Field order matters: entries are diffed as JSON strings (backfill
+  // idempotency), so both construction paths must emit identical shapes.
+  return {
     // A signup is the person typing their own name — let it win; otherwise
     // the first recorded name sticks and blanks fill in.
     name:
@@ -61,13 +65,10 @@ export function mergeMailingListEntry(
         ? incoming.name
         : existing.name ?? incoming.name,
     source: keepExistingSource ? existing.source : incoming.source,
+    ...(signedUpAt ? { signedUpAt } : {}),
     addedAt: existing.addedAt <= incoming.at ? existing.addedAt : incoming.at,
     updatedAt: existing.updatedAt >= incoming.at ? existing.updatedAt : incoming.at,
   };
-  const signedUpAt =
-    existing.signedUpAt ?? (incoming.source === 'signup' ? incoming.at : undefined);
-  if (signedUpAt) entry.signedUpAt = signedUpAt;
-  return entry;
 }
 
 /**
