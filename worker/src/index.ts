@@ -19,7 +19,9 @@ import {
 } from './validation.ts';
 import { sendEmail } from './services/mailgun.ts';
 import {
+  markUnsubscribed,
   normalizeExisting,
+  unsubscribeToken,
   upsertMailingListEntry,
   type MailingListEntry,
 } from './services/mailing-list.ts';
@@ -83,6 +85,14 @@ export default {
         return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
       }
       return handleMailingList(request, env, corsHeaders);
+    }
+
+    if (url.pathname === '/api/mailing-list/unsubscribe') {
+      // GET = link click (human, gets a page); POST = RFC 8058 one-click.
+      if (request.method !== 'GET' && request.method !== 'POST') {
+        return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+      }
+      return handleUnsubscribe(request, url, env, corsHeaders);
     }
 
     if (url.pathname.startsWith('/api/guestlist')) {
@@ -569,6 +579,65 @@ async function handleMailingList(
   }
 
   return jsonResponse(200, { success: true }, corsHeaders);
+}
+
+/** Minimal branded page for the unsubscribe link (human GET path). */
+function unsubscribePage(heading: string, body: string): Response {
+  const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" /><title>${heading} — DJKMD Legends</title></head>
+<body style="margin:0;background:#0c0a12;color:#e8e4da;font-family:Georgia,'Times New Roman',serif;">
+<div style="max-width:480px;margin:0 auto;padding:4rem 1.5rem;text-align:center;">
+<p style="letter-spacing:0.25em;text-transform:uppercase;font-size:12px;color:#d4af37;margin:0 0 1rem;">DJKMD Legends</p>
+<h1 style="font-size:28px;margin:0 0 1rem;color:#f5f0e6;">${heading}</h1>
+<p style="font-size:16px;line-height:1.6;color:#b8b2a6;margin:0 0 2rem;">${body}</p>
+<a href="https://djkmdlegends.com" style="color:#d4af37;">djkmdlegends.com</a>
+</div></body></html>`;
+  return new Response(html, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+  });
+}
+
+function timingSafeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+async function handleUnsubscribe(
+  request: Request,
+  url: URL,
+  env: Env,
+  corsHeaders: Record<string, string>,
+): Promise<Response> {
+  if (!env.UNSUBSCRIBE_SECRET) {
+    console.error('[unsubscribe] UNSUBSCRIBE_SECRET not configured');
+    return jsonResponse(500, { error: 'Not configured' }, corsHeaders);
+  }
+  const email = (url.searchParams.get('e') ?? '').trim().toLowerCase();
+  const token = url.searchParams.get('t') ?? '';
+  const expected = email.includes('@') ? await unsubscribeToken(env.UNSUBSCRIBE_SECRET, email) : '';
+  if (!expected || !timingSafeEqualHex(token, expected)) {
+    if (request.method === 'POST') {
+      return jsonResponse(400, { error: 'Invalid link' }, corsHeaders);
+    }
+    return unsubscribePage(
+      'Link not recognized',
+      'This unsubscribe link is invalid or incomplete. Reply to any of our emails and we will remove you manually.',
+    );
+  }
+
+  await markUnsubscribed(env.MAILING_LIST, email);
+
+  if (request.method === 'POST') {
+    return jsonResponse(200, { ok: true }, corsHeaders);
+  }
+  return unsubscribePage(
+    "You're unsubscribed",
+    'You will no longer receive emails from DJKMD Legends. Changed your mind? Rejoin anytime from our website.',
+  );
 }
 
 /** Admin: the full mailing list (form signups + ticket buyers + imports). */

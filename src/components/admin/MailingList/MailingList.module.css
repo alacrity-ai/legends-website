@@ -171,6 +171,11 @@
   border-color: var(--color-border);
 }
 
+.badge_unsubscribed {
+  border-color: rgba(220, 90, 90, 0.55);
+  color: #e08a8a;
+}
+
 .date {
   color: var(--color-text-muted);
   font-size: var(--text-xs);

@@ -36,6 +36,8 @@ export interface Env {
   SQUARE_LOCATION_ID: string;
   SQUARE_ENVIRONMENT: 'sandbox' | 'production';
   SQUARE_WEBHOOK_SIGNATURE_KEY?: string;
+  /** HMAC secret for mailing-list unsubscribe tokens (agentsecrets: legends_unsubscribe_secret). */
+  UNSUBSCRIBE_SECRET?: string;
   LEGACY_CALENDAR_ENABLED: string;
 }
 

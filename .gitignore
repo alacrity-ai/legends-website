@@ -34,3 +34,4 @@ DO_NOT_COMMIT.md
 reference_repos/
 # Wrangler local dev state
 worker/.wrangler/
+worker/campaign-preview.*
