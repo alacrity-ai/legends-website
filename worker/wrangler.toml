@@ -44,4 +44,4 @@ GOOGLE_CALENDAR_ID = "c_f31ec573a399824b85486344a243eb27e6742ef72157c2240a8723ad
 SQUARE_ENVIRONMENT = "production"
 # Legacy Google Calendar event reading. Keep "true" through the grandfathering window
 # (the 2 existing calendar shows with live bookings), then flip to "false" at cutover (~Sept 2026).
-LEGACY_CALENDAR_ENABLED = "true"
+LEGACY_CALENDAR_ENABLED = "false"
