@@ -11,8 +11,8 @@ export const siteDescription =
 export const navItems: NavItem[] = [
   { label: 'Home', href: '#home' },
   { label: 'About', href: '#about' },
-  { label: 'Acts', href: '#acts' },
   { label: 'Video', href: '#media' },
+  { label: 'Acts', href: '#acts' },
   { label: 'Press Kit', href: '#press-kit' },
 ];
 

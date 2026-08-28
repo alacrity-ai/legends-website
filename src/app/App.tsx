@@ -59,9 +59,9 @@ function MarketingSite() {
       <main id="main-content">
         <Hero onOpenMailingList={openMailingList} />
         <About />
-        <Performers />
         <Media />
         <Calendar />
+        <Performers />
         <BookingForm />
         <PressKit />
       </main>
