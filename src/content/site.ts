@@ -12,6 +12,7 @@ export const navItems: NavItem[] = [
   { label: 'Home', href: '#home' },
   { label: 'About', href: '#about' },
   { label: 'Acts', href: '#acts' },
+  { label: 'Video', href: '#media' },
   { label: 'Press Kit', href: '#press-kit' },
 ];
 
@@ -73,8 +74,13 @@ export const eventTypes = [
 
 /* ── Media ─────────────────────────────────────────────────── */
 
-/** @see .env.example — VITE_YOUTUBE_VIDEO_ID */
-export const youtubeVideoId: string = import.meta.env.VITE_YOUTUBE_VIDEO_ID || '';
+/**
+ * DJKMD Legends promo video (https://youtu.be/u_eMzaB6RXM), supplied by Keith
+ * on 2026-08-03. Public content, so the ID lives here; VITE_YOUTUBE_VIDEO_ID
+ * (see .env.example) can still override it per build.
+ */
+export const youtubeVideoId: string =
+  import.meta.env.VITE_YOUTUBE_VIDEO_ID || 'u_eMzaB6RXM';
 export const mediaCaption =
   'See DJKMD Legends in action — live performances that captivate any crowd.';
 
