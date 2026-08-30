@@ -1,2 +1,6 @@
 https://www.djkmdlegends.com/* https://djkmdlegends.com/:splat 301
+# The staff console moved to its own PWA (admin/). Keep old bookmarks working.
+/guestlist   https://admin.djkmdlegends.com/checkin   301
+/admin       https://admin.djkmdlegends.com/          301
+/admin/*     https://admin.djkmdlegends.com/:splat    301
 /* /index.html 200

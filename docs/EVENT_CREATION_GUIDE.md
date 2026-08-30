@@ -1,7 +1,7 @@
 # How to Add a New Show to the Website
 
 > ⚠️ **DEPRECATED (as of v0.2).** New shows are now added through the **admin Event Form** at
-> `https://djkmdlegends.com/admin` → **Create a Show**, which makes the Square checkout links for
+> `https://admin.djkmdlegends.com` (the **Legends Admin** app) → **Create a Show**, which makes the Square checkout links for
 > you automatically. See `docs/resources/1-SOPS.md` → SOP 2. This Google-Calendar guide is kept
 > only for the 2 original "grandfathered" shows that still run on calendar links until ~September 2026.
 

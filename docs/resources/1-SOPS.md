@@ -9,7 +9,7 @@ Each SOP is tagged by who does it and whether code changes:
 
 > **The golden rule of deploys:** anything in the **repo** (artists, the YouTube video, copy) only goes live after a deploy. Anything in **Google Calendar, Square, or KV** (shows, tickets, mailing list, guestlists) is live within ~1 minute with **no deploy**. Know which kind of change you're making before you start.
 
-**How a deploy happens:** GitHub → Actions → **"Deploy to Cloudflare Pages"** → **Run workflow** (it's `workflow_dispatch`, i.e. manual). This rebuilds the frontend and redeploys the Worker. See SOP 6.
+**How a deploy happens:** GitHub → Actions → **"Deploy to Cloudflare Pages"** → **Run workflow** (it's `workflow_dispatch`, i.e. manual). This rebuilds the public site **and** the admin PWA and redeploys the Worker. See SOP 6.
 
 ---
 
@@ -49,13 +49,13 @@ The carousel (`#acts` on the homepage) is driven entirely by data in `src/conten
 
 ## SOP 2 — Add a new show / event 🎤
 
-Shows are created through the **admin Event Form** at `https://djkmdlegends.com/admin`. The form creates the Square checkout link(s) for you automatically — no Square dashboard steps, no Google Calendar, no copy-pasting links. **No deploy needed** — the show appears under Upcoming Shows within ~1 minute.
+Shows are created through the **Legends Admin** app at `https://admin.djkmdlegends.com` (install it to your phone's home screen — Share → *Add to Home Screen* on iPhone, the install prompt on Android). The **Create a Show** form creates the Square checkout link(s) for you automatically — no Square dashboard steps, no Google Calendar, no copy-pasting links. **No deploy needed** — the show appears under Upcoming Shows within ~1 minute.
 
 > **Legacy note:** the 2 original shows still live in **Google Calendar** with pasted Square links, and stay that way until ~September 2026 (see [SOP 2-Legacy](#sop-2legacy--grandfathered-google-calendar-shows-)). All **new** shows go through the form below — don't add new shows to the calendar.
 
 ### Steps
 
-1. Go to **`/admin`** and sign in with the admin passcode → choose **Create a Show**.
+1. Open **`https://admin.djkmdlegends.com`** and sign in with the admin passcode → choose **Create a Show**.
 2. Fill in the form (all fields required):
    - **Show name** — appears on the site.
    - **Description** — the blurb buyers see (multi-line; plain text).
@@ -67,7 +67,7 @@ Shows are created through the **admin Event Form** at `https://djkmdlegends.com/
 
 **Verify:** within a minute, the show appears under **Upcoming Shows** with its image; **Buy Tickets** opens a modal with one Buy button per ticket type, each going to its Square checkout.
 
-**Remove a show:** in `/admin` → (event management), delete it. This also deactivates its Square links and removes the image.
+**Remove a show:** Legends Admin → **Manage Shows** → delete it. This also deactivates its Square links and removes the image.
 
 **Gotchas:**
 - "Square: … failed" on submit → the price or Square config was rejected; nothing is saved, fix and resubmit.
@@ -126,7 +126,7 @@ Pipe the list through `jq` to extract emails for an export. Add `--preview=false
 
 ## SOP 5 — Load a guestlist for door check-in 🎤 (light CLI)
 
-The `/guestlist` staff app reads its roster from the **KV `GUESTLIST`** namespace, keyed `roster:YYYY-MM-DD`. You populate it before the show from a Square orders export using `tools/ingest-guestlist.mjs`.
+The **Door Check-in** tool in Legends Admin (`https://admin.djkmdlegends.com/checkin`) builds rosters automatically from Square purchases (v0.3). The steps below are the **legacy CSV path** for the 2 grandfathered calendar shows: it reads the **KV `GUESTLIST`** namespace, keyed `roster:YYYY-MM-DD`. You populate it before the show from a Square orders export using `tools/ingest-guestlist.mjs`.
 
 1. **Export orders from Square** for the show as CSV. The script expects these columns: `Recipient Name`, `Recipient Email`, `Recipient Phone`, `Item Quantity`, `Item Variation`, `Order Date`, `Fulfillment Notes`. (Variations are normalized to `Show and Meal` / `Show Only`.)
 2. **Dry-run** to sanity-check parsing (prints parties, writes nothing):
@@ -144,7 +144,7 @@ The `/guestlist` staff app reads its roster from the **KV `GUESTLIST`** namespac
    ```
 
    Without `--remote` it writes to your **local** dev KV (for testing against `make dev-worker`). The script dedupes buyers by email, aggregates ticket quantities, and sorts by last name.
-4. **At the door:** staff open `https://djkmdlegends.com/guestlist`, sign in with the shared **`GUESTLIST_PASSCODE`**, pick the show date, search names, and check parties in/out. Check-ins are stored as separate `checkin:<show>:<partyId>` keys, so re-uploading a roster does **not** wipe who's already checked in.
+4. **At the door:** staff open **Legends Admin** (`https://admin.djkmdlegends.com` → **Door Check-in**), sign in with the shared **`ADMIN_PASSCODE`**, pick the show date, search names, and check parties in/out. Check-ins are stored as separate `checkin:<show>:<partyId>` keys, so re-uploading a roster does **not** wipe who's already checked in.
 
 **Re-uploading:** running the script again for the same `--show` overwrites the roster (`roster:<date>`) but leaves check-ins intact.
 
@@ -152,15 +152,17 @@ The `/guestlist` staff app reads its roster from the **KV `GUESTLIST`** namespac
 
 ## SOP 6 — Deploy the site 🧑‍💻
 
-Both artifacts (frontend → Cloudflare Pages, Worker → Cloudflare) ship from one **manually triggered** GitHub Actions workflow.
+All three artifacts (public site → Pages `legends-website`, admin PWA → Pages `legends-admin`, Worker → Cloudflare) ship from one **manually triggered** GitHub Actions workflow.
 
 1. Merge/commit your change to `main`.
 2. GitHub → **Actions** tab → **"Deploy to Cloudflare Pages"** → **Run workflow** (on `main`).
-3. The workflow: `npm ci` → `npm run build` (injecting `VITE_*` secrets) → deploy `dist/` to Pages → `npm ci` + deploy in `worker/`.
+3. The workflow: `npm ci` → `npm run build` (injecting `VITE_*` secrets) → deploy `dist/` to Pages → `cd admin && npm ci && npm run build` → deploy `admin/dist/` to Pages (`legends-admin`) → `npm ci` + deploy in `worker/`.
 
-**Worker-only deploy** (no frontend change — e.g. you only touched `worker/`): `make deploy-worker` (runs `cd worker && npm run deploy`), assuming you're authenticated with `wrangler` locally.
+**Partial deploys** (assuming Cloudflare creds are in your env — see `claude_ops/docs/sops/cloudflare-deploys.md`):
+- Worker only (you only touched `worker/`): `make deploy-worker`.
+- Admin PWA only (you only touched `admin/`): `make deploy-admin` (builds, then `wrangler pages deploy admin/dist --project-name legends-admin`).
 
-**Before deploying**, run `make lint` and `make build` locally to catch type/build errors early.
+**Before deploying**, run `make lint`, `make build` and `make build-admin` locally to catch type/build errors early.
 
 ---
 
@@ -169,11 +171,12 @@ Both artifacts (frontend → Cloudflare Pages, Worker → Cloudflare) ship from 
 | Task | Type | Edit | Deploy? |
 | --- | --- | --- | --- |
 | Add/edit/reorder an artist | 🧑‍💻 | `src/content/performers.ts` + image in `public/assets/images/` | **Yes** |
-| Add a show | 🎤 | `/admin` → Create a Show form (auto-creates Square links) | No |
-| Change ticket price/checkout | 🎤 | Delete + recreate the show in `/admin` | No |
+| Add a show | 🎤 | Legends Admin (`admin.djkmdlegends.com`) → Create a Show (auto-creates Square links) | No |
+| Change ticket price/checkout | 🎤 | Legends Admin → Manage Shows → edit (or delete + recreate) | No |
+| Check guests in at the door | 🎤 | Legends Admin → Door Check-in | No |
 | Grandfathered (legacy) shows | 🎤 | Leave in Google Calendar until ~Sept 2026 | No |
 | Set the YouTube video | 🧑‍💻 | `VITE_YOUTUBE_VIDEO_ID` GitHub secret | **Yes** |
 | Edit site copy | 🧑‍💻 | `src/content/site.ts` (and `social.ts`) | **Yes** |
-| View / export the mailing list | 🎤 | KV `MAILING_LIST` (dashboard or `wrangler`) | No |
+| View / export the mailing list | 🎤 | Legends Admin → Mailing List (CSV export); or KV `MAILING_LIST` via `wrangler` | No |
 | Load a guestlist | 🎤 | `tools/ingest-guestlist.mjs` → KV `GUESTLIST` | No |
-| Ship code changes | 🧑‍💻 | — | **Yes** (SOP 6) |
+| Ship code changes (site / admin PWA / worker) | 🧑‍💻 | — | **Yes** (SOP 6) |

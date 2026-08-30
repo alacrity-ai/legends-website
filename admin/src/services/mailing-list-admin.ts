@@ -1,6 +1,6 @@
 import { clearPasscode, getPasscode, UnauthorizedError } from './guestlist.ts';
 
-const apiUrl = import.meta.env.VITE_BOOKING_API_URL;
+import { apiUrl } from './api-base.ts';
 
 export type SubscriberSource = 'signup' | 'purchase' | 'import';
 
