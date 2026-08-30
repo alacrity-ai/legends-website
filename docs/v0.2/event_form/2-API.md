@@ -20,7 +20,7 @@ Square payment link per ticket type → store the image in R2 → persist to KV.
 
 ## Auth
 
-Bearer token = the admin passcode (the same one that gates `/admin`):
+Bearer token = the admin passcode (the same one that gates the Legends Admin app at `admin.djkmdlegends.com`):
 
 ```
 Authorization: Bearer <ADMIN_PASSCODE>
@@ -86,7 +86,7 @@ curl -sS -X POST https://djkmdlegends.com/api/admin/events \
 ```
 
 The returned `event.id` and per-ticket `checkoutUrl`s can be managed/deleted from
-`/admin` → Manage Shows (which also offers Copy link / Download QR per ticket).
+Legends Admin (`https://admin.djkmdlegends.com/events`) → Manage Shows (which also offers Copy link / Download QR per ticket).
 
 ## Update an event — `PATCH /api/admin/events/:id`
 
@@ -136,7 +136,7 @@ curl -X PATCH .../api/admin/events/$ID -H "Authorization: Bearer $ADMIN_PASSCODE
 
 Auth required. Removes the KV record, deactivates the event's Square payment
 link(s), and deletes its R2 image. Returns `{ "ok": true }` (or `404` if the id
-isn't found). Also available from `/admin → Manage Shows`.
+isn't found). Also available from Legends Admin → Manage Shows.
 
 ```bash
 curl -X DELETE https://djkmdlegends.com/api/admin/events/$ID \

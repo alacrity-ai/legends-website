@@ -38,6 +38,21 @@ jobs:
           command: pages deploy dist --project-name legends-website
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install admin dependencies
+        run: cd admin && npm ci
+
+      - name: Build admin PWA
+        run: cd admin && npm run build
+
+      - name: Deploy admin PWA to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: admin
+          command: pages deploy dist --project-name legends-admin
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install worker dependencies
         run: cd worker && npm ci
 
