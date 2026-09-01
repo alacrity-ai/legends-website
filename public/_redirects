@@ -1,4 +1,8 @@
-https://www.djkmdlegends.com/* https://djkmdlegends.com/:splat 301
+# NOTE: Pages `_redirects` matches paths only — a hostname source like
+# `https://www.djkmdlegends.com/* https://djkmdlegends.com/:splat 301` is ignored.
+# www.djkmdlegends.com is an active Pages custom domain that serves the site as-is;
+# the API worker is routed on it too (worker/wrangler.toml). A canonical www→apex
+# redirect belongs in a Cloudflare zone Redirect Rule, not here.
 # The staff console moved to its own PWA (admin/). Keep old bookmarks working.
 /guestlist   https://admin.djkmdlegends.com/checkin   301
 /admin       https://admin.djkmdlegends.com/          301

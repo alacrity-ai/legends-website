@@ -4,11 +4,7 @@ import Container from '../../layout/Container/Container.tsx';
 import Heading from '../../shared/Heading/Heading.tsx';
 import Button from '../../shared/Button/Button.tsx';
 import TicketModal from '../TicketModal/TicketModal.tsx';
-import {
-  googleCalendarPublicUrl,
-  calendarCopy,
-  sectionIds,
-} from '../../../content/site.ts';
+import { calendarCopy, sectionIds } from '../../../content/site.ts';
 import { fetchUpcomingEvents } from '../../../services/events.ts';
 import { eventImageSrc } from '../../../utils/event-image.ts';
 import type { CalendarEvent } from '../../../types/event.ts';
@@ -67,17 +63,9 @@ export default function Calendar() {
         )}
 
         {error && (
-          <div className={styles.statusText}>
-            <p>Unable to load upcoming shows.</p>
-            <a
-              href={googleCalendarPublicUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.fallbackLink}
-            >
-              View calendar &rarr;
-            </a>
-          </div>
+          <p className={styles.statusText}>
+            Unable to load upcoming shows right now — please refresh, or check back soon.
+          </p>
         )}
 
         {!loading && !error && events.length === 0 && (
