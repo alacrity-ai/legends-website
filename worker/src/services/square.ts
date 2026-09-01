@@ -315,6 +315,8 @@ export interface SquarePaymentDetails {
   /** Cardholder name from the billing/shipping address, if Square captured one. */
   buyerName: string | null;
   customerId: string | null;
+  /** Total charged, in cents (amount_money.amount); null when Square omits it. */
+  amountCents: number | null;
 }
 
 /**
@@ -341,6 +343,7 @@ export async function getPaymentDetails(
       billing_address?: SquareAddressName;
       shipping_address?: SquareAddressName;
       customer_id?: string;
+      amount_money?: { amount?: number; currency?: string };
     };
   };
   const payment = json.payment;
@@ -352,7 +355,31 @@ export async function getPaymentDetails(
     buyerEmail: payment.buyer_email_address ?? null,
     buyerName: addr,
     customerId: payment.customer_id ?? null,
+    amountCents:
+      typeof payment.amount_money?.amount === 'number' ? payment.amount_money.amount : null,
   };
+}
+
+/**
+ * All locations on the account, as id → dashboard nickname. Used by the sales
+ * report to say *which* Square location a show's money lands in. Returns an
+ * empty map (never throws to the caller's hot path) when Square is unreachable.
+ */
+export async function listLocations(env: Env): Promise<Map<string, string>> {
+  const { token } = requireSecrets(env);
+  const res = await fetch(`${apiBase(env)}/v2/locations`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Square-Version': SQUARE_API_VERSION,
+    },
+  });
+  if (!res.ok) return new Map();
+  const json = (await res.json()) as {
+    locations?: Array<{ id: string; name?: string; business_name?: string }>;
+  };
+  return new Map(
+    (json.locations ?? []).map((l) => [l.id, l.name ?? l.business_name ?? l.id] as const),
+  );
 }
 
 interface SquareAddressName {
