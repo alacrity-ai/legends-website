@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getSalesReport,
   getShowBuyers,
+  salesToCsv,
   type SalesBuyer,
   type SalesReport,
   type ShowSales,
@@ -174,6 +175,37 @@ export default function Sales({ onUnauthorized }: SalesProps) {
 
   const maxGross = useMemo(() => shows.reduce((m, s) => Math.max(m, s.grossCents), 0), [shows]);
 
+  const [exporting, setExporting] = useState(false);
+
+  // One row per order for every show in the current view — "All shows" +
+  // export is the year's sales in a spreadsheet. Amounts are gross at
+  // checkout; Square's own transaction export stays the authority for taxes.
+  const handleExport = useCallback(async () => {
+    if (shows.length === 0) return;
+    setExporting(true);
+    try {
+      const rows = await Promise.all(
+        shows.map(async (show) => ({ show, buyers: await getShowBuyers(show.id) })),
+      );
+      const csv = salesToCsv(rows);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `legends-sales-${mode}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        onUnauthorized();
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  }, [shows, mode, onUnauthorized]);
+
   const legendSlots = useMemo(() => {
     if (!report || report.ticketTypes.length < 2) return [];
     const slots = report.ticketTypes.slice(0, SERIES_SLOTS).map((_, i) => i);
@@ -192,9 +224,19 @@ export default function Sales({ onUnauthorized }: SalesProps) {
             live in Square.
           </p>
         </div>
-        <button className={styles.refresh} onClick={handleRefresh} type="button" disabled={refreshing}>
-          {refreshing ? 'Refreshing…' : 'Refresh'}
-        </button>
+        <div className={styles.headBtns}>
+          <button className={styles.refresh} onClick={handleRefresh} type="button" disabled={refreshing}>
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+          <button
+            className={styles.refresh}
+            onClick={() => void handleExport()}
+            type="button"
+            disabled={exporting || !report || shows.length === 0}
+          >
+            {exporting ? 'Exporting…' : `Export CSV${report ? ` (${totals.parties})` : ''}`}
+          </button>
+        </div>
       </header>
 
       {error && <p className={styles.error}>{error}</p>}

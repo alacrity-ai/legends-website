@@ -70,6 +70,51 @@ export function getSalesReport(): Promise<SalesReport> {
   return request<SalesReport>('/api/admin/sales');
 }
 
+/**
+ * Buyer-level CSV for the given shows (Excel/Sheets-friendly, all fields
+ * quoted). One row per order; amounts are gross at checkout before Square
+ * fees and refunds — `amount_basis` says whether the amount was recorded at
+ * checkout or estimated from the show's current ticket price.
+ */
+export function salesToCsv(rows: Array<{ show: ShowSales; buyers: SalesBuyer[] }>): string {
+  const quote = (v: string | number | null | undefined) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const out = [
+    [
+      'show',
+      'show_date',
+      'venue',
+      'show_status',
+      'buyer_first_name',
+      'buyer_last_name',
+      'buyer_email',
+      'tickets',
+      'ticket_type',
+      'amount_usd',
+      'amount_basis',
+      'purchased_at',
+      'square_payment_id',
+    ],
+    ...rows.flatMap(({ show, buyers }) =>
+      buyers.map((b) => [
+        show.showName,
+        show.startTime,
+        show.venueName,
+        show.isPast ? 'past' : 'upcoming',
+        b.firstName,
+        b.lastName,
+        b.email,
+        b.quantity,
+        b.ticketType,
+        b.amountCents === null ? '' : (b.amountCents / 100).toFixed(2),
+        b.amountCents === null ? 'unpriced' : b.recorded ? 'recorded' : 'estimated',
+        b.purchasedAt,
+        b.paymentId,
+      ]),
+    ),
+  ];
+  return out.map((r) => r.map(quote).join(',')).join('\r\n');
+}
+
 export async function getShowBuyers(eventId: string): Promise<SalesBuyer[]> {
   const data = await request<{ buyers: SalesBuyer[] }>(
     `/api/admin/sales/shows/${encodeURIComponent(eventId)}`,
