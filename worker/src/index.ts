@@ -28,6 +28,7 @@ import {
 import { buildNotificationEmail } from './templates/notification.ts';
 import { buildConfirmationEmail } from './templates/confirmation.ts';
 import { fetchUpcomingEvents } from './services/google-calendar.ts';
+import { buildSalesReport, buildShowBuyers } from './sales.ts';
 import {
   createPaymentLink,
   createVenueLocation,
@@ -101,6 +102,10 @@ export default {
 
     if (url.pathname.startsWith('/api/admin/events')) {
       return handleAdminEvents(request, url, env, corsHeaders);
+    }
+
+    if (url.pathname === '/api/admin/sales' || url.pathname.startsWith('/api/admin/sales/')) {
+      return handleAdminSales(request, url, env, corsHeaders);
     }
 
     if (url.pathname === '/api/admin/mailing-list') {
@@ -467,6 +472,7 @@ async function processCompletedPayment(
     quantity,
     ticketType,
     purchasedAt: new Date().toISOString(),
+    ...(payment?.amountCents != null ? { amountCents: payment.amountCents } : {}),
   };
   await env.GUESTLIST.put(partyKey, JSON.stringify(party));
 
@@ -861,6 +867,43 @@ function formatEventDateTime(iso: string): string {
   const period = hour >= 12 ? 'PM' : 'AM';
   hour = hour % 12 || 12;
   return `${monthName} ${Number(day)}, ${year}, ${hour}:${mm} ${period}`;
+}
+
+/* ── Admin: sales report (LGD-10) ─────────────────────────── */
+
+async function handleAdminSales(
+  request: Request,
+  url: URL,
+  env: Env,
+  corsHeaders: Record<string, string>,
+): Promise<Response> {
+  if (!isAuthorized(request, adminPasscode(env))) {
+    return jsonResponse(401, { error: 'Unauthorized' }, corsHeaders);
+  }
+  if (request.method !== 'GET') {
+    return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+  }
+  const noStore = { 'Cache-Control': 'no-store' };
+
+  try {
+    const events = await listEventRecords(env);
+
+    const buyersMatch = url.pathname.match(/^\/api\/admin\/sales\/shows\/([a-f0-9-]+)$/);
+    if (buyersMatch) {
+      const event = events.find((e) => e.id === buyersMatch[1]);
+      if (!event) return jsonResponse(404, { error: 'Show not found' }, corsHeaders);
+      return jsonResponse(200, await buildShowBuyers(env, event), corsHeaders, noStore);
+    }
+
+    if (url.pathname === '/api/admin/sales') {
+      return jsonResponse(200, await buildSalesReport(env, events), corsHeaders, noStore);
+    }
+
+    return jsonResponse(404, { error: 'Not found' }, corsHeaders);
+  } catch (err) {
+    console.error('[sales] report failed:', errorMessage(err));
+    return jsonResponse(500, { error: 'Failed to build sales report' }, corsHeaders);
+  }
 }
 
 async function handleAdminEvents(

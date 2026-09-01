@@ -1,0 +1,620 @@
+/* Sales dashboard (LGD-10). Chart colours are the three categorical slots
+   validated for this dark surface (#16121b): gold, blue, aqua — plus a neutral
+   for "Other". Text never wears a series colour. */
+
+.wrap {
+  --series-0: #ad8d2b;
+  --series-1: #3987e5;
+  --series-2: #199e70;
+  --series-3: #6f6a62;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+/* ── Page header ──────────────────────────────────────────── */
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+}
+
+.overline {
+  display: block;
+  font-size: var(--text-xs);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 var(--space-xs);
+}
+
+.title {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
+  margin: 0 0 var(--space-xs);
+}
+
+.subtitle {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+  max-width: 48ch;
+}
+
+.headBtns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.refresh {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-md);
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.refresh:hover:not(:disabled) {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.status {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: var(--space-md) 0;
+}
+
+.error {
+  color: var(--color-error);
+  font-size: var(--text-sm);
+  margin: var(--space-md) 0;
+}
+
+/* ── View toggle ──────────────────────────────────────────── */
+
+.toggle {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  margin-bottom: var(--space-lg);
+}
+
+.toggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  border-radius: 999px;
+  padding: 0.4rem 0.95rem;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.toggleBtn:hover {
+  color: var(--color-text);
+}
+
+.toggleOn {
+  background: var(--color-accent);
+  color: var(--btn-primary-text);
+}
+
+.toggleOn:hover {
+  color: var(--btn-primary-text);
+}
+
+.toggleCount {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+/* ── Stat tiles ───────────────────────────────────────────── */
+
+.tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md) var(--space-lg);
+  min-width: 0;
+}
+
+.hero {
+  grid-column: 1 / -1;
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(212, 175, 55, 0.07), transparent 140px),
+    var(--color-surface-elevated);
+  box-shadow: var(--shadow-md);
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+  opacity: 0.6;
+}
+
+.tileLabel {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.heroValue {
+  font-size: clamp(2.5rem, 2rem + 2.5vw, 3.5rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-text);
+}
+
+.tileValue {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
+}
+
+.tileNote {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ── Cards ────────────────────────────────────────────────── */
+
+.card {
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.cardHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.cardTitle {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.cardHint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ── Legend + swatches ────────────────────────────────────── */
+
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.s0 { background: var(--series-0); }
+.s1 { background: var(--series-1); }
+.s2 { background: var(--series-2); }
+.s3 { background: var(--series-3); }
+
+/* ── Bar chart ────────────────────────────────────────────── */
+
+.bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.barRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.barPast .barName {
+  color: var(--color-text-muted);
+}
+
+.barLabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+}
+
+.barName {
+  color: var(--color-text);
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barDate {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  flex-shrink: 0;
+}
+
+.barLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.barTrack {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 18px;
+  display: flex;
+  align-items: center;
+}
+
+/* The bar is a row of segments separated by a 2px surface gap; the data-end
+   is rounded 4px, the baseline (left) is square. */
+.bar {
+  display: flex;
+  height: 18px;
+  gap: 2px;
+  min-width: 0;
+  transition: width 0.4s var(--ease-out);
+}
+
+.seg {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.seg:hover {
+  filter: brightness(1.15);
+}
+
+.seg:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.barValue {
+  flex-shrink: 0;
+  min-width: 4.5rem;
+  text-align: right;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.caption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ── Show list ────────────────────────────────────────────── */
+
+.showList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.show {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.showPast {
+  opacity: 0.8;
+}
+
+.showHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.showText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.showName {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.showWhen {
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+}
+
+.showWhere {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.showRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.showGross {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.chevron {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.chip {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px var(--space-sm);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.chip_onSale {
+  color: var(--color-success);
+  border: 1px solid rgba(63, 165, 91, 0.45);
+}
+
+.chip_soldOut {
+  color: var(--color-error);
+  border: 1px solid rgba(217, 92, 92, 0.45);
+}
+
+.chip_past {
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-sm);
+  margin: 0;
+}
+
+.stat dt {
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.stat dd {
+  margin: 2px 0 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.types {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+}
+
+.type {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+}
+
+.typeName {
+  color: var(--color-text);
+}
+
+.typeMeta {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.warn {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ── Buyers table ─────────────────────────────────────────── */
+
+.buyers {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-sm);
+}
+
+.tableWrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  min-width: 480px;
+}
+
+.table th {
+  text-align: left;
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  padding: 0.4rem 0.35rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table td {
+  padding: 0.55rem 0.35rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+  color: var(--color-text);
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.date {
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
+.buyerName {
+  display: block;
+  font-weight: 500;
+}
+
+.buyerEmail {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+.est {
+  margin-left: 4px;
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.footnote {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-xl);
+}
+
+@media (max-width: 480px) {
+  .head {
+    flex-direction: column;
+  }
+  .tiles {
+    gap: var(--space-sm);
+  }
+  .tile {
+    padding: var(--space-md);
+  }
+  .card {
+    padding: var(--space-md);
+  }
+}
