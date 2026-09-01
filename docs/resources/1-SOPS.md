@@ -156,7 +156,8 @@ Open **Legends Admin → Sales** (`https://admin.djkmdlegends.com/sales`). No Sq
 
 - **Top tiles:** gross ticket sales across every show, tickets sold, and orders.
 - **Gross by show:** one bar per show (colour = ticket type; tap a segment for its numbers).
-- **By show:** tap a show to list its buyers (name, tickets, type, amount paid, date). The **Money goes to** line names the Square location that show's sales land in — a venue location when the show's address parsed (`Street, City, ST ZIP`), otherwise the account default location.
+- **Upcoming / All shows:** the page opens on upcoming shows; switch to **All shows** to include anything that ended in the past year (older shows stay in the system but drop out of the view).
+- **By show:** tap a show to list its buyers (name, tickets, type, amount paid, date).
 
 Gross is what buyers paid at checkout. Refunds, Square fees and payouts are only in Square. Orders placed before amounts were captured are valued at the show's current ticket price and marked *est.*
 

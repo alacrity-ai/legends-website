@@ -1,5 +1,4 @@
 import type { Env, EventRecord, PartyRecord } from './types.ts';
-import { listLocations, parseVenueAddress } from './services/square.ts';
 
 /* ── Sales report (LGD-10) ─────────────────────────────────────
  * Aggregates ticket sales from our own KV: EVENTS (shows + ticket prices)
@@ -11,13 +10,6 @@ import { listLocations, parseVenueAddress } from './services/square.ts';
  */
 
 export type SalesByType = { ticketType: string; tickets: number; grossCents: number };
-
-export type SalesLocation = {
-  id: string | null;
-  name: string;
-  isDefault: boolean;
-  pending: boolean;
-};
 
 export type ShowSales = {
   id: string;
@@ -34,7 +26,6 @@ export type ShowSales = {
   parties: number;
   unpricedTickets: number;
   byType: SalesByType[];
-  location: SalesLocation;
 };
 
 export type SalesReport = {
@@ -55,8 +46,6 @@ export type SalesBuyer = {
   amountCents: number | null;
   recorded: boolean;
 };
-
-const LOCATION_NAME_PREFIX = /^DJKMD Legends\s*[—–-]\s*/i;
 
 async function listParties(env: Env, eventId: string): Promise<PartyRecord[]> {
   const list = await env.GUESTLIST.list({ prefix: `party:${eventId}:` });
@@ -85,65 +74,12 @@ function priceOrder(
   return { amountCents: unit * party.quantity, recorded: false };
 }
 
-/** Same normalisation as resolveVenueLocationId's cache key (index.ts). */
-function venueCacheKey(event: EventRecord): string {
-  return (
-    'sqloc:' + `${event.venueName}|${event.venueAddress}`.toLowerCase().replace(/\s+/g, ' ').trim()
-  );
-}
-
-function displayLocationName(rawName: string | undefined, fallback: string): string {
-  if (!rawName) return fallback;
-  return rawName.replace(LOCATION_NAME_PREFIX, '').trim() || fallback;
-}
-
-async function resolveLocation(
-  env: Env,
-  event: EventRecord,
-  names: Map<string, string>,
-): Promise<SalesLocation> {
-  const defaultId = env.SQUARE_LOCATION_ID || null;
-  const defaultName = displayLocationName(
-    defaultId ? names.get(defaultId) : undefined,
-    'Default location',
-  );
-
-  const cached = await env.EVENTS.get(venueCacheKey(event));
-  if (cached) {
-    try {
-      const entry = JSON.parse(cached) as { locationId?: string };
-      if (entry.locationId) {
-        return {
-          id: entry.locationId,
-          name: displayLocationName(names.get(entry.locationId), event.venueName),
-          isDefault: false,
-          pending: false,
-        };
-      }
-    } catch {
-      // fall through
-    }
-  }
-
-  // Nothing minted yet: checkout will create/resolve the venue location on the
-  // first sale — unless the address can't be parsed, in which case it falls
-  // back to the default location (mirrors resolveVenueLocationId).
-  if (parseVenueAddress(event.venueAddress)) {
-    return { id: null, name: event.venueName, isDefault: false, pending: true };
-  }
-  return { id: defaultId, name: defaultName, isDefault: true, pending: false };
-}
-
 export async function buildSalesReport(env: Env, events: EventRecord[]): Promise<SalesReport> {
   const now = Date.now();
-  const names = await listLocations(env).catch(() => new Map<string, string>());
 
   const shows = await Promise.all(
     events.map(async (event): Promise<ShowSales> => {
-      const [parties, location] = await Promise.all([
-        listParties(env, event.id),
-        resolveLocation(env, event, names),
-      ]);
+      const parties = await listParties(env, event.id);
       const prices = new Map(event.tickets.map((t) => [t.ticketType, t.priceCents]));
       const byType = new Map<string, SalesByType>();
       let grossCents = 0;
@@ -177,7 +113,6 @@ export async function buildSalesReport(env: Env, events: EventRecord[]): Promise
         parties: parties.length,
         unpricedTickets,
         byType: [...byType.values()],
-        location,
       };
     }),
   );

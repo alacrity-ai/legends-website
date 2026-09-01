@@ -67,7 +67,7 @@ make dev-admin
 
 ### Admin PWA (`admin/`)
 
-The staff console (Sales, Create a Show, Manage Shows, Door Check-in, Mailing List) is its own Vite + React app in `admin/`, deployed as a separate Pages project and installable to a phone home screen. It has no build-time secrets: it calls `/api` on its own origin (the worker is routed on the admin host), so it needs no `.env` at all. Routes: `/`, `/sales`, `/events/new`, `/events`, `/checkin`, `/mailing-list`. `/sales` is the box-office dashboard (LGD-10): gross ticket sales by show from our own KV (`GET /api/admin/sales`), tickets by type, buyers per show, and the Square location each show's money lands in — refunds/fees/payouts stay in Square. The old `djkmdlegends.com/admin` and `/guestlist` URLs 301 to it.
+The staff console (Sales, Create a Show, Manage Shows, Door Check-in, Mailing List) is its own Vite + React app in `admin/`, deployed as a separate Pages project and installable to a phone home screen. It has no build-time secrets: it calls `/api` on its own origin (the worker is routed on the admin host), so it needs no `.env` at all. Routes: `/`, `/sales`, `/events/new`, `/events`, `/checkin`, `/mailing-list`. `/sales` is the box-office dashboard (LGD-10): gross ticket sales by show from our own KV (`GET /api/admin/sales`), tickets by type, buyers per show (Upcoming by default; toggle to All shows for the past year) — refunds/fees/payouts stay in Square. The old `djkmdlegends.com/admin` and `/guestlist` URLs 301 to it.
 
 ```bash
 make dev-admin      # dev server on :5174

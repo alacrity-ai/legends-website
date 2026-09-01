@@ -9,17 +9,6 @@ export interface SalesByType {
   grossCents: number;
 }
 
-export interface SalesLocation {
-  /** Square location id; null when the venue location hasn't been created yet. */
-  id: string | null;
-  /** Display name ("The Moose", "Princeton Station"). */
-  name: string;
-  /** True when sales land at the account's default location rather than a venue one. */
-  isDefault: boolean;
-  /** True when the venue location will be created at the first sale (nothing minted yet). */
-  pending: boolean;
-}
-
 export interface ShowSales {
   id: string;
   showName: string;
@@ -36,7 +25,6 @@ export interface ShowSales {
   /** Tickets with no recorded amount and no matching ticket price — counted, not valued. */
   unpricedTickets: number;
   byType: SalesByType[];
-  location: SalesLocation;
 }
 
 export interface SalesReport {

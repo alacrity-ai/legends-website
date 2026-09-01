@@ -17,6 +17,10 @@ interface SalesProps {
 const SERIES_SLOTS = 3;
 const OTHER_LABEL = 'Other';
 const TZ = 'America/New_York';
+/** "All shows" reaches this far back; older shows stay in KV but out of the view. */
+const PAST_WINDOW_DAYS = 365;
+
+type ViewMode = 'upcoming' | 'all';
 
 const usdWhole = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -75,6 +79,7 @@ export default function Sales({ onUnauthorized }: SalesProps) {
   const [report, setReport] = useState<SalesReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [mode, setMode] = useState<ViewMode>('upcoming');
   const [active, setActive] = useState<{ showId: string; ticketType: string } | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [buyers, setBuyers] = useState<Record<string, BuyersState>>({});
@@ -137,10 +142,37 @@ export default function Sales({ onUnauthorized }: SalesProps) {
     [buyers, loadBuyers],
   );
 
-  const maxGross = useMemo(
-    () => (report ? report.shows.reduce((m, s) => Math.max(m, s.grossCents), 0) : 0),
-    [report],
+  // The view decides which shows count: upcoming only, or upcoming plus
+  // anything that ended within the past year. Tiles, chart and list all
+  // follow the same selection so the numbers on screen agree with each other.
+  const shows = useMemo(() => {
+    if (!report) return [];
+    if (mode === 'upcoming') return report.shows.filter((s) => !s.isPast);
+    const cutoff = Date.now() - PAST_WINDOW_DAYS * 86_400_000;
+    return report.shows.filter((s) => !s.isPast || new Date(s.endTime).getTime() >= cutoff);
+  }, [report, mode]);
+
+  const pastCount = useMemo(() => {
+    if (!report) return 0;
+    const cutoff = Date.now() - PAST_WINDOW_DAYS * 86_400_000;
+    return report.shows.filter((s) => s.isPast && new Date(s.endTime).getTime() >= cutoff).length;
+  }, [report]);
+
+  const totals = useMemo(
+    () =>
+      shows.reduce(
+        (acc, s) => ({
+          grossCents: acc.grossCents + s.grossCents,
+          tickets: acc.tickets + s.tickets,
+          parties: acc.parties + s.parties,
+          shows: acc.shows + 1,
+        }),
+        { grossCents: 0, tickets: 0, parties: 0, shows: 0 },
+      ),
+    [shows],
   );
+
+  const maxGross = useMemo(() => shows.reduce((m, s) => Math.max(m, s.grossCents), 0), [shows]);
 
   const legendSlots = useMemo(() => {
     if (!report || report.ticketTypes.length < 2) return [];
@@ -170,21 +202,41 @@ export default function Sales({ onUnauthorized }: SalesProps) {
 
       {report && (
         <>
+          <div className={styles.toggle} role="group" aria-label="Which shows to include">
+            <button
+              type="button"
+              className={`${styles.toggleBtn} ${mode === 'upcoming' ? styles.toggleOn : ''}`}
+              aria-pressed={mode === 'upcoming'}
+              onClick={() => setMode('upcoming')}
+            >
+              Upcoming
+            </button>
+            <button
+              type="button"
+              className={`${styles.toggleBtn} ${mode === 'all' ? styles.toggleOn : ''}`}
+              aria-pressed={mode === 'all'}
+              onClick={() => setMode('all')}
+            >
+              All shows
+              {pastCount > 0 && <span className={styles.toggleCount}>+{pastCount} past</span>}
+            </button>
+          </div>
+
           <section className={styles.tiles} aria-label="Totals">
             <div className={`${styles.tile} ${styles.hero}`}>
               <span className={styles.tileLabel}>Gross ticket sales</span>
-              <span className={styles.heroValue}>{money(report.totals.grossCents)}</span>
+              <span className={styles.heroValue}>{money(totals.grossCents)}</span>
               <span className={styles.tileNote}>
-                across {integer.format(report.totals.shows)} {report.totals.shows === 1 ? 'show' : 'shows'}
+                across {integer.format(totals.shows)} {totals.shows === 1 ? 'show' : 'shows'}
               </span>
             </div>
             <div className={styles.tile}>
               <span className={styles.tileLabel}>Tickets sold</span>
-              <span className={styles.tileValue}>{integer.format(report.totals.tickets)}</span>
+              <span className={styles.tileValue}>{integer.format(totals.tickets)}</span>
             </div>
             <div className={styles.tile}>
               <span className={styles.tileLabel}>Orders</span>
-              <span className={styles.tileValue}>{integer.format(report.totals.parties)}</span>
+              <span className={styles.tileValue}>{integer.format(totals.parties)}</span>
             </div>
           </section>
 
@@ -203,14 +255,18 @@ export default function Sales({ onUnauthorized }: SalesProps) {
               )}
             </div>
 
-            {report.shows.length === 0 && <p className={styles.status}>No shows yet.</p>}
-            {report.shows.length > 0 && report.totals.grossCents === 0 && (
+            {shows.length === 0 && (
+              <p className={styles.status}>
+                {mode === 'upcoming' ? 'No upcoming shows.' : 'No shows in the past year.'}
+              </p>
+            )}
+            {shows.length > 0 && totals.grossCents === 0 && (
               <p className={styles.status}>No ticket sales yet.</p>
             )}
 
-            {report.shows.length > 0 && (
+            {shows.length > 0 && (
               <ol className={styles.bars}>
-                {report.shows.map((show) => {
+                {shows.map((show) => {
                   const width = maxGross > 0 ? (show.grossCents / maxGross) * 100 : 0;
                   const segments = show.byType.filter((t) => t.grossCents > 0);
                   const caption =
@@ -266,9 +322,13 @@ export default function Sales({ onUnauthorized }: SalesProps) {
               <h2 className={styles.cardTitle}>By show</h2>
               <span className={styles.cardHint}>Tap a show to see its buyers</span>
             </div>
-            {report.shows.length === 0 && <p className={styles.status}>No shows yet.</p>}
+            {shows.length === 0 && (
+              <p className={styles.status}>
+                {mode === 'upcoming' ? 'No upcoming shows.' : 'No shows in the past year.'}
+              </p>
+            )}
             <ul className={styles.showList}>
-              {report.shows.map((show) => (
+              {shows.map((show) => (
                 <ShowCard
                   key={show.id}
                   show={show}
@@ -362,18 +422,6 @@ function ShowCard({ show, ticketTypes, expanded, buyers, onToggle }: ShowCardPro
           ))}
         </ul>
       )}
-
-      <div className={styles.location}>
-        <span className={styles.locLabel}>Money goes to</span>
-        <span className={styles.locName}>{show.location.name}</span>
-        <span className={styles.locNote}>
-          {show.location.pending
-            ? 'Square location · created at the first sale'
-            : show.location.isDefault
-              ? 'Square account default location'
-              : 'Square location'}
-        </span>
-      </div>
 
       {show.unpricedTickets > 0 && (
         <p className={styles.warn}>

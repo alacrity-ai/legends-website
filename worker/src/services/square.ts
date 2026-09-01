@@ -360,27 +360,6 @@ export async function getPaymentDetails(
   };
 }
 
-/**
- * All locations on the account, as id → dashboard nickname. Used by the sales
- * report to say *which* Square location a show's money lands in. Returns an
- * empty map (never throws to the caller's hot path) when Square is unreachable.
- */
-export async function listLocations(env: Env): Promise<Map<string, string>> {
-  const { token } = requireSecrets(env);
-  const res = await fetch(`${apiBase(env)}/v2/locations`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Square-Version': SQUARE_API_VERSION,
-    },
-  });
-  if (!res.ok) return new Map();
-  const json = (await res.json()) as {
-    locations?: Array<{ id: string; name?: string; business_name?: string }>;
-  };
-  return new Map(
-    (json.locations ?? []).map((l) => [l.id, l.name ?? l.business_name ?? l.id] as const),
-  );
-}
 
 interface SquareAddressName {
   first_name?: string;
