@@ -78,6 +78,53 @@
   margin: var(--space-md) 0;
 }
 
+/* ── View toggle ──────────────────────────────────────────── */
+
+.toggle {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  margin-bottom: var(--space-lg);
+}
+
+.toggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  border-radius: 999px;
+  padding: 0.4rem 0.95rem;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.toggleBtn:hover {
+  color: var(--color-text);
+}
+
+.toggleOn {
+  background: var(--color-accent);
+  color: var(--btn-primary-text);
+}
+
+.toggleOn:hover {
+  color: var(--btn-primary-text);
+}
+
+.toggleCount {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  opacity: 0.8;
+}
+
 /* ── Stat tiles ───────────────────────────────────────────── */
 
 .tiles {
@@ -464,35 +511,6 @@
 .typeMeta {
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
-}
-
-.location {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-xs) var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-md);
-  background: var(--gold-06);
-  border: 1px solid var(--gold-12);
-  font-size: var(--text-sm);
-}
-
-.locLabel {
-  font-size: var(--text-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.locName {
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.locNote {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
 }
 
 .warn {
