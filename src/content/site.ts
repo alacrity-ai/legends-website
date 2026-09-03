@@ -81,6 +81,26 @@ export const eventTypes = [
  */
 export const youtubeVideoId: string =
   import.meta.env.VITE_YOUTUBE_VIDEO_ID || 'u_eMzaB6RXM';
+
+/**
+ * Videos offered in the Media section's switcher. The first entry is the
+ * default. The promo keeps its env override; more videos = more entries.
+ */
+export interface MediaVideo {
+  /** YouTube video id. */
+  id: string;
+  /** Short chip label shown in the switcher. */
+  label: string;
+  /** Iframe title (accessibility). */
+  title: string;
+}
+
+export const mediaVideos: MediaVideo[] = [
+  { id: youtubeVideoId, label: 'Legends Promo', title: 'DJKMD Legends promo video' },
+  // "THE RAT PACK" — supplied by Keith on 2026-09-02 (LGD-11).
+  { id: 'zLKgjY1znwc', label: 'The Rat Pack', title: 'The Rat Pack — live tribute performance' },
+];
+
 export const mediaCaption =
   'See DJKMD Legends in action — live performances that captivate any crowd.';
 
