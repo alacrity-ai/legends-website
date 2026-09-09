@@ -29,6 +29,15 @@ import { buildNotificationEmail } from './templates/notification.ts';
 import { buildConfirmationEmail } from './templates/confirmation.ts';
 import { fetchUpcomingEvents } from './services/google-calendar.ts';
 import { buildSalesReport, buildShowBuyers } from './sales.ts';
+import { handleAdminCharts } from './charts.ts';
+import { listEventRecords } from './events-store.ts';
+import {
+  adminPasscode,
+  errorMessage,
+  getCorsHeaders,
+  isAuthorized,
+  jsonResponse,
+} from './http.ts';
 import {
   createPaymentLink,
   createVenueLocation,
@@ -100,6 +109,10 @@ export default {
       return handleGuestlist(request, url, env, corsHeaders);
     }
 
+    if (url.pathname === '/api/admin/charts' || url.pathname.startsWith('/api/admin/charts/')) {
+      return handleAdminCharts(request, url, env, corsHeaders);
+    }
+
     if (url.pathname.startsWith('/api/admin/events')) {
       return handleAdminEvents(request, url, env, corsHeaders);
     }
@@ -166,21 +179,6 @@ async function handleEvents(
 
 function eventSortKey(e: PublicEvent): string {
   return `${e.date}T${e.time ?? '00:00'}`;
-}
-
-async function listEventRecords(env: Env): Promise<EventRecord[]> {
-  const list = await env.EVENTS.list({ prefix: 'event:' });
-  const raws = await Promise.all(list.keys.map((k) => env.EVENTS.get(k.name)));
-  const records: EventRecord[] = [];
-  for (const raw of raws) {
-    if (!raw) continue;
-    try {
-      records.push(JSON.parse(raw) as EventRecord);
-    } catch {
-      // skip malformed record
-    }
-  }
-  return records;
 }
 
 function eventRecordToPublic(r: EventRecord): PublicEvent {
@@ -1480,60 +1478,4 @@ async function handleEventImage(
 function primaryOrigin(env: Env): string {
   const first = env.ALLOWED_ORIGINS.split(',')[0]?.trim();
   return first || 'https://djkmdlegends.com';
-}
-
-function adminPasscode(env: Env): string {
-  return env.ADMIN_PASSCODE || env.GUESTLIST_PASSCODE || '';
-}
-
-function isAuthorized(request: Request, passcode: string): boolean {
-  const header = request.headers.get('Authorization');
-  if (!header || !header.startsWith('Bearer ')) {
-    return false;
-  }
-  const token = header.slice('Bearer '.length);
-  return constantTimeEqual(token, passcode);
-}
-
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return result === 0;
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : 'Invalid request';
-}
-
-function getCorsHeaders(request: Request, allowedOrigins: string): Record<string, string> {
-  const origin = request.headers.get('Origin') ?? '';
-  const allowed = allowedOrigins.split(',').map((o) => o.trim());
-
-  const headers: Record<string, string> = {
-    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
-
-  if (allowed.includes(origin)) {
-    headers['Access-Control-Allow-Origin'] = origin;
-  }
-
-  return headers;
-}
-
-function jsonResponse(
-  status: number,
-  body: Record<string, unknown>,
-  ...headerObjects: Record<string, string>[]
-): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      ...Object.assign({}, ...headerObjects),
-    },
-  });
 }

@@ -1,0 +1,223 @@
+/* SeatMap — floor-plan renderer shared by the editor, the buyer picker and
+   the door view. Colours come from the brand tokens (identical in src/ and
+   admin/). Everything is in canvas units; strokes use vector-effect so they
+   stay crisp at any zoom. */
+
+.svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  font-family: var(--font-body, system-ui, sans-serif);
+  overflow: hidden;
+}
+
+.canvas {
+  fill: var(--color-surface, #16121b);
+  stroke: var(--color-border-strong, rgba(212, 175, 55, 0.38));
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.gridDot {
+  fill: rgba(212, 175, 55, 0.22);
+}
+
+/* ── Objects ────────────────────────────────────────────── */
+
+.object {
+  cursor: default;
+}
+
+.mode_edit .object {
+  cursor: grab;
+}
+
+.table {
+  fill: var(--color-surface-elevated, #1d1823);
+  stroke: rgba(212, 175, 55, 0.55);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 0.15s ease;
+}
+
+.stage {
+  fill: rgba(212, 175, 55, 0.1);
+  stroke: var(--color-accent, #d4af37);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.stageLabel {
+  fill: var(--color-accent, #d4af37);
+  font-family: var(--font-display, Georgia, serif);
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  pointer-events: none;
+}
+
+.tableLabel {
+  fill: var(--color-text, #f5f0e6);
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--color-surface-elevated, #1d1823);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.rowLabel {
+  fill: var(--color-accent, #d4af37);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.rowSpine {
+  stroke: rgba(212, 175, 55, 0.25);
+  stroke-width: 3;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.emptyHint {
+  fill: rgba(191, 181, 163, 0.55);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+/* Selection halo (edit mode). */
+.selected .table,
+.selected .stage {
+  stroke: var(--color-primary-light, #ffe08a);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px rgba(243, 212, 107, 0.55));
+}
+
+.selected .rowSpine {
+  stroke: var(--color-primary-light, #ffe08a);
+  stroke-width: 4;
+}
+
+.selected .seatCircle {
+  stroke: var(--color-primary-light, #ffe08a);
+}
+
+/* ── Seats ──────────────────────────────────────────────── */
+
+.seat {
+  cursor: default;
+}
+
+.mode_pick .seat,
+.mode_view .seat {
+  cursor: pointer;
+}
+
+.seatCircle {
+  fill: rgba(212, 175, 55, 0.08);
+  stroke: rgba(212, 175, 55, 0.75);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transition: fill 0.15s ease, stroke 0.15s ease;
+}
+
+.seatNumber {
+  fill: var(--color-text-muted, #bfb5a3);
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.seatCheck {
+  fill: #1a1408;
+  font-size: 16px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+/* Seat states — outline = available, gold = sold, green = arrived,
+   hatched = held (admin only), filled gold + check = selected (picker). */
+.seat_available .seatCircle {
+  fill: rgba(212, 175, 55, 0.08);
+}
+
+.seat_held .seatCircle {
+  fill: rgba(212, 175, 55, 0.3);
+  stroke: rgba(212, 175, 55, 0.5);
+  stroke-dasharray: 4 3;
+}
+
+.seat_sold .seatCircle {
+  fill: var(--color-accent, #d4af37);
+  stroke: var(--color-accent, #d4af37);
+}
+
+.seat_sold .seatNumber {
+  fill: #1a1408;
+}
+
+.seat_checkedIn .seatCircle {
+  fill: var(--color-success, #3fa55b);
+  stroke: var(--color-success, #3fa55b);
+}
+
+.seat_checkedIn .seatNumber {
+  fill: #fff;
+}
+
+.seat_selected .seatCircle {
+  fill: var(--color-primary, #f3d46b);
+  stroke: var(--color-primary-light, #ffe08a);
+  stroke-width: 2.5;
+}
+
+.seat_selected .seatNumber {
+  display: none;
+}
+
+/* Taken seats fade in the picker so the free ones pop. */
+.mode_pick .seat_sold,
+.mode_pick .seat_held {
+  opacity: 0.45;
+}
+
+.mode_pick .seat_sold .seatCircle,
+.mode_pick .seat_held .seatCircle {
+  fill: rgba(191, 181, 163, 0.25);
+  stroke: rgba(191, 181, 163, 0.35);
+}
+
+/* ── Editor handles (rendered by the admin overlay) ─────── */
+
+.handle {
+  fill: var(--color-bg, #0b0a0f);
+  stroke: var(--color-primary-light, #ffe08a);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  cursor: nwse-resize;
+}
+
+.handleRotate {
+  cursor: grab;
+}
+
+.handleStem {
+  stroke: var(--color-primary-light, #ffe08a);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.marquee {
+  fill: rgba(212, 175, 55, 0.12);
+  stroke: var(--color-accent, #d4af37);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}

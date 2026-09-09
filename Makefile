@@ -64,7 +64,8 @@ deploy-worker: ## Deploy the worker to Cloudflare
 	cd worker && npm run deploy
 
 deploy-admin: build-admin ## Build + deploy the admin PWA to Cloudflare Pages (legends-admin)
-	cd admin && npx wrangler pages deploy dist --project-name legends-admin --commit-dirty=true
+	# --branch main: the Pages project’s production branch is `main`; without it a deploy from a feature branch only creates a preview.
+	cd admin && npx wrangler pages deploy dist --project-name legends-admin --branch main --commit-dirty=true
 
 # ── D1 (seating) ─────────────────────────────────────────────
 # The Legends deploy token has no D1 scope; use the shared account token:

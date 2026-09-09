@@ -5,28 +5,62 @@ import EventForm from '../components/admin/EventForm/EventForm.tsx';
 import ManageShows from '../components/admin/ManageShows/ManageShows.tsx';
 import MailingList from '../components/admin/MailingList/MailingList.tsx';
 import Sales from '../components/admin/Sales/Sales.tsx';
+import ChartsList from '../components/admin/Charts/ChartsList.tsx';
+import ChartEditor from '../components/admin/Charts/ChartEditor.tsx';
 import AdminSignIn from '../components/admin/AdminSignIn.tsx';
 import styles from './App.module.css';
 
-type View = 'menu' | 'checkin' | 'events' | 'manage' | 'mailing' | 'sales';
+type View = 'menu' | 'checkin' | 'events' | 'manage' | 'mailing' | 'sales' | 'charts' | 'chartEdit';
 
-function viewFromPath(): View {
-  if (typeof window === 'undefined') return 'menu';
+interface Route {
+  view: View;
+  /** /charts/:id → the chart id; /charts/new → null. */
+  chartId?: string | null;
+}
+
+function routeFromPath(): Route {
+  if (typeof window === 'undefined') return { view: 'menu' };
   const path = window.location.pathname.replace(/\/$/, '');
   // Root-level paths on the admin host; the legacy /admin/* and /guestlist
   // shapes are accepted so old bookmarks redirected from the public site land.
   const p = path.replace(/^\/admin(?=\/|$)/, '');
-  if (p === '/events/new') return 'events';
-  if (p === '/events') return 'manage';
-  if (p === '/mailing-list') return 'mailing';
-  if (p === '/sales') return 'sales';
-  if (p === '/checkin' || p === '/guestlist') return 'checkin';
-  return 'menu';
+  if (p === '/events/new') return { view: 'events' };
+  if (p === '/events') return { view: 'manage' };
+  if (p === '/mailing-list') return { view: 'mailing' };
+  if (p === '/sales') return { view: 'sales' };
+  if (p === '/charts') return { view: 'charts' };
+  if (p === '/charts/new') return { view: 'chartEdit', chartId: null };
+  const chart = p.match(/^\/charts\/(c_[a-f0-9]{8})$/);
+  if (chart) return { view: 'chartEdit', chartId: chart[1] };
+  if (p === '/checkin' || p === '/guestlist') return { view: 'checkin' };
+  return { view: 'menu' };
+}
+
+function pathFor(route: Route): string {
+  switch (route.view) {
+    case 'events':
+      return '/events/new';
+    case 'manage':
+      return '/events';
+    case 'mailing':
+      return '/mailing-list';
+    case 'sales':
+      return '/sales';
+    case 'checkin':
+      return '/checkin';
+    case 'charts':
+      return '/charts';
+    case 'chartEdit':
+      return route.chartId ? `/charts/${route.chartId}` : '/charts/new';
+    default:
+      return '/';
+  }
 }
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean>(() => Boolean(getPasscode()));
-  const [view, setView] = useState<View>(viewFromPath);
+  const [route, setRoute] = useState<Route>(routeFromPath);
+  const view = route.view;
 
   useEffect(() => {
     document.title = 'Legends Admin';
@@ -43,25 +77,20 @@ export default function App() {
     };
   }, []);
 
-  const navigate = useCallback((to: View) => {
-    const path =
-      to === 'events'
-        ? '/events/new'
-        : to === 'manage'
-          ? '/events'
-          : to === 'mailing'
-            ? '/mailing-list'
-            : to === 'sales'
-              ? '/sales'
-              : to === 'checkin'
-                ? '/checkin'
-                : '/';
-    window.history.pushState({}, '', path);
-    setView(to);
+  const navigate = useCallback((to: View, chartId?: string | null) => {
+    const next: Route = to === 'chartEdit' ? { view: to, chartId: chartId ?? null } : { view: to };
+    window.history.pushState({}, '', pathFor(next));
+    setRoute(next);
+  }, []);
+
+  /** Swap the URL without a history entry (after creating a chart at /charts/new). */
+  const replaceRoute = useCallback((next: Route) => {
+    window.history.replaceState({}, '', pathFor(next));
+    setRoute(next);
   }, []);
 
   useEffect(() => {
-    const onPop = () => setView(viewFromPath());
+    const onPop = () => setRoute(routeFromPath());
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
@@ -83,6 +112,19 @@ export default function App() {
   // The check-in tool is self-contained (its own header + sign out).
   if (view === 'checkin') {
     return <Guestlist onBack={() => navigate('menu')} />;
+  }
+
+  // The chart editor owns the whole viewport (header + canvas + inspector).
+  if (view === 'chartEdit') {
+    return (
+      <ChartEditor
+        key={route.chartId ?? 'new'}
+        chartId={route.chartId ?? null}
+        onBack={() => navigate('charts')}
+        onCreated={(chart) => replaceRoute({ view: 'chartEdit', chartId: chart.id })}
+        onUnauthorized={handleUnauthorized}
+      />
+    );
   }
 
   return (
@@ -116,6 +158,12 @@ export default function App() {
               <span className={styles.menuTitle}>Manage Shows</span>
               <span className={styles.menuDesc}>
                 View all shows tracked in KV and delete them.
+              </span>
+            </button>
+            <button className={styles.menuCard} onClick={() => navigate('charts')} type="button">
+              <span className={styles.menuTitle}>Seating Charts</span>
+              <span className={styles.menuDesc}>
+                Build and reuse venue layouts — tables, rows and the stage — for reserved-seat shows.
               </span>
             </button>
             <button className={styles.menuCard} onClick={() => navigate('checkin')} type="button">
@@ -157,6 +205,19 @@ export default function App() {
               ← Back to menu
             </button>
             <MailingList onUnauthorized={handleUnauthorized} />
+          </>
+        )}
+
+        {view === 'charts' && (
+          <>
+            <button className={styles.back} onClick={() => navigate('menu')} type="button">
+              ← Back to menu
+            </button>
+            <ChartsList
+              onNew={() => navigate('chartEdit', null)}
+              onEdit={(id) => navigate('chartEdit', id)}
+              onUnauthorized={handleUnauthorized}
+            />
           </>
         )}
 
