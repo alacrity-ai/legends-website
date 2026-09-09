@@ -117,8 +117,23 @@ These are read automatically by `wrangler dev`. In production they are stored as
 ```bash
 npm run build          # public site → dist/
 make build-admin       # admin PWA  → admin/dist/
-make test-shared       # unit tests for shared/seating (geometry, ids, validation)
+make test              # every suite below, in order
+make test-shared       # unit: shared/seating (geometry, ids, validation, seat assignment) — vitest
+make test-worker       # integration: the worker inside workerd with local D1/KV/R2, Square mocked — vitest-pool-workers
+make test-e2e          # browser: buyer flow + door console on a phone viewport — Playwright
 ```
+
+## Tests
+
+Three layers, all runnable offline and in CI (`.github/workflows/test.yml` runs them on every PR):
+
+| Layer | Where | What it proves |
+|---|---|---|
+| Unit | `shared/seating/*.test.ts` | Geometry, ids, chart validation, and the seat-assignment rule (front tables first, keep the party together, split only when nothing fits). |
+| Worker integration | `worker/test/*.test.ts` | Every seating + money route end to end inside workerd: attach/detach/re-sync, holds (validation, choosing, change table, release, expiry, a 20-way race for the last seats), checkout (general admission unchanged; seated shows need a live hold; Square outage keeps the hold), and the Square webhook (signature, roster party, sold counter, seat confirmation, late payers flagged `partial`/`unassigned`, never a lost payment). Square is stubbed with `fetchMock`; nothing leaves the machine. |
+| Browser | `tests/e2e/specs/*.spec.ts` | What a buyer on a phone sees: general admission goes straight to checkout with the legacy body; reserved seating shows the sheet with the party's seats, taken seats dimmed, Change table, Back/close releasing the hold, split parties, not-enough-seats and sold-out copy, and checkout/hold failures with a way back. Playwright boots `wrangler dev` (own state dir, :8797) plus production builds of the site (:5183) and admin (:5184); checkout is intercepted in the browser. |
+
+`make install` sets everything up (including the Playwright Chromium). Failed browser tests leave screenshots + traces in `tests/e2e/test-results/`.
 
 ## Deploy
 

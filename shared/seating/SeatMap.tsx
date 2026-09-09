@@ -245,6 +245,7 @@ function ObjectView({ object: o, mode, selected, seatStates, showNumbers, scale,
               className={`${styles.seat} ${styles[`seat_${state}`]}`}
               data-seat-id={s.id}
               data-seat-label={s.label}
+              data-seat-state={state}
             >
               <circle cx={s.x} cy={s.y} r={SEAT_RADIUS} className={styles.seatCircle} />
               {showNumbers && (

@@ -1,0 +1,52 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  unit:
+    name: Shared + worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install
+        run: |
+          (cd shared && npm ci)
+          (cd worker && npm ci)
+      - name: Shared unit tests
+        run: cd shared && npx vitest run
+      - name: Worker integration tests (workerd, local D1/KV/R2, Square mocked)
+        run: cd worker && npx vitest run
+
+  e2e:
+    name: Browser (buyer flow + door console)
+    runs-on: ubuntu-latest
+    env:
+      CI: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install
+        run: |
+          npm ci
+          (cd admin && npm ci)
+          (cd worker && npm ci)
+          (cd tests/e2e && npm ci && npx playwright install --with-deps chromium)
+      - name: Playwright
+        run: cd tests/e2e && npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            tests/e2e/playwright-report
+            tests/e2e/test-results
+          retention-days: 7

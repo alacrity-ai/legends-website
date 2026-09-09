@@ -30,7 +30,12 @@ import {
 
 export const HOLD_ID_RE = /^h_[a-f0-9]{12}$/;
 const MAX_QTY = 20;
-const CLAIM_ATTEMPTS = 3;
+/**
+ * A lost race is retried from a fresh read. Twelve buyers tapping Buy in the
+ * same second collide round after round (one winner per round), so the budget
+ * must cover a whole mailing-list burst, not just a pair.
+ */
+const CLAIM_ATTEMPTS = 12;
 
 export interface HoldResponse {
   holdId: string;
@@ -197,7 +202,10 @@ async function handleHold(id: string, request: Request, env: Env, ctx: Execution
     const claim = await claimSeats(env.SEATING, id, assignment.seatIds, holdId, expiresAt, now);
     if (!claim.ok) {
       await env.SEATING.prepare(`DELETE FROM seat_holds WHERE id = ?`).bind(holdId).run();
-      continue; // someone got there first — choose again from a fresh read
+      // Someone got there first — choose again from a fresh read, after a short
+      // random pause so a burst of losers does not re-collide in lockstep.
+      await new Promise((r) => setTimeout(r, Math.random() * 25));
+      continue;
     }
     if (claim.superseded.length) {
       await markSuperseded(env.SEATING, claim.superseded, now);
