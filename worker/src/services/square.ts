@@ -315,6 +315,8 @@ export interface SquarePaymentDetails {
   /** Cardholder name from the billing/shipping address, if Square captured one. */
   buyerName: string | null;
   customerId: string | null;
+  /** Total charged, in cents (amount_money.amount); null when Square omits it. */
+  amountCents: number | null;
 }
 
 /**
@@ -341,6 +343,7 @@ export async function getPaymentDetails(
       billing_address?: SquareAddressName;
       shipping_address?: SquareAddressName;
       customer_id?: string;
+      amount_money?: { amount?: number; currency?: string };
     };
   };
   const payment = json.payment;
@@ -352,8 +355,11 @@ export async function getPaymentDetails(
     buyerEmail: payment.buyer_email_address ?? null,
     buyerName: addr,
     customerId: payment.customer_id ?? null,
+    amountCents:
+      typeof payment.amount_money?.amount === 'number' ? payment.amount_money.amount : null,
   };
 }
+
 
 interface SquareAddressName {
   first_name?: string;

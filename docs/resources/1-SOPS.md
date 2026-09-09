@@ -150,6 +150,20 @@ The **Door Check-in** tool in Legends Admin (`https://admin.djkmdlegends.com/che
 
 ---
 
+## SOP 5b — Check ticket sales 🎤
+
+Open **Legends Admin → Sales** (`https://admin.djkmdlegends.com/sales`). No Square login needed.
+
+- **Top tiles:** gross ticket sales across every show, tickets sold, and orders.
+- **Gross by show:** one bar per show (colour = ticket type; tap a segment for its numbers).
+- **Upcoming / All shows:** the page opens on upcoming shows; switch to **All shows** to include anything that ended in the past year (older shows stay in the system but drop out of the view).
+- **By show:** tap a show to list its buyers (name, tickets, type, amount paid, date).
+- **Export CSV:** downloads one spreadsheet row per order for the current view — switch to **All shows** first to export the year (for the accountant, Square's own Dashboard → Reports export remains the authority: it has refunds and fees; ours is gross at checkout).
+
+Gross is what buyers paid at checkout. Refunds, Square fees and payouts are only in Square. Orders placed before amounts were captured are valued at the show's current ticket price and marked *est.*
+
+---
+
 ## SOP 6 — Deploy the site 🧑‍💻
 
 All three artifacts (public site → Pages `legends-website`, admin PWA → Pages `legends-admin`, Worker → Cloudflare) ship from one **manually triggered** GitHub Actions workflow.

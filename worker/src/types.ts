@@ -134,4 +134,6 @@ export interface PartyRecord {
   quantity: number;
   ticketType: string;
   purchasedAt: string;
+  /** Total charged at checkout in cents (from the Square payment); absent on records written before LGD-10. */
+  amountCents?: number;
 }

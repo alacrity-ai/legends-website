@@ -4,10 +4,11 @@ import Guestlist from '../components/guestlist/Guestlist.tsx';
 import EventForm from '../components/admin/EventForm/EventForm.tsx';
 import ManageShows from '../components/admin/ManageShows/ManageShows.tsx';
 import MailingList from '../components/admin/MailingList/MailingList.tsx';
+import Sales from '../components/admin/Sales/Sales.tsx';
 import AdminSignIn from '../components/admin/AdminSignIn.tsx';
 import styles from './App.module.css';
 
-type View = 'menu' | 'checkin' | 'events' | 'manage' | 'mailing';
+type View = 'menu' | 'checkin' | 'events' | 'manage' | 'mailing' | 'sales';
 
 function viewFromPath(): View {
   if (typeof window === 'undefined') return 'menu';
@@ -18,6 +19,7 @@ function viewFromPath(): View {
   if (p === '/events/new') return 'events';
   if (p === '/events') return 'manage';
   if (p === '/mailing-list') return 'mailing';
+  if (p === '/sales') return 'sales';
   if (p === '/checkin' || p === '/guestlist') return 'checkin';
   return 'menu';
 }
@@ -49,9 +51,11 @@ export default function App() {
           ? '/events'
           : to === 'mailing'
             ? '/mailing-list'
-            : to === 'checkin'
-              ? '/checkin'
-              : '/';
+            : to === 'sales'
+              ? '/sales'
+              : to === 'checkin'
+                ? '/checkin'
+                : '/';
     window.history.pushState({}, '', path);
     setView(to);
   }, []);
@@ -95,6 +99,13 @@ export default function App() {
       <main className={styles.main}>
         {view === 'menu' && (
           <nav className={styles.menu}>
+            <button className={styles.menuCard} onClick={() => navigate('sales')} type="button">
+              <span className={styles.menuTitle}>Sales</span>
+              <span className={styles.menuDesc}>
+                Gross ticket sales by show, who is buying, and which Square location the money
+                lands in.
+              </span>
+            </button>
             <button className={styles.menuCard} onClick={() => navigate('events')} type="button">
               <span className={styles.menuTitle}>Create a Show</span>
               <span className={styles.menuDesc}>
@@ -146,6 +157,15 @@ export default function App() {
               ← Back to menu
             </button>
             <MailingList onUnauthorized={handleUnauthorized} />
+          </>
+        )}
+
+        {view === 'sales' && (
+          <>
+            <button className={styles.back} onClick={() => navigate('menu')} type="button">
+              ← Back to menu
+            </button>
+            <Sales onUnauthorized={handleUnauthorized} />
           </>
         )}
       </main>
