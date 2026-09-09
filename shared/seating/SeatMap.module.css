@@ -54,7 +54,6 @@
 .stageLabel {
   fill: var(--color-accent, #d4af37);
   font-family: var(--font-display, Georgia, serif);
-  font-size: 22px;
   font-weight: 700;
   letter-spacing: 0.3em;
   pointer-events: none;
@@ -62,14 +61,16 @@
 
 .tableLabel {
   fill: var(--color-text, #f5f0e6);
-  font-size: 18px;
   font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--color-surface-elevated, #1d1823);
+  stroke-width: 4px;
+  stroke-linejoin: round;
   pointer-events: none;
 }
 
 .rowLabel {
   fill: var(--color-accent, #d4af37);
-  font-size: 18px;
   font-weight: 700;
   pointer-events: none;
 }
@@ -79,6 +80,13 @@
   stroke-width: 3;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
+}
+
+.emptyHint {
+  fill: rgba(191, 181, 163, 0.55);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  pointer-events: none;
 }
 
 /* Selection halo (edit mode). */

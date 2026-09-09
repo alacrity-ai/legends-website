@@ -39,6 +39,8 @@ export interface SeatMapProps {
   selection?: ReadonlySet<string>;
   /** Draw the 20-unit dot grid (edit). */
   grid?: boolean;
+  /** Draw table / row / stage labels (off for thumbnails). Default true. */
+  labels?: boolean;
   onSeatTap?: (seatId: string) => void;
   /** Extra SVG props — the editor's gesture handlers. */
   svgProps?: SVGProps<SVGSVGElement>;
@@ -60,6 +62,7 @@ export default function SeatMap({
   seatStates,
   selection,
   grid = false,
+  labels = true,
   onSeatTap,
   svgProps,
   overlay,
@@ -151,6 +154,19 @@ export default function SeatMap({
         />
       )}
 
+      {mode === 'edit' && layout.objects.length === 0 && (
+        <text
+          x={layout.canvas.width / 2}
+          y={layout.canvas.height / 2}
+          className={styles.emptyHint}
+          style={{ fontSize: readable(16, scale) }}
+          textAnchor="middle"
+          dominantBaseline="central"
+        >
+          Tap a shape above to start the floor plan
+        </text>
+      )}
+
       {layout.objects.map((o) => (
         <ObjectView
           key={o.id}
@@ -159,6 +175,8 @@ export default function SeatMap({
           selected={selection?.has(o.id) ?? false}
           seatStates={seatStates}
           showNumbers={showNumbers}
+          scale={scale}
+          labels={labels}
         />
       ))}
 
@@ -173,26 +191,38 @@ interface ObjectViewProps {
   selected: boolean;
   seatStates?: Readonly<Record<string, SeatState>>;
   showNumbers: boolean;
+  /** CSS px per canvas unit — labels grow in canvas units when zoomed out so they stay legible. */
+  scale: number;
+  labels: boolean;
 }
 
-function ObjectView({ object: o, mode, selected, seatStates, showNumbers }: ObjectViewProps) {
+/** A font size in canvas units that is at least `px` on screen. */
+function readable(px: number, scale: number, base = px): number {
+  return Math.max(base, px / Math.max(scale, 0.01));
+}
+
+function ObjectView({ object: o, mode, selected, seatStates, showNumbers, scale, labels }: ObjectViewProps) {
   const cls = [styles.object, styles[`kind_${o.kind}`], selected ? styles.selected : ''].filter(Boolean).join(' ');
   const center = objectCenter(o);
+  const labelSize = readable(12, scale, 18);
 
   return (
     <g className={cls} data-object-id={o.id}>
       {o.kind === 'stage' && (
         <g transform={`rotate(${o.rotation} ${o.x} ${o.y})`}>
           <rect x={o.x} y={o.y} width={o.width} height={o.height} rx={10} className={styles.stage} />
+          {labels && (
           <text
             x={o.x + o.width / 2}
             y={o.y + o.height / 2}
             className={styles.stageLabel}
+            style={{ fontSize: Math.min(readable(11, scale, 22), o.height * 0.6) }}
             textAnchor="middle"
             dominantBaseline="central"
           >
             {o.label.toUpperCase() || 'STAGE'}
           </text>
+          )}
         </g>
       )}
 
@@ -231,11 +261,12 @@ function ObjectView({ object: o, mode, selected, seatStates, showNumbers }: Obje
           );
         })}
 
-      {o.kind !== 'stage' && (
+      {labels && o.kind !== 'stage' && (
         <text
           x={o.kind === 'row' ? rowLabelPoint(o).x : center.x}
           y={o.kind === 'row' ? rowLabelPoint(o).y : center.y}
           className={o.kind === 'row' ? styles.rowLabel : styles.tableLabel}
+          style={{ fontSize: labelSize }}
           textAnchor="middle"
           dominantBaseline="central"
         >

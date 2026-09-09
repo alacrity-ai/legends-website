@@ -77,6 +77,9 @@ export interface ChartSummary {
   revision: number;
   updatedAt: string;
   usedBy: ChartUsedBy[];
+  /** Layout for the list thumbnails (charts are small; a venue has a handful). */
+  canvas: SeatingChart['canvas'];
+  objects: ChartObject[];
 }
 
 export async function handleAdminCharts(
@@ -191,6 +194,8 @@ function summarize(chart: SeatingChart, events: EventRecord[]): ChartSummary {
     revision: chart.revision,
     updatedAt: chart.updatedAt,
     usedBy: usedByUpcoming(events, chart.id),
+    canvas: chart.canvas,
+    objects: chart.objects,
   };
 }
 

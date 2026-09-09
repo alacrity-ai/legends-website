@@ -7,7 +7,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { deleteChart, duplicateChart, listCharts, type ChartSummary } from '../../../services/charts.ts';
 import { UnauthorizedError } from '../../../services/guestlist.ts';
 import ConfirmModal from '../ManageShows/ConfirmModal.tsx';
+import SeatMap from '@seating/SeatMap.tsx';
+import { layoutBounds } from '@seating/geometry.ts';
+import { fitViewBox } from '@seating/view.ts';
 import styles from './ChartsList.module.css';
+
+const THUMB_W = 132;
+const THUMB_H = 88;
 
 interface ChartsListProps {
   onNew: () => void;
@@ -135,16 +141,32 @@ export default function ChartsList({ onNew, onEdit, onUnauthorized }: ChartsList
             return (
               <li key={c.id} className={styles.card}>
                 <div className={styles.cardHead}>
-                  <div className={styles.headText}>
-                    <h2 className={styles.name}>{c.name}</h2>
-                    <p className={styles.meta}>
-                      <strong>{c.seatCount}</strong> seats · {c.objectSummary}
-                    </p>
-                    <p className={styles.updated}>Edited {formatUpdated(c.updatedAt)}</p>
+                  <button
+                    type="button"
+                    className={styles.thumb}
+                    onClick={() => onEdit(c.id)}
+                    aria-label={`Edit ${c.name}`}
+                    title="Edit"
+                  >
+                    <SeatMap
+                      layout={{ canvas: c.canvas, objects: c.objects }}
+                      mode="view"
+                      labels={false}
+                      viewBox={fitViewBox(layoutBounds({ canvas: c.canvas, objects: c.objects }), THUMB_W, THUMB_H, 30)}
+                    />
+                  </button>
+                  <div className={styles.headBody}>
+                    <div className={styles.headText}>
+                      <h2 className={styles.name}>{c.name}</h2>
+                      <p className={styles.meta}>
+                        <strong>{c.seatCount}</strong> seats · {c.objectSummary}
+                      </p>
+                      <p className={styles.updated}>Edited {formatUpdated(c.updatedAt)}</p>
+                    </div>
+                    <span className={`${styles.status} ${inUse ? styles.statusUsed : styles.statusFree}`}>
+                      {inUse ? `${c.usedBy.length} show${c.usedBy.length === 1 ? '' : 's'}` : 'Unused'}
+                    </span>
                   </div>
-                  <span className={`${styles.status} ${inUse ? styles.statusUsed : styles.statusFree}`}>
-                    {inUse ? `${c.usedBy.length} show${c.usedBy.length === 1 ? '' : 's'}` : 'Unused'}
-                  </span>
                 </div>
 
                 {inUse && (

@@ -66,8 +66,11 @@ function ObjectFields({ o, dispatch }: { o: ChartObject; dispatch: Dispatch<Edit
   return (
     <>
       <div className={styles.inspectorHead}>
-        <span className={styles.inspectorTitle}>{kindName(o)}</span>
-        <span className={styles.inspectorMeta}>{o.kind === 'stage' ? '' : `${o.seats} seats`}</span>
+        <span className={styles.inspectorTitle}>{o.label || kindName(o)}</span>
+        <span className={styles.inspectorMeta}>
+          {kindName(o)}
+          {o.kind !== 'stage' && ` · ${o.seats} seat${o.seats === 1 ? '' : 's'}`}
+        </span>
       </div>
 
       <div className={styles.fields}>

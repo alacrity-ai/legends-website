@@ -1,6 +1,6 @@
 import { clearPasscode, getPasscode, UnauthorizedError } from './guestlist.ts';
 import { apiUrl } from './api-base.ts';
-import type { ChartDraft, SeatingChart } from '@seating/types.ts';
+import type { ChartDraft, ChartObject, CanvasSize, SeatingChart } from '@seating/types.ts';
 
 export interface ChartUsedBy {
   eventId: string;
@@ -16,6 +16,8 @@ export interface ChartSummary {
   revision: number;
   updatedAt: string;
   usedBy: ChartUsedBy[];
+  canvas: CanvasSize;
+  objects: ChartObject[];
 }
 
 /** A non-2xx reply, with the status and any structured details the worker sent. */

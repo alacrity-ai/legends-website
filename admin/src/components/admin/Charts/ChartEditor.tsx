@@ -211,19 +211,25 @@ export default function ChartEditor({ chartId, onBack, onCreated, onUnauthorized
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <button type="button" className={styles.back} onClick={handleBack}>
-          ← Charts
-        </button>
-        <input
-          className={styles.name}
-          value={layout.name}
-          placeholder="Venue 1 Seating"
-          maxLength={60}
-          onChange={(e) => dispatch({ type: 'setName', name: e.target.value })}
-          aria-label="Chart name"
-        />
+        <div className={styles.headerRow}>
+          <button type="button" className={styles.back} onClick={handleBack}>
+            ← Charts
+          </button>
+          <input
+            className={styles.name}
+            value={layout.name}
+            placeholder="Venue 1 Seating"
+            maxLength={60}
+            onChange={(e) => dispatch({ type: 'setName', name: e.target.value })}
+            aria-label="Chart name"
+          />
+        </div>
+        <div className={`${styles.headerRow} ${styles.headerRowTools}`}>
         <span className={styles.seatCount}>
           <strong>{seats}</strong> seats
+          {layout.objects.length > 0 && (
+            <span className={styles.seatCountMeta}> · {layout.objects.filter((o) => o.kind !== 'stage').length} objects</span>
+          )}
         </span>
         <div className={styles.headerTools}>
           <button type="button" className={styles.iconBtn} onClick={() => dispatch({ type: 'undo' })} disabled={past.length === 0} title="Undo (⌘Z)" aria-label="Undo">
@@ -237,13 +243,14 @@ export default function ChartEditor({ chartId, onBack, onCreated, onUnauthorized
           </button>
           <button
             type="button"
-            className={styles.save}
+            className={`${styles.save} ${!dirty && meta && !saving ? styles.saveClean : ''}`}
             onClick={() => void save()}
             disabled={saving || !validation.ok || (!dirty && !!meta)}
             title={!validation.ok ? validation.errors[0] : undefined}
           >
-            {saving ? 'Saving…' : savedFlash ? 'Saved ✓' : meta ? 'Save' : 'Create'}
+            {saving ? 'Saving…' : savedFlash || (!dirty && meta) ? 'Saved ✓' : meta ? 'Save' : 'Create'}
           </button>
+        </div>
         </div>
       </header>
 
