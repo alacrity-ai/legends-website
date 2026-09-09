@@ -163,6 +163,16 @@
       .lead { color: var(--muted); font-size: 1.15rem; max-width: 60ch; }
 
       /* Video */
+      .video-tabs { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1.4rem; }
+      .video-tab {
+        background: none; border: 1px solid var(--border); border-radius: 999px;
+        padding: 0.5rem 1.1rem; font: inherit; font-size: 0.92rem; font-weight: 600;
+        color: var(--muted); cursor: pointer; transition: background 0.2s, color 0.2s, border-color 0.2s;
+      }
+      .video-tab:hover { color: var(--text); border-color: var(--gold); }
+      .video-tab[aria-pressed='true'] { background: var(--gold); border-color: var(--gold); color: #1a1408; }
+      .video-frame iframe { animation: videoFade 0.35s ease; }
+      @keyframes videoFade { from { opacity: 0; } to { opacity: 1; } }
       .video-frame { position: relative; padding-top: 56.25%; margin-top: 1.6rem; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: #000; box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
       .video-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 
@@ -227,36 +237,17 @@
     <section class="ticket-band">
       <div class="wrap">
         <p class="ticket-eyebrow">Upcoming Live Shows</p>
-        <div class="ticket-show">
-          <div>
-            <p class="ticket-date">Friday, August 28, 2026</p>
-            <p class="ticket-meta">The Rat Pack with a 12-Piece Orchestra &middot; The Irish American, Malden MA</p>
-          </div>
-          <a
-            class="btn btn-primary"
-            href="https://djkmdlegends.com/?event=43c4f19d-766a-4824-8741-e0ad684643a6"
-          >Buy Tickets</a>
-        </div>
+        <!-- Keep this list to shows that are actually on sale: the Aug 28 show is
+             past and the Oct 17 Holy Ghost show was cancelled (removed 2026-09-03,
+             LGD-11). The Buy Tickets link deep-links the homepage checkout. -->
         <div class="ticket-show">
           <div>
             <p class="ticket-date">Sunday, September 20, 2026</p>
-            <p class="ticket-meta">Sinatra, Martin, and Sammy Davis &middot; Chelmsford Elks, Chelmsford MA</p>
+            <p class="ticket-meta">The Rat Pack with a 17-Piece Orchestra &middot; Chelmsford Elks, Chelmsford MA</p>
           </div>
           <a
             class="btn btn-primary"
-            href="https://checkout.square.site/merchant/MLPWE1EPSW06D/checkout/ODAFNHMVFGBCECXXR4GIIJGT"
-            target="_blank"
-            rel="noopener noreferrer"
-          >Buy Tickets</a>
-        </div>
-        <div class="ticket-show">
-          <div>
-            <p class="ticket-date">Saturday, October 17, 2026</p>
-            <p class="ticket-meta">The Rat Pack with an 18-Piece Orchestra &middot; Holy Ghost Society, Peabody MA</p>
-          </div>
-          <a
-            class="btn btn-primary"
-            href="https://djkmdlegends.com/?event=10ce0cc2-2aa8-413b-ab3e-86f9bf2be90c"
+            href="https://djkmdlegends.com/?event=6841b593-7e76-47b2-81d2-6928ab6c63ea"
           >Buy Tickets</a>
         </div>
       </div>
@@ -267,8 +258,13 @@
       <div class="wrap">
         <h2 class="section-title">See Joey <span class="accent">Live</span></h2>
         <p class="lead">An evening of timeless standards, old-school charm, and the on-stage banter that made the Rat Pack legendary.</p>
+        <div class="video-tabs" role="group" aria-label="Choose a video">
+          <button type="button" class="video-tab" data-video="kgB5mBi0N3A" data-video-title="Sinatra Under the Stars — Joey Chiarenza live tribute" aria-pressed="true">Sinatra Under the Stars</button>
+          <button type="button" class="video-tab" data-video="zLKgjY1znwc" data-video-title="The Rat Pack — live tribute performance" aria-pressed="false">The Rat Pack</button>
+        </div>
         <div class="video-frame">
           <iframe
+            id="act-video"
             src="https://www.youtube.com/embed/kgB5mBi0N3A"
             title="Sinatra Under the Stars — Joey Chiarenza live tribute"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -276,6 +272,22 @@
             loading="lazy"
           ></iframe>
         </div>
+        <script>
+          // Swap the single player between videos; one iframe, no layout shift.
+          document.querySelectorAll('.video-tab').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              if (btn.getAttribute('aria-pressed') === 'true') return;
+              document.querySelectorAll('.video-tab').forEach(function (b) {
+                b.setAttribute('aria-pressed', String(b === btn));
+              });
+              var frame = document.getElementById('act-video');
+              var next = frame.cloneNode();
+              next.src = 'https://www.youtube.com/embed/' + btn.dataset.video;
+              next.title = btn.dataset.videoTitle;
+              frame.replaceWith(next); // fresh element restarts the fade + stops the old video
+            });
+          });
+        </script>
       </div>
     </section>
 
