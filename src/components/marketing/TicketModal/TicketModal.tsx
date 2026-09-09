@@ -4,6 +4,7 @@ import { ticketComingSoonMessage } from '../../../content/site.ts';
 import { parseDescription } from '../../../utils/parse-description.ts';
 import { eventImageSrc } from '../../../utils/event-image.ts';
 import { startCheckout } from '../../../services/events.ts';
+import SeatSheet from './SeatSheet.tsx';
 import styles from './TicketModal.module.css';
 
 interface TicketModalProps {
@@ -22,6 +23,8 @@ export default function TicketModal({ selectedEvent, onClose }: TicketModalProps
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [buyingType, setBuyingType] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  /** Reserved-seating step (v0.5): set once Buy is tapped on a show with a chart. */
+  const [seatStep, setSeatStep] = useState<{ ticketType: string; quantity: number; priceCents: number } | null>(null);
 
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
@@ -59,6 +62,12 @@ export default function TicketModal({ selectedEvent, onClose }: TicketModalProps
 
   const handleBuy = async (ticketType: string) => {
     if (!selectedEvent.id) return;
+    // Reserved seating: the worker picks and holds the party's seats on the next sheet.
+    if (selectedEvent.seating) {
+      const ticket = selectedEvent.tickets?.find((t) => t.ticketType === ticketType);
+      setSeatStep({ ticketType, quantity: qtyFor(ticketType), priceCents: ticket?.priceCents ?? 0 });
+      return;
+    }
     setBuyingType(ticketType);
     setCheckoutError(null);
     try {
@@ -85,7 +94,15 @@ export default function TicketModal({ selectedEvent, onClose }: TicketModalProps
 
         {text && <p className={styles.description}>{text}</p>}
 
-        {hasTickets ? (
+        {seatStep && selectedEvent.id ? (
+          <SeatSheet
+            eventId={selectedEvent.id}
+            ticketType={seatStep.ticketType}
+            quantity={seatStep.quantity}
+            priceLabel={formatPrice(seatStep.priceCents * seatStep.quantity)}
+            onBack={() => setSeatStep(null)}
+          />
+        ) : hasTickets ? (
           soldOut ? (
             <div className={styles.soldOut}>Sold Out</div>
           ) : (

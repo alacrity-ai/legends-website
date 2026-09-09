@@ -146,5 +146,7 @@ export interface PartyRecord {
   amountCents?: number;
   /** Seat ids confirmed for this party (v0.5); absent on general-admission shows. */
   seats?: string[];
+  /** Human labels for `seats` ("T1-3"), derived from the show's snapshot at confirmation. */
+  seatLabels?: string[];
   seatStatus?: PartySeatStatus;
 }

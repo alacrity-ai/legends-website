@@ -31,7 +31,10 @@ import { fetchUpcomingEvents } from './services/google-calendar.ts';
 import { buildSalesReport, buildShowBuyers } from './sales.ts';
 import { handleAdminCharts } from './charts.ts';
 import { AttachError, assertSeatingMutable, attachChart, detachChart, resyncChart, stripLayout } from './seating/attach.ts';
-import { deleteShowSeats } from './seating/db.ts';
+import { HOLD_TTL_MS, attachOrderToHold, confirmHold, deleteShowSeats, findHoldByOrder, getHold, holdSeatIds, type HoldRow } from './seating/db.ts';
+import { HOLD_ID_RE, handleSeatingPublic } from './seating/holds.ts';
+import { groupSeatIds, objectNoun, seatNumbersPhrase } from '@seating/assign.ts';
+import { seatLabel } from '@seating/ids.ts';
 import { listEventRecords } from './events-store.ts';
 import {
   adminPasscode,
@@ -76,6 +79,10 @@ export default {
       }
       return handleSquareWebhook(request, url, env, ctx, corsHeaders);
     }
+
+    // Reserved seating (v0.5): layout/availability + holds for the buyer sheet.
+    const seatingResponse = await handleSeatingPublic(request, url, env, ctx, corsHeaders);
+    if (seatingResponse) return seatingResponse;
 
     const checkoutMatch = url.pathname.match(/^\/api\/events\/([a-f0-9-]+)\/checkout$/);
     if (checkoutMatch) {
@@ -221,7 +228,7 @@ async function handleCheckout(
 ): Promise<Response> {
   const noStore = { 'Cache-Control': 'no-store' };
 
-  let body: { ticketType?: unknown; quantity?: unknown };
+  let body: { ticketType?: unknown; quantity?: unknown; holdId?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -229,6 +236,7 @@ async function handleCheckout(
   }
   const ticketType = typeof body.ticketType === 'string' ? body.ticketType.trim() : '';
   const quantity = typeof body.quantity === 'number' ? body.quantity : NaN;
+  const holdId = typeof body.holdId === 'string' ? body.holdId : null;
   if (!ticketType) {
     return jsonResponse(400, { error: 'ticketType is required' }, corsHeaders);
   }
@@ -253,6 +261,30 @@ async function handleCheckout(
     return jsonResponse(409, { error: 'Sold out' }, corsHeaders);
   }
 
+  // Reserved seating (v0.5): a live hold is required and names the seats on the receipt.
+  let hold: HoldRow | null = null;
+  let seatSummary = '';
+  if (event.seating) {
+    if (!holdId || !HOLD_ID_RE.test(holdId)) {
+      return jsonResponse(409, { error: 'Please choose your seats first.' }, corsHeaders, noStore);
+    }
+    hold = await getHold(env.SEATING, holdId);
+    const now = Date.now();
+    if (
+      !hold ||
+      hold.show_id !== id ||
+      hold.status !== 'active' ||
+      hold.expires_at < now ||
+      hold.ticket_type !== ticketType ||
+      hold.quantity !== quantity
+    ) {
+      return jsonResponse(409, { error: 'Your seats are no longer held — go back and we will find you seats again.' }, corsHeaders, noStore);
+    }
+    seatSummary = groupSeatIds(event.seating.layout, holdSeatIds(hold))
+      .map((o) => `${objectNoun(o)}, ${seatNumbersPhrase(o.seats)}`)
+      .join('; ');
+  }
+
   // Buyer receipts render the order's location (address + map), so mint the
   // link at a Square location matching the show's venue — never the account
   // default, whose registered address is not a public venue (LGD-3).
@@ -274,7 +306,7 @@ async function handleCheckout(
   let link;
   try {
     link = await createPaymentLink(env, {
-      itemName: `${ticketType} × ${quantity} · ${formatEventDateTime(event.startTime)} · ${event.venueName}`,
+      itemName: `${ticketType} × ${quantity} · ${seatSummary ? `${seatSummary} · ` : ''}${formatEventDateTime(event.startTime)} · ${event.venueName}`,
       amountCents: ticket.priceCents * quantity,
       redirectUrl: primaryOrigin(env) + '/?purchase=success',
       paymentNote: `legends-event:${id}:${ticketType}:${quantity}`,
@@ -299,6 +331,12 @@ async function handleCheckout(
     `link:${id}:${ticketType}:${quantity}:${link.paymentLinkId}`,
     JSON.stringify(minted),
   );
+
+  // Tie the hold to this Square order (the webhook looks it up by order_id)
+  // and restart its clock now that the buyer is heading to Square.
+  if (hold) {
+    await attachOrderToHold(env.SEATING, hold.id, link.orderId, link.paymentLinkId, Date.now() + HOLD_TTL_MS);
+  }
 
   return jsonResponse(200, { checkoutUrl: link.checkoutUrl }, corsHeaders, noStore);
 }
@@ -475,6 +513,42 @@ async function processCompletedPayment(
     purchasedAt: new Date().toISOString(),
     ...(payment?.amountCents != null ? { amountCents: payment.amountCents } : {}),
   };
+
+  // Reserved seating (v0.5): convert the hold minted for this Square order
+  // into sold seats. Whatever the party still wins is recorded; a late payer
+  // whose seats were re-held ends up partial/unassigned for staff to fix —
+  // the payment itself is never lost.
+  const eventRaw = await env.EVENTS.get(`event:${eventId}`);
+  let eventRecord: EventRecord | null = null;
+  if (eventRaw) {
+    try {
+      eventRecord = JSON.parse(eventRaw) as EventRecord;
+    } catch {
+      eventRecord = null;
+    }
+  }
+  if (eventRecord?.seating) {
+    try {
+      const hold = await findHoldByOrder(env.SEATING, orderId);
+      const won = hold && hold.show_id === eventId ? await confirmHold(env.SEATING, hold, partyKey) : [];
+      const layout = eventRecord.seating.layout;
+      const byObject = new Map(layout.objects.map((o) => [o.id, o]));
+      party.seats = won;
+      party.seatLabels = won.map((sid) => {
+        const dot = sid.lastIndexOf('.');
+        const o = byObject.get(sid.slice(0, dot));
+        return o ? seatLabel(o, Number(sid.slice(dot + 1))) : sid;
+      });
+      party.seatStatus = won.length >= quantity ? 'assigned' : won.length > 0 ? 'partial' : 'unassigned';
+      if (party.seatStatus !== 'assigned') {
+        console.warn('[webhook] seats', party.seatStatus, { eventId, paymentId, orderId, holdId: hold?.id ?? null, won: won.length, quantity });
+      }
+    } catch (err) {
+      console.error('[webhook] seat confirmation failed', errorMessage(err));
+      party.seats = [];
+      party.seatStatus = 'unassigned';
+    }
+  }
   await env.GUESTLIST.put(partyKey, JSON.stringify(party));
 
   // Every buyer joins the mailing list; never let this break the sale flow.

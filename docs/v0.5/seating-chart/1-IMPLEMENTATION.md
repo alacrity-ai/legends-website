@@ -141,45 +141,48 @@ src/types/event.ts              CalendarEvent += seating?: { seatCount }
 
 ---
 
-## Phase 3 — Buyer seat picker 🎟️ + holds + checkout + webhook confirmation
+## Phase 3 — Seats chosen for the party 🎟️ + holds + checkout + webhook confirmation (revised 2026-09-09)
 
 ### Files
 ```
-worker/src/seating/db.ts        availability(showId), claim(showId, seatIds, holdId, ttl), release(holdId), extend(holdId, ttl), findHoldByOrder(orderId), confirm(showId, holdId, partyKey) → wonSeatIds
-worker/src/seating/holds.ts     handleSeatingPublic(): GET seating, POST hold, DELETE hold
-worker/src/index.ts             routes: ^/api/events/([a-f0-9-]+)/seating$, ^/api/events/([a-f0-9-]+)/seats/hold(?:/(h_[a-f0-9]{12}))?$; handleCheckout += holdId; processCompletedPayment += confirm step
-worker/src/services/square.ts   createPaymentLink itemName unchanged in shape (labels added by the caller)
-src/services/events.ts          fetchSeating(eventId), holdSeats(eventId, body), releaseHold(eventId, holdId), startCheckout(…, holdId?)
-src/components/marketing/TicketModal/TicketModal.tsx   step machine: qty → seats → paying
-src/components/marketing/TicketModal/SeatPicker.tsx (+ .module.css)   uses @seating/SeatMap mode="pick"
+shared/seating/assign.ts        chooseSeats(layout, freeSeatIds, quantity, { objectId? }) → { seatIds, objects, split } | null; tableFits(); freeRuns()
+shared/seating/assign.test.ts   together-first, tight-fit, stage proximity, wrap on round tables, split fallback, objectId constraint
+worker/src/seating/db.ts        availability(showId), createHold(), claimSeats(), releaseHold(), extendHold(), findHoldByOrder(orderId), confirmHold() → won seat ids
+worker/src/seating/holds.ts     handleSeatingPublic(): GET seating, POST hold (choose + claim, retry ×3), DELETE hold
+worker/src/index.ts             routes: ^/api/events/([a-f0-9-]+)/seating$, ^/api/events/([a-f0-9-]+)/seats/hold(?:/(h_[a-f0-9]{12}))?$; handleCheckout += holdId (required for seated shows); processCompletedPayment += confirm step
+src/services/events.ts          fetchSeating(eventId, quantity), holdSeats(eventId, body), releaseHold(eventId, holdId), startCheckout(…, holdId?)
+src/components/marketing/TicketModal/TicketModal.tsx   step machine: qty → seats (seated shows only) → paying
+src/components/marketing/TicketModal/SeatSheet.tsx (+ .module.css)   message · SeatMap mode="view" diagram · Looks good / Change table · table list
 ```
 
-### Step 0 — prove the correlation first 🔬
-Sandbox (`SQUARE_ENVIRONMENT=sandbox` in `.dev.vars`): mint a link via the existing checkout endpoint, note the returned `orderId`; pay with a sandbox card; confirm the webhook's `payment.order_id` equals it. **GO** → proceed as designed. **NO-GO** → append `:h=<holdId>` to the payment note and extend `parsePaymentNote`'s regex to `^legends-event:([^:]+):(.+):(\d+)(?::h=(h_[a-f0-9]{12}))?$`; record the result on the card.
+### Step 0 — prove the correlation first 🔬 — DONE 2026-09-09 (GO)
+Sandbox: a quick_pay link's `order_id` equals the `order_id` on the resulting Payment (`GET /v2/payments/:id`), and that order carries our `payment_note`. Production already relies on this (the webhook resolves the note through `payment.order_id`). No note-format change needed.
+
+### Steps — shared
+1. `assign.ts`: `freeRuns(object, freeIds)` → contiguous runs of free seat numbers (wrapping on round tables); `tableFits(object, freeIds, n)`; `chooseSeats(layout, freeIds, n, opts)` per DESIGN §6.2 (together → tightest fit → nearest stage → split fallback). Pure; unit-tested.
 
 ### Steps — worker
-1. `GET /api/events/:id/seating` (no-store): `{ layout: event.seating.layout, seats: { [seatId]: 'available' | 'taken' } }` where taken = `sold` or (`held` and `hold_expires_at > now`). 404 for GA shows.
-2. `POST /api/events/:id/seats/hold`: validate body (`seatIds` array of 1–20 valid ids, unique, length === `quantity`, `ticketType` exists on the event, event not sold out / ended). Insert hold row (`active`, `expires_at = now + 12 min`), then **claim** per DESIGN §6.3 (conditional UPDATE, check `meta.changes`, compensate on shortfall, respond `409 { error: 'Some seats were just taken', unavailable: [...] }`). Before the UPDATE, `SELECT hold_id FROM seats WHERE … AND status='held' AND hold_expires_at < now` to find superseded holds → mark `superseded` + `ctx.waitUntil(deactivatePaymentLink(square_link_id))` each. Respond `{ holdId, expiresAt }`.
-3. `DELETE /api/events/:id/seats/hold/:holdId`: release seats where `hold_id = ?`, hold → `released`. Idempotent 200.
-4. `handleCheckout`: if the event has `seating`, `holdId` is **required**; load the hold, 409 if not `active`/expired/wrong event/ticketType/quantity mismatch. Item name becomes `${ticketType} × ${quantity} · ${labels.join(', ')} · ${date} · ${venue}`. After `createPaymentLink`, `UPDATE seat_holds SET square_order_id=?, square_link_id=?, expires_at=now+12min` and extend the seat rows' `hold_expires_at` likewise. GA shows ignore `holdId`.
-5. `processCompletedPayment`: after the party record is built and **before** it is written, `findHoldByOrder(orderId)`; if found, `confirm()` → `UPDATE seats SET status='sold', party_key=?, hold_id=NULL, hold_expires_at=NULL WHERE show_id=? AND seat_id IN (…) AND (hold_id=? OR status='available')` (chunked), collect the won ids via a follow-up `SELECT … WHERE party_key=?`; hold → `converted`. Write `party.seats` + `seatStatus` (`assigned` | `partial` | `unassigned`). If the show has seating but no hold matched → `seatStatus: 'unassigned'`, `seats: []`. Log a `console.warn` for `partial`/`unassigned`. `sold` increments unchanged.
-6. `clearLinkCache` (sold-out path) unchanged; additionally when a show flips `soldOut`, nothing seat-specific is needed (no available seats remain by construction).
+2. `GET /api/events/:id/seating?quantity=N` (no-store): `{ layout, seats: { id: 'available' | 'taken' }, tables: [{ objectId, label, kind, free, fits }] }`. 404 for GA shows / unknown.
+3. `POST /api/events/:id/seats/hold { ticketType, quantity, objectId?, replaceHoldId? }`: validate (ticket type exists, 1–20, show not ended / sold out); if `replaceHoldId` → release it first; read availability; `chooseSeats`; insert hold row (`active`, `expires_at = now + 12 min`); **claim** per DESIGN §6.4; on shortfall compensate, re-read, choose again (≤ 3 attempts); respond `{ holdId, expiresAt, seatIds, seatLabels, objects, split, message }` or 409 `{ error }` when nothing fits. Superseded expired holds → `superseded` + `ctx.waitUntil(deactivatePaymentLink)`.
+4. `DELETE /api/events/:id/seats/hold/:holdId`: release seats where `hold_id = ?`, hold → `released`. Idempotent 200.
+5. `handleCheckout`: if the event has `seating`, `holdId` is **required**; load the hold, 409 if not `active` / expired / wrong event / ticketType / quantity mismatch. Item name `${ticketType} × ${quantity} · ${objects} ${labels} · ${date} · ${venue}`. After `createPaymentLink`, `UPDATE seat_holds SET square_order_id, square_link_id, expires_at = now + 12 min` and extend the seat rows likewise. GA shows ignore `holdId`.
+6. `processCompletedPayment`: after the party record is built and before it is written, `findHoldByOrder(orderId)`; if found `confirmHold()` (chunked conditional UPDATE, then SELECT the rows now owned by the party key); write `party.seats`, `party.seatLabels`, `seatStatus` (`assigned` | `partial` | `unassigned`); hold → `converted`. Seated show with no matching hold → `unassigned`, `seats: []`, `console.warn`. `sold` increments unchanged.
 
 ### Steps — site
-7. `TicketModal` step machine: `qty` (today's rows; the button reads **Choose seats** for seating shows) → `seats` (`SeatPicker`) → `paying` (spinner then redirect). Back arrow returns to `qty` and releases any hold.
-8. `SeatPicker`: fetches seating on mount (and on 409 recovery); renders `SeatMap mode="pick"`; state: `selected: string[]`, `hold`, `countdown`. Behaviours from DESIGN §6.1 step 3: table-tap selects `quantity` adjacent free seats (adjacency = consecutive seat numbers on the same object, wrapping on round tables); **Best available** = the free run of `quantity` seats on the object whose centroid is closest to the stage (fallback: nearest to canvas top). Footer: chosen labels, **Continue to payment** (disabled until `selected.length === quantity`), countdown after hold.
-9. Continue → `holdSeats` → on 409 refresh + toast "T1-3 was just taken — pick again" and un-select the lost ones → on 200 `startCheckout(id, type, qty, holdId)` → `window.location.href`. Modal close / back → `releaseHold` via `fetch(…, { method: 'DELETE', keepalive: true })`.
-10. Picker default zoom: fit the bounding box of all seat objects (not the whole canvas) to the modal width; enable pinch/pan from `SeatMap`; **Fit** button.
+7. `TicketModal`: Buy on a seated show → `seats` step (`SeatSheet`); GA path untouched (same POST body as today).
+8. `SeatSheet`: on mount `holdSeats(id, { ticketType, quantity })`; render the message, the diagram (`SeatMap mode="view"`, party seats `selected`, others dimmed, `labels` off except the party's objects, viewBox fitted to the party's objects + stage), "Held for you for 10 minutes", **Looks good, continue** (→ `startCheckout(id, type, qty, holdId)` → `window.location.href`), **Change table** (→ `fetchSeating(id, qty)`, list `tables.filter(fits)` sorted by stage distance; tap → `holdSeats` with `objectId` + `replaceHoldId`). Back / close → `releaseHold` with `keepalive`. If `expiresAt` passes while open → re-hold silently. 409 on open → "No seats left for a party of N — try a smaller number."
+9. Bundle discipline: the site imports `SeatMap`, `assign` is worker/admin-only; no editor code reaches `src/`.
 
 ### Acceptance criteria
-- [ ] Step 0 result recorded (GO/NO-GO) before any UI work.
-- [ ] Concurrency: a script fires 20 parallel `POST …/seats/hold` for the same 2 seats; exactly one 200, nineteen 409s, and D1 shows those seats held by the winner only.
-- [ ] Sandbox purchase end-to-end: pick 2 seats → hold → Square sandbox pay → webhook → party has `seats` = those 2 ids, D1 rows `sold` with the party key, `sold` counter +2, capacity meter reflects it.
-- [ ] Expired-hold path: set a hold's `expires_at` in the past, have another buyer claim the seats, then complete the first payment → first party `seatStatus: 'unassigned'`, logged; second party assigned. No payment lost.
-- [ ] Closing the modal releases the hold (D1 rows back to `available`).
-- [ ] GA shows: `TicketModal` behaviour identical to today (no seating fetch, no hold, same POST body plus nothing).
-- [ ] Site bundle delta < 25 KB gzipped (`vite build` report).
-- [ ] Phone check on a real device: table tap selects a run, individual taps toggle, pinch works, footer stays reachable, countdown visible.
+- [x] Step 0 GO recorded.
+- [ ] Parallel claim: 20 simultaneous holds for quantity 2 on a 2-seat chart → exactly one 200, nineteen 409s; D1 shows the seats held by the winner only. Two simultaneous holds on a 4-seat table → both 200 with disjoint seats.
+- [ ] Assignment unit tests: together-first, tightest fit, stage tiebreak, round-table wrap, split fallback with the fewest pieces, `objectId` constraint, none-fits → null.
+- [ ] Sandbox purchase end-to-end on the local worker pointed at sandbox: open sheet → hold → Looks good → Square sandbox pay → signed `payment.updated` replayed to the local webhook → party has `seats`, D1 rows `sold` with the party key, `sold` counter +N.
+- [ ] Expired-hold path: hold expired, seats re-held by another party, first payment completes → first party `unassigned` (or `partial`), logged; second party assigned. No payment lost.
+- [ ] Closing the sheet releases the hold; Change table moves the party and releases the old seats.
+- [ ] GA shows: `TicketModal` behaviour identical to today.
+- [ ] Site bundle delta < 25 KB gzipped.
+- [ ] Phone check (Leif): the sheet reads clearly, the two buttons are obvious, Change table works with one tap.
 
 ---
 
