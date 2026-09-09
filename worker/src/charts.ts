@@ -38,6 +38,31 @@ function nameKey(name: string): string {
   return `${NAME_PREFIX}${name.trim().toLowerCase()}`;
 }
 
+/**
+ * Id index: `chartindex` → JSON array of chart ids. KV `get` is
+ * read-your-writes from the edge that wrote, `list` is not — without this a
+ * chart created a moment ago is missing from the list page for up to a
+ * minute. The listing unions this with `list()` so a lost update self-heals.
+ */
+const INDEX_KEY = 'chartindex';
+
+async function readIndex(env: Env): Promise<string[]> {
+  const raw = await env.EVENTS.get(INDEX_KEY);
+  if (!raw) return [];
+  try {
+    const ids = JSON.parse(raw) as unknown;
+    return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+async function updateIndex(env: Env, fn: (ids: Set<string>) => void): Promise<void> {
+  const ids = new Set(await readIndex(env));
+  fn(ids);
+  await env.EVENTS.put(INDEX_KEY, JSON.stringify([...ids]));
+}
+
 export interface ChartUsedBy {
   eventId: string;
   showName: string;
@@ -104,6 +129,7 @@ async function writeChart(env: Env, chart: SeatingChart, previousName?: string):
     await env.EVENTS.delete(nameKey(previousName));
   }
   await env.EVENTS.put(nameKey(chart.name), chart.id);
+  if (previousName === undefined) await updateIndex(env, (ids) => ids.add(chart.id));
 }
 
 /** Is `name` already taken by a different chart? Index first, listing as a fallback. */
@@ -120,8 +146,9 @@ async function nameTaken(env: Env, name: string, exceptId?: string): Promise<boo
 }
 
 export async function listChartRecords(env: Env): Promise<SeatingChart[]> {
-  const list = await env.EVENTS.list({ prefix: CHART_PREFIX });
-  const raws = await Promise.all(list.keys.map((k) => env.EVENTS.get(k.name)));
+  const [list, indexed] = await Promise.all([env.EVENTS.list({ prefix: CHART_PREFIX }), readIndex(env)]);
+  const ids = new Set<string>([...list.keys.map((k) => k.name.slice(CHART_PREFIX.length)), ...indexed]);
+  const raws = await Promise.all([...ids].filter((id) => CHART_ID_RE.test(id)).map((id) => env.EVENTS.get(`${CHART_PREFIX}${id}`)));
   const charts: SeatingChart[] = [];
   for (const raw of raws) {
     if (!raw) continue;
@@ -316,5 +343,6 @@ async function deleteChart(id: string, env: Env, corsHeaders: Record<string, str
   if ((await env.EVENTS.get(nameKey(chart.name))) === id) {
     await env.EVENTS.delete(nameKey(chart.name));
   }
+  await updateIndex(env, (ids) => ids.delete(id));
   return jsonResponse(200, { ok: true }, corsHeaders, NO_STORE);
 }
