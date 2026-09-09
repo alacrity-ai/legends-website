@@ -31,10 +31,10 @@ import { fetchUpcomingEvents } from './services/google-calendar.ts';
 import { buildSalesReport, buildShowBuyers } from './sales.ts';
 import { handleAdminCharts } from './charts.ts';
 import { AttachError, assertSeatingMutable, attachChart, detachChart, resyncChart, stripLayout } from './seating/attach.ts';
-import { HOLD_TTL_MS, attachOrderToHold, confirmHold, deleteShowSeats, findHoldByOrder, getHold, holdSeatIds, occupancy, type HoldRow } from './seating/db.ts';
+import { HOLD_TTL_MS, attachOrderToHold, confirmHold, deleteShowSeats, findHoldByOrder, getHold, holdSeatIds, occupancy, reassign, type HoldRow } from './seating/db.ts';
 import { HOLD_ID_RE, handleSeatingPublic } from './seating/holds.ts';
 import { groupSeatIds, objectNoun, seatNumbersPhrase } from '@seating/assign.ts';
-import { seatLabel } from '@seating/ids.ts';
+import { SEAT_ID_RE, seatLabel } from '@seating/ids.ts';
 import { listEventRecords } from './events-store.ts';
 import {
   adminPasscode,
@@ -1036,6 +1036,15 @@ async function handleAdminEvents(
     return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
   }
 
+  // Reserved seating (v0.5 P5): staff give a party its seats (or move it).
+  const seatsMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/parties\/([A-Za-z0-9_-]{6,64})\/seats$/);
+  if (seatsMatch) {
+    if (request.method !== 'PUT') {
+      return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+    }
+    return handleSetPartySeats(seatsMatch[1], seatsMatch[2], request, env, corsHeaders, noStore);
+  }
+
   const resyncMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/seating\/resync$/);
   if (resyncMatch) {
     if (request.method !== 'POST') {
@@ -1133,6 +1142,91 @@ async function handleGetEventGuests(
   }
 
   return jsonResponse(200, { parties, checkedIn, ...(seating ? { seating } : {}) }, corsHeaders, noStore);
+}
+
+/** Seat labels for ids, in the layout's own order (table by table, seat by seat). */
+function labelsFor(layout: NonNullable<EventRecord['seating']>['layout'], seatIds: readonly string[]): string[] {
+  const byObject = new Map(layout.objects.map((o) => [o.id, o]));
+  return seatIds.map((sid) => {
+    const dot = sid.lastIndexOf('.');
+    const o = byObject.get(sid.slice(0, dot));
+    return o ? seatLabel(o, Number(sid.slice(dot + 1))) : sid;
+  });
+}
+
+/**
+ * PUT /api/admin/events/:id/parties/:paymentId/seats { seatIds }
+ * Assign (unassigned party), top up (partial) or move a party. Fewer seats
+ * than tickets is allowed and leaves the party `partial`; `[]` releases all.
+ */
+async function handleSetPartySeats(
+  id: string,
+  paymentId: string,
+  request: Request,
+  env: Env,
+  corsHeaders: Record<string, string>,
+  noStore: Record<string, string>,
+): Promise<Response> {
+  let body: { seatIds?: unknown };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return jsonResponse(400, { error: 'Invalid JSON body' }, corsHeaders);
+  }
+  if (typeof body !== 'object' || body === null || Object.keys(body).some((k) => k !== 'seatIds')) {
+    return jsonResponse(400, { error: 'Body must be { seatIds }' }, corsHeaders);
+  }
+  const seatIds = body.seatIds;
+  if (!Array.isArray(seatIds) || seatIds.length > MAX_CHECKOUT_QTY || !seatIds.every((s) => typeof s === 'string' && SEAT_ID_RE.test(s))) {
+    return jsonResponse(400, { error: 'seatIds must be a list of seat ids' }, corsHeaders);
+  }
+  if (new Set(seatIds).size !== seatIds.length) {
+    return jsonResponse(400, { error: 'seatIds must not repeat' }, corsHeaders);
+  }
+
+  const eventRaw = await env.EVENTS.get(`event:${id}`);
+  if (!eventRaw) return jsonResponse(404, { error: 'Event not found' }, corsHeaders);
+  let event: EventRecord;
+  try {
+    event = JSON.parse(eventRaw) as EventRecord;
+  } catch {
+    return jsonResponse(500, { error: 'Event is malformed' }, corsHeaders);
+  }
+  if (!event.seating) return jsonResponse(404, { error: 'This show has no seating chart' }, corsHeaders);
+  const layout = event.seating.layout;
+  const known = new Set(layout.objects.filter((o) => o.kind !== 'stage').flatMap((o) => Array.from({ length: o.seats }, (_, i) => `${o.id}.${i + 1}`)));
+  const unknown = (seatIds as string[]).filter((s) => !known.has(s));
+  if (unknown.length) return jsonResponse(400, { error: `Unknown seat: ${unknown[0]}` }, corsHeaders);
+
+  const partyKey = `party:${id}:${paymentId}`;
+  const partyRaw = await env.GUESTLIST.get(partyKey);
+  if (!partyRaw) return jsonResponse(404, { error: 'Party not found in show' }, corsHeaders);
+  let party: PartyRecord;
+  try {
+    party = JSON.parse(partyRaw) as PartyRecord;
+  } catch {
+    return jsonResponse(500, { error: 'Party is malformed' }, corsHeaders);
+  }
+  if (seatIds.length > party.quantity) {
+    return jsonResponse(400, { error: `This party has ${party.quantity} ${party.quantity === 1 ? 'ticket' : 'tickets'}; pick at most that many seats` }, corsHeaders);
+  }
+
+  const result = await reassign(env.SEATING, id, partyKey, seatIds as string[]);
+  if (!result.ok) {
+    const names = labelsFor(layout, result.unavailable);
+    return jsonResponse(
+      409,
+      { error: `${names.length === 1 ? 'Seat' : 'Seats'} ${names.join(', ')} ${names.length === 1 ? 'was' : 'were'} just taken — pick again.`, unavailable: result.unavailable },
+      corsHeaders,
+      noStore,
+    );
+  }
+
+  party.seats = seatIds as string[];
+  party.seatLabels = labelsFor(layout, party.seats);
+  party.seatStatus = party.seats.length >= party.quantity ? 'assigned' : party.seats.length > 0 ? 'partial' : 'unassigned';
+  await env.GUESTLIST.put(partyKey, JSON.stringify(party));
+  return jsonResponse(200, { party: partyRecordToParty(party) }, corsHeaders, noStore);
 }
 
 async function handleEventCheckin(

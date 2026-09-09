@@ -7,10 +7,11 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { UnauthorizedError } from '../../../services/guestlist.ts';
-import { eventCheckIn, eventUncheck, getEventGuests, resyncSeating, type EventGuests, type ManagedEvent } from '../../../services/admin-events.ts';
+import { eventCheckIn, eventUncheck, getEventGuests, resyncSeating, setPartySeats, type EventGuests, type ManagedEvent } from '../../../services/admin-events.ts';
 import type { CheckinMap, Party } from '../../../types/guestlist.ts';
 import OccupancyChart from '../../guestlist/OccupancyChart.tsx';
 import CheckInModal from '../../guestlist/CheckInModal.tsx';
+import SeatAssignSheet from '../../guestlist/SeatAssignSheet.tsx';
 import styles from './SeatingModal.module.css';
 
 const POLL_MS = 8000;
@@ -28,6 +29,7 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
   const [error, setError] = useState<string | null>(null);
   const [checkedIn, setCheckedIn] = useState<CheckinMap>({});
   const [selectedParty, setSelectedParty] = useState<Party | null>(null);
+  const [assignParty, setAssignParty] = useState<Party | null>(null);
   const [resyncing, setResyncing] = useState(false);
 
   const refetch = useCallback(async () => {
@@ -74,7 +76,7 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !selectedParty) onClose();
+      if (e.key === 'Escape' && !selectedParty && !assignParty) onClose();
     };
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
@@ -82,7 +84,7 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [onClose, selectedParty]);
+  }, [onClose, selectedParty, assignParty]);
 
   const handleResync = async () => {
     setResyncing(true);
@@ -133,6 +135,15 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
     }
   };
 
+  const saveSeats = async (party: Party, seatIds: string[]) => {
+    try {
+      await setPartySeats(event.id, party.id, seatIds);
+      setAssignParty(null);
+    } finally {
+      void refetch();
+    }
+  };
+
   const sold = event.sold ?? 0;
 
   return (
@@ -156,7 +167,18 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
         {error && <p className={styles.error}>{error}</p>}
         {!data && !error && <p className={styles.empty}>Loading the room…</p>}
         {data?.seating && (
-          <OccupancyChart layout={data.seating.layout} seats={data.seating.seats} checkedIn={checkedIn} parties={data.parties} onPartyTap={setSelectedParty} />
+          <OccupancyChart
+            layout={data.seating.layout}
+            seats={data.seating.seats}
+            checkedIn={checkedIn}
+            parties={data.parties}
+            onPartyTap={setSelectedParty}
+            needsSeatsAction={(p) => (
+              <button type="button" className={styles.ghost} onClick={() => setAssignParty(p)}>
+                Assign seats
+              </button>
+            )}
+          />
         )}
         {data && !data.seating && <p className={styles.empty}>This show has no seating chart.</p>}
 
@@ -182,6 +204,20 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
             await uncheck(selectedParty);
             setSelectedParty(null);
           }}
+          onChangeSeats={() => {
+            setAssignParty(selectedParty);
+            setSelectedParty(null);
+          }}
+        />
+      )}
+
+      {assignParty && data?.seating && (
+        <SeatAssignSheet
+          layout={data.seating.layout}
+          seats={data.seating.seats}
+          party={data.parties.find((p) => p.id === assignParty.id) ?? assignParty}
+          onSave={(ids) => saveSeats(assignParty, ids)}
+          onClose={() => setAssignParty(null)}
         />
       )}
     </div>

@@ -61,6 +61,10 @@ which orchestra size, etc.) — see the "discrepancies" note below.
   count and the show's seats are materialized in D1. Omit / `null` = general admission. Change or
   detach later via `PATCH { "seatingChartId": "c_…" | null }` (409 once any ticket has sold);
   `POST /api/admin/events/:id/seating/resync` re-copies the master layout while `sold = 0`.
+  After sales: `GET /api/admin/events/:id/guests` returns each party's `seats` / `seatLabels` /
+  `seatStatus` (`assigned` | `partial` | `unassigned`) plus `seating.seats` occupancy;
+  `PUT /api/admin/events/:id/parties/:paymentId/seats { "seatIds": ["o_2.1", "o_2.2"] }` assigns
+  or moves a party (409 with `unavailable` if a seat was taken meanwhile).
 - `image`: JPEG/PNG/WebP, ≤5 MB, sent as a **base64 data URL** (see Step 2). Required at create.
 
 ## Step 2 — Build the request body (image as a data URL)
