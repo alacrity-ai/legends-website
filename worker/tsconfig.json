@@ -9,7 +9,11 @@
     "strict": true,
     "noEmit": true,
     "isolatedModules": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+
+    /* Shared seating module (LGD-14) */
+    "baseUrl": ".",
+    "paths": { "@seating/*": ["../shared/seating/*"] }
   },
   "include": ["src"]
 }
