@@ -29,6 +29,12 @@ export default function Handles({ objects, selection, scale, marquee }: HandlesP
   );
 }
 
+/** Angle (radians) halfway between seat 1 and seat 2 — a gap on the ring, never on a seat. */
+function radiusHandleAngle(o: Extract<ChartObject, { kind: 'round' }>): number {
+  const stepDeg = o.seats > 0 ? 360 / o.seats : 90;
+  return ((o.rotation - 90 + stepDeg / 2) * Math.PI) / 180;
+}
+
 function ObjectHandles({ o, r }: { o: ChartObject; r: number }) {
   const c = objectCenter(o);
   const anchor = { x: o.x, y: o.y };
@@ -94,8 +100,8 @@ function ObjectHandles({ o, r }: { o: ChartObject; r: number }) {
 
       {o.kind === 'round' && (
         <circle
-          cx={o.x + o.radius + SEAT_OFFSET + SEAT_RADIUS}
-          cy={o.y}
+          cx={o.x + (o.radius + SEAT_OFFSET + SEAT_RADIUS + r) * Math.cos(radiusHandleAngle(o))}
+          cy={o.y + (o.radius + SEAT_OFFSET + SEAT_RADIUS + r) * Math.sin(radiusHandleAngle(o))}
           r={r * 0.9}
           className={mapStyles.handle}
           data-handle="radius"

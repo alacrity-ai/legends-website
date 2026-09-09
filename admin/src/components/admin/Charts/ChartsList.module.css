@@ -277,8 +277,11 @@
     width: 100%;
   }
 
-  .toolGroup .btn,
-  .toolbar > .btn {
+  .toolGroup .btn {
     flex: 1;
+  }
+
+  .toolbar > .btn {
+    width: 100%;
   }
 }
