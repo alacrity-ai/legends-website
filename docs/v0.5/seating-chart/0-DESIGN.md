@@ -202,24 +202,35 @@ shared/seating/SeatMap.tsx       the renderer (mode: "edit" | "pick" | "view")
 
 `SeatMap` is the one component all three surfaces use. In `edit` mode it renders handles and forwards gestures; in `pick` mode it renders seat states and emits `onSeatTap`; in `view` mode it renders states and emits `onSeatTap` for check-in. It is copied verbatim into `src/` and `admin/` by the alias, not duplicated.
 
-## 6. Buyer: seat selection at purchase
+## 6. Buyer: seats chosen for the party (revised 2026-09-09 after the design conversation)
+
+**Principle (Leif's call):** the audience is older, on phones, and should never have to pick individual seats. The system picks the party's seats, holds them, shows a reassuring picture, and offers one easy escape hatch — change *table*, not seat. Lowest possible resistance; customisation only for the particular.
 
 ### 6.1 Flow
 
-1. `TicketModal` opens as today. If the event has `seating`, the stepper is followed by a **Choose seats** step instead of an immediate **Buy** button.
-2. The picker fetches `GET /api/events/:id/seating` (no-store) and renders `SeatMap mode="pick"`: available seats gold outline, taken seats dimmed, selected seats filled gold with a check. A legend and a sticky footer show **"2 of 2 seats chosen · T1-3, T1-4"** and **Continue to payment**.
-3. **Ergonomics that matter on a phone**: tapping a **table** with enough free seats auto-selects `quantity` adjacent free seats at it (tap again to cycle to the next free run; tap individual seats to fine-tune). **Best available** picks the closest-to-stage run of `quantity` free seats. Pinch to zoom, **Fit** to reset. Seats are ≥ 40 CSS px tap targets at fit-to-width on a 390 px phone for a 1200-unit canvas because the picker auto-zooms to the densest region; if a layout is wider the picker starts zoomed to the stage half.
-4. **Continue** → `POST /api/events/:id/seats/hold { seatIds, ticketType, quantity }` → `{ holdId, expiresAt }`. On 409 (someone just took one) the picker refreshes availability, highlights the lost seats and asks the buyer to pick again.
-5. Then `POST /api/events/:id/checkout { ticketType, quantity, holdId }` (the existing endpoint, one new field) → full-page redirect to Square, unchanged. The Square item name gains the seat labels: `General × 2 · T1-3, T1-4 · Sat Oct 4 7:00 PM · Venue`.
-6. Between hold and redirect the footer shows a **10:00 countdown**; closing the modal calls `DELETE /api/events/:id/seats/hold/:holdId` (best effort, `keepalive`).
+1. **Order Tickets → quantity → Buy**, exactly as today. A show **without** a chart goes straight to Square as before — nothing changes for general admission.
+2. A show **with** a chart opens a second sheet in the same modal. On open the site calls `POST /api/events/:id/seats/hold { ticketType, quantity }`; the worker **chooses the seats and holds them in one atomic step** from live D1 availability. The buyer is never shown seats anyone else can take.
+3. The sheet reads **"We've saved seats for your party together at Table 3"** (or "…at Tables 3 and 4, right beside each other" when a split was unavoidable), with a small diagram: the party's seats lit gold, everything else dimmed, the stage drawn for orientation, auto-zoomed to their table with the stage in frame. Under it, quietly: "Held for you for 10 minutes."
+4. **Looks good, continue** → `POST /api/events/:id/checkout { ticketType, quantity, holdId }` → full-page redirect to Square, unchanged. The Square line item reads `General × 2 · Table 3, seats 3–4 · Sat Oct 4 7:00 PM · Venue`, so the email receipt tells them where they sit.
+5. **Change table** → the sheet lists only the tables (and rows) that can seat the whole party side by side: "Table 5 · nearest the stage · 6 free". Tapping one (in the list or on the map) calls `hold` again with `objectId` and `replaceHoldId`; the worker releases the old hold and claims the new seats in one request; the diagram updates. Individual seats are never selectable.
+6. Closing the sheet calls `DELETE /api/events/:id/seats/hold/:holdId` (best effort, `keepalive`). If the hold lapses while the sheet is still open, the site re-holds silently and only tells the buyer if the table changed.
+7. If no table fits and no split is possible ("no seats left for a party of 6"), the sheet says so and offers a smaller quantity.
 
-### 6.2 Hold rules
+### 6.2 Assignment rule (`shared/seating/assign.ts`, unit-tested; reused by P5 admin reassignment)
 
-- **TTL 12 minutes** from creation. The checkout POST **extends** the hold to `now + 12 min` so the clock starts when the buyer lands on Square. The countdown the buyer sees is the conservative 10 min.
-- One hold covers exactly `quantity` seats of one ticket type. A buyer wanting two ticket types checks out twice, as today.
-- Holds are anonymous (no account); the `holdId` in the browser is the capability.
+1. **Together first.** Find every object (table or row — rows count as tables) with a run of `quantity` free seats side by side (consecutive seat numbers; round tables wrap).
+2. **Tightest fit, then nearest the stage.** Among fits, prefer the object with the fewest free seats (so single seats are not stranded and later parties can still sit together), then the smallest distance from the object's centre to the stage's centre (canvas top if no stage). Within the object, prefer the run whose leftover free seats stay contiguous.
+3. **Split only when necessary.** If nothing fits, take the largest run available, then fill from the nearest objects by centre distance, fewest pieces first (a party of 6 → 4 + 2 at neighbouring tables). The sheet always says when a party is split.
+4. `objectId` (Change table) restricts step 1 to that object; 409 if it cannot seat the party.
 
-### 6.3 Claim (the only place concurrency matters)
+### 6.3 Hold rules
+
+- **TTL 12 minutes** from the hold's creation (the sheet opening). The checkout POST extends it to `now + 12 min` so the clock restarts when the buyer lands on Square. The buyer sees the conservative "10 minutes".
+- One hold = exactly `quantity` seats of one ticket type. Two ticket types = two checkouts, as today.
+- Holds are anonymous; the `holdId` in the browser is the capability. Replacing a hold (Change table) releases the old one in the same request.
+- Expired holds are treated as free by every read and claim (lazy expiry — no cron).
+
+### 6.4 Claim (the only place concurrency matters)
 
 ```sql
 -- inside one D1 batch, in this order
@@ -228,14 +239,14 @@ UPDATE seats SET status='held', hold_id=?1, hold_expires_at=?2, updated_at=?3
    AND (status='available' OR (status='held' AND hold_expires_at < ?3));
 -- read meta.changes; if changes != seatIds.length:
 UPDATE seats SET status='available', hold_id=NULL, hold_expires_at=NULL WHERE hold_id=?1;   -- compensate
--- respond 409 { unavailable: [...] } from a fresh SELECT
+-- then re-read availability and choose again (up to 3 attempts) before answering 409
 ```
 
-A hold that takes over an *expired* hold's seats marks the old hold `superseded` and, best effort, deactivates its Square payment link so a late payment is unlikely.
+Because the server chooses from a fresh read and retries on a lost race, two buyers opening the sheet at the same moment simply get different tables. A hold that takes over an *expired* hold's seats marks the old hold `superseded` and, best effort, deactivates its Square payment link.
 
-### 6.4 Confirmation (webhook)
+### 6.5 Confirmation (webhook)
 
-`processCompletedPayment` (`index.ts:430`) gains one step after the party record is built: look up the active hold by `payment.order_id`. If found: `UPDATE seats SET status='sold', party_key=?, hold_id=NULL WHERE show_id=? AND seat_id IN (…) AND (hold_id=? OR status='available')`; whatever count comes back is written to `party.seats`; `seatStatus` is `assigned` when all were won, `partial` when some, `unassigned` when none (or when no hold was found, e.g. a payment on a stale link). The hold becomes `converted`. `sold` increments exactly as today. Nothing here can lose a payment; the worst case is a paid party without seats, which the admin resolves in seconds (§8).
+`processCompletedPayment` gains one step after the party record is built: look up the hold by `payment.order_id` (proven in sandbox 2026-09-09: the Payment's `order_id` is the payment link's `order_id`, and that order carries our `payment_note`). If found: `UPDATE seats SET status='sold', party_key=?, hold_id=NULL WHERE show_id=? AND seat_id IN (…) AND (hold_id=? OR status='available')`; whatever count comes back is written to `party.seats` (+ `seatLabels`); `seatStatus` is `assigned` when all were won, `partial` when some, `unassigned` when none (or when no hold was found, e.g. a payment on a stale link). The hold becomes `converted`. `sold` increments exactly as today. Nothing here can lose a payment; the worst case is a paid party without seats, which staff resolve from the chart view (§8).
 
 ## 7. Show ↔ chart association
 
@@ -271,8 +282,8 @@ A hold that takes over an *expired* hold's seats marks the old hold `superseded`
 | `GET /api/admin/events/:id/guests` | admin | **+ `seating`**, parties **+ `seats`, `seatStatus`** |
 | `PUT /api/admin/events/:id/parties/:paymentId/seats` | admin | assign/replace seats |
 | `GET /api/events` | public | events **+ `seating: { seatCount }`** when attached |
-| `GET /api/events/:id/seating` | public, no-store | `{ layout, seats: { [seatId]: "available" \| "taken" } }` |
-| `POST /api/events/:id/seats/hold` | public | `{ seatIds, ticketType, quantity }` → `{ holdId, expiresAt }`; 409 `{ unavailable }` |
+| `GET /api/events/:id/seating?quantity=N` | public, no-store | `{ layout, seats: { [seatId]: "available" \| "taken" }, tables: [{ objectId, label, kind, free, fits }] }` — `fits` = can seat N side by side |
+| `POST /api/events/:id/seats/hold` | public | `{ ticketType, quantity, objectId?, replaceHoldId? }` → `{ holdId, expiresAt, seatIds, seatLabels, objects: [{ id, label }], split, message }`; 409 when nothing fits |
 | `DELETE /api/events/:id/seats/hold/:holdId` | public | release (idempotent) |
 | `POST /api/events/:id/checkout` | public | **+ `holdId`** (required when the show has seating; 409 if expired) |
 
@@ -283,13 +294,13 @@ Errors follow the existing `{ error, details? }` + status convention.
 **Functional**
 - Build, save, duplicate, delete named layouts with round/rect tables, rows and a stage; seat counts per object; multiple layouts.
 - Attach a layout to a show at create or edit; capacity derives from it; GA shows unchanged.
-- Buyer selects exactly `quantity` seats before Square; seats are held during checkout and confirmed by the webhook; two buyers cannot buy the same seat.
+- The server chooses and holds exactly `quantity` seats for the buyer before Square (together at one table when possible); the buyer can only change table; seats are confirmed by the webhook; two buyers cannot buy the same seat.
 - Party records carry seats; check-in modal, print sheet and sales buyer drill-down show them.
 - Door Check-in chart toggle with live refresh and tap-to-check-in; Manage Shows chart button with the same view; admin can assign/reassign seats.
 
 **Non-functional**
 - Zero new runtime dependencies in the site and admin bundles; the site bundle grows by < 25 KB gzipped (renderer + picker).
-- Editor and picker usable on a 390 px phone with one hand; seat tap targets ≥ 40 px at the picker's default zoom.
+- Editor usable on a 390 px phone with one hand; the buyer sheet needs no gesture beyond two buttons and a list.
 - Hold claim is atomic under concurrent requests (verified with a 20-way parallel `curl` in P3).
 - No change to Square money flow, the payment note, or the webhook signature path.
 - All new admin endpoints behind the existing passcode; all public endpoints validate ids with the existing regexes.

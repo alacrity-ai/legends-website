@@ -1,0 +1,214 @@
+/* Reserved-seating step of the ticket modal. Big type, two obvious buttons. */
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.title {
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.seats {
+  color: var(--color-accent);
+  font-size: var(--text-base);
+  font-weight: 600;
+  margin: 0;
+}
+
+.body,
+.status {
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.status {
+  text-align: center;
+  padding: var(--space-lg) 0;
+}
+
+.note {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.held {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+  text-align: center;
+}
+
+.error {
+  color: var(--color-error);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+/* ── Diagram ──────────────────────────────────────────────── */
+
+.diagram {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.diagram svg {
+  pointer-events: none;
+}
+
+.legend {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  background: rgba(11, 10, 15, 0.7);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.legendYou {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary-light);
+}
+
+/* ── Actions ──────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.primary,
+.secondary {
+  width: 100%;
+  min-height: 52px;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border: none;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--btn-primary-hover-bg);
+}
+
+.secondary {
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+}
+
+.secondary:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.link {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: var(--space-xs);
+}
+
+.link:hover:not(:disabled) {
+  color: var(--color-text);
+}
+
+/* ── Table list ───────────────────────────────────────────── */
+
+.tableList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.tableRow {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0.9rem 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tableRow:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.tableRow:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.tableName {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tableMeta {
+  text-align: right;
+}
+
+.tableMeta {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.tableGo {
+  color: var(--color-accent);
+  font-size: var(--text-xl);
+  line-height: 1;
+}

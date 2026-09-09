@@ -72,6 +72,8 @@ One Worker (`worker/src/index.ts`) routes four groups of endpoints, on two route
 | --- | --- | --- | --- |
 | `/api/events` | GET | Upcoming shows for the Calendar section | KV `EVENTS` (v0.2) merged with legacy Google Calendar, cached 60s |
 | `/api/admin/events` | POST/GET/DELETE | Create/list/delete shows (admin-gated); creates Square links + stores image | KV `EVENTS`, R2, Square API |
+| `/api/events/:id/seating?quantity=N` | GET | Reserved seating (v0.5): layout, live availability, which tables seat N together | KV snapshot + D1 `seats`, no-store |
+| `/api/events/:id/seats/hold[/:holdId]` | POST/DELETE | Choose + hold seats for a party (server-side, atomic, 12 min) / release; `POST …/checkout` then requires the `holdId` on seated shows | D1 `seats`, `seat_holds` |
 | `/api/booking` | POST | Booking inquiry → emails the team + confirmation to sender | Mailgun |
 | `/api/mailing-list` | POST | Save a signup (email + optional name) | KV `MAILING_LIST` |
 | `/api/guestlist/...` | GET/POST/DELETE | List shows, fetch a roster, check parties in/out | KV `GUESTLIST`, passcode-gated |
