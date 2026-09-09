@@ -51,12 +51,13 @@ Shared primitives (`Button`, `Card`, `Heading`) and layout wrappers (`Section`, 
 A **separate app** in `admin/` (its own Vite build, its own Pages project), installable to a phone home screen. It is the **staff console**; the public site no longer links to it, and the old `djkmdlegends.com/admin` / `/guestlist` URLs 301 here. Design notes: `docs/v0.4/admin-pwa/`.
 
 - Passcode sign-in (`AdminSignIn`) → the passcode is stored in `localStorage` and sent as a `Bearer` token on every Worker call. One shared code (`ADMIN_PASSCODE`) gates everything.
-- Menu → four tools, each a client-side route:
+- Menu → six tools, each a client-side route:
 
 | Route | Tool | Component | Talks to |
 | --- | --- | --- | --- |
 | `/events/new` | Create a Show (ticket types, capacity, image → Square links) | `components/admin/EventForm` | `POST /api/admin/events` |
 | `/events` | Manage Shows (list, edit, sold-out, QR/share link, delete) | `components/admin/ManageShows` | `GET/PATCH/DELETE /api/admin/events[/:id]` |
+| `/charts`, `/charts/new`, `/charts/:id` | Seating Charts (v0.5): venue layouts — tables, rows, stage on an SVG floor plan; renderer shared from `shared/seating/SeatMap.tsx` | `components/admin/Charts` | `GET/POST /api/admin/charts`, `GET/PUT/DELETE /api/admin/charts/:id`, `POST …/:id/duplicate` (KV `chart:<id>`) |
 | `/checkin` | Door Check-in (auto roster from Square purchases; legacy CSV rosters) | `components/guestlist/*` | `/api/admin/events/:id/{guests,checkin}`, legacy `/api/guestlist/*` |
 | `/mailing-list` | Mailing List (search, unsubscribed badges, CSV export) | `components/admin/MailingList` | `GET /api/admin/mailing-list` |
 
