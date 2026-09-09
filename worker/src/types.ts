@@ -17,6 +17,8 @@ export interface CalendarEvent {
   description: string | null;
 }
 
+import type { EventSeating, PartySeatStatus } from '@seating/types.ts';
+
 export interface Env {
   MAILGUN_API_KEY: string;
   MAILGUN_DOMAIN: string;
@@ -28,6 +30,8 @@ export interface Env {
   GUESTLIST: KVNamespace;
   EVENTS: KVNamespace;
   EVENT_IMAGES: R2Bucket;
+  /** Seat state for reserved-seating shows (v0.5). */
+  SEATING: D1Database;
   // ADMIN_PASSCODE is the canonical gate for the whole /admin area.
   // GUESTLIST_PASSCODE is kept as a legacy alias for one release.
   ADMIN_PASSCODE: string;
@@ -79,6 +83,8 @@ export interface EventRecord extends EventDraft {
   soldOut: boolean; // capacity reached, or manually toggled
   createdAt: string;
   source: 'form' | 'google-calendar';
+  /** Reserved seating (v0.5): a snapshot of the attached layout. Absent = general admission. */
+  seating?: EventSeating;
 }
 
 /** Cached on-demand checkout link, keyed `link:<eventId>:<ticketType>:<qty>`. */
@@ -136,4 +142,7 @@ export interface PartyRecord {
   purchasedAt: string;
   /** Total charged at checkout in cents (from the Square payment); absent on records written before LGD-10. */
   amountCents?: number;
+  /** Seat ids confirmed for this party (v0.5); absent on general-admission shows. */
+  seats?: string[];
+  seatStatus?: PartySeatStatus;
 }

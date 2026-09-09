@@ -50,6 +50,18 @@ binding = "EVENT_IMAGES"
 bucket_name = "legends-event-images"
 preview_bucket_name = "legends-event-images"
 
+# Seat state for reserved-seating shows (v0.5, LGD-14). Layouts live in KV
+# (`chart:<id>`); D1 holds the per-show seat rows + checkout holds that need an
+# atomic conditional claim. Created with the SHARED account token (the Legends
+# deploy token has no D1 scope):
+#   CLOUDFLARE_API_TOKEN=$(agentsecrets get cloudflare_api_token) npx wrangler d1 create legends-seating
+# Migrations: `make d1-migrate-remote` (worker/migrations/).
+[[d1_databases]]
+binding = "SEATING"
+database_name = "legends-seating"
+database_id = "44105bd6-359e-4ca9-a303-0c628b546c79"
+migrations_dir = "migrations"
+
 [vars]
 BOOKING_EMAIL = "booking@djkmdlegends.com"
 ALLOWED_ORIGINS = "https://djkmdlegends.com,https://www.djkmdlegends.com,https://admin.djkmdlegends.com,http://localhost:5173,http://localhost:5174"

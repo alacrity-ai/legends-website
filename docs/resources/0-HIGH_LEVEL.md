@@ -14,7 +14,8 @@
 | Frontend | React 19 + TypeScript, Vite 8, CSS Modules | `src/` → built to `dist/`, deployed to **Cloudflare Pages** (`legends-website`) |
 | Admin PWA | React 19 + TypeScript, Vite 8, CSS Modules — installable, `noindex` | `admin/` → built to `admin/dist/`, deployed to **Cloudflare Pages** (`legends-admin`) at `admin.djkmdlegends.com` |
 | Backend API | A single **Cloudflare Worker** (`legends-booking-worker`) | `worker/` → served at `djkmdlegends.com/api/*` **and** `admin.djkmdlegends.com/api/*` |
-| Data store | **Cloudflare KV** — two namespaces: `MAILING_LIST`, `GUESTLIST` | bound in `worker/wrangler.toml` |
+| Data store | **Cloudflare KV** — namespaces `MAILING_LIST`, `GUESTLIST`, `EVENTS` (shows, cached links, seating-chart layouts `chart:<id>`) | bound in `worker/wrangler.toml` |
+| Seat state | **Cloudflare D1** `legends-seating` (`seats`, `seat_holds`) — reserved-seating shows only (v0.5, `docs/v0.5/seating-chart/`); created/migrated with the shared account token because the Legends deploy token has no D1 scope | binding `SEATING` in `worker/wrangler.toml`; `worker/migrations/`; `make d1-migrate-remote` |
 | Email | **Mailgun** (sending domain `mg.djkmdlegends.com`) | `worker/src/services/mailgun.ts` |
 | Events | **Custom admin form → KV `EVENTS` + Square API** (v0.2). Legacy: Google Calendar (grandfathered until ~Sept 2026) | `worker/src/services/square.ts`, `google-calendar.ts` |
 | Show images | **Cloudflare R2** bucket `EVENT_IMAGES` | `worker/wrangler.toml` |

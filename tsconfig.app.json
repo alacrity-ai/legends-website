@@ -23,7 +23,11 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+
+    /* Shared seating module (LGD-14) */
+    "baseUrl": ".",
+    "paths": { "@seating/*": ["./shared/seating/*"] }
   },
   "include": ["src"]
 }

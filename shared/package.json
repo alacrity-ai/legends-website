@@ -1,0 +1,13 @@
+{
+  "name": "legends-shared",
+  "private": true,
+  "type": "module",
+  "description": "Code shared by the site, the admin PWA and the worker (imported via the @seating/* alias). This package exists only to run the unit tests.",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

@@ -110,13 +110,14 @@ cp worker/.dev.vars.example worker/.dev.vars
 
 These are read automatically by `wrangler dev`. In production they are stored as Cloudflare Worker secrets (`wrangler secret put`).
 
-**Worker bindings** (`worker/wrangler.toml`): KV namespaces `MAILING_LIST`, `GUESTLIST`, `EVENTS` (custom events), and R2 bucket `EVENT_IMAGES` (show images). See `docs/v0.2/event_form/` for the event-form feature. The worker has three routes (`djkmdlegends.com/api/*`, `www.djkmdlegends.com/api/*`, `admin.djkmdlegends.com/api/*` — `www` is a Pages custom domain, not a redirect, so it needs its own route); `ALLOWED_ORIGINS` lists the public, admin, and local dev origins.
+**Worker bindings** (`worker/wrangler.toml`): KV namespaces `MAILING_LIST`, `GUESTLIST`, `EVENTS` (custom events + seating-chart layouts), R2 bucket `EVENT_IMAGES` (show images), and D1 database `SEATING` (`legends-seating`: per-show seat state + checkout holds for reserved-seating shows, v0.5 — schema in `worker/migrations/`, apply with `make d1-migrate-remote` under the shared Cloudflare token; design in `docs/v0.5/seating-chart/`). See `docs/v0.2/event_form/` for the event-form feature. The worker has three routes (`djkmdlegends.com/api/*`, `www.djkmdlegends.com/api/*`, `admin.djkmdlegends.com/api/*` — `www` is a Pages custom domain, not a redirect, so it needs its own route); `ALLOWED_ORIGINS` lists the public, admin, and local dev origins.
 
 ## Build
 
 ```bash
 npm run build          # public site → dist/
 make build-admin       # admin PWA  → admin/dist/
+make test-shared       # unit tests for shared/seating (geometry, ids, validation)
 ```
 
 ## Deploy
@@ -137,6 +138,7 @@ src/
 ├── styles/         # Global styles and design tokens
 └── types/          # TypeScript interfaces
 
+shared/seating/     # Layout types, geometry, seat ids, validation (+ SeatMap renderer) shared by src/, admin/ and worker/ via the @seating/* alias
 admin/              # Staff console PWA (separate Vite app, separate Pages project)
 ├── index.html      # PWA chrome: manifest link, theme-color, apple-touch-icon, noindex
 ├── public/         # manifest.webmanifest, sw.js (no-cache), icons/, _redirects, _headers, robots.txt
