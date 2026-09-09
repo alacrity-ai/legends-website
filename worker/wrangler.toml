@@ -4,9 +4,15 @@ compatibility_date = "2025-01-01"
 workers_dev = false
 preview_urls = false
 
-# Production route — uncomment and deploy once worker is ready
+# Public site: the marketing SPA calls the API cross-origin (CORS below).
 [[routes]]
 pattern = "djkmdlegends.com/api/*"
+zone_name = "djkmdlegends.com"
+
+# Admin PWA (admin/): routed on its own host so the console calls /api
+# same-origin — no preflights at the door on venue wifi.
+[[routes]]
+pattern = "admin.djkmdlegends.com/api/*"
 zone_name = "djkmdlegends.com"
 
 [[kv_namespaces]]
@@ -38,7 +44,7 @@ preview_bucket_name = "legends-event-images"
 
 [vars]
 BOOKING_EMAIL = "booking@djkmdlegends.com"
-ALLOWED_ORIGINS = "https://djkmdlegends.com,https://www.djkmdlegends.com,http://localhost:5173"
+ALLOWED_ORIGINS = "https://djkmdlegends.com,https://www.djkmdlegends.com,https://admin.djkmdlegends.com,http://localhost:5173,http://localhost:5174"
 GOOGLE_CALENDAR_ID = "c_f31ec573a399824b85486344a243eb27e6742ef72157c2240a8723ad89987594@group.calendar.google.com"
 # Square: API base is selected by this var. Real token/location are secrets (wrangler secret put).
 SQUARE_ENVIRONMENT = "production"

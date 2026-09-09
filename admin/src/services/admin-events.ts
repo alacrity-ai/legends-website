@@ -1,7 +1,7 @@
 import { clearPasscode, getPasscode, UnauthorizedError } from './guestlist.ts';
 import type { CheckinMap, Party } from '../types/guestlist.ts';
 
-const apiUrl = import.meta.env.VITE_BOOKING_API_URL;
+import { apiUrl } from './api-base.ts';
 
 export interface TicketInput {
   ticketType: string;

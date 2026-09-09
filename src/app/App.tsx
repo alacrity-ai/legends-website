@@ -10,14 +10,6 @@ import Calendar from '../components/marketing/Calendar/Calendar.tsx';
 import BookingForm from '../components/marketing/BookingForm/BookingForm.tsx';
 import MailingList from '../components/marketing/MailingList/MailingList.tsx';
 import PressKit from '../components/marketing/PressKit/PressKit.tsx';
-import Admin from '../components/admin/Admin.tsx';
-
-function isAdminRoute(): boolean {
-  if (typeof window === 'undefined') return false;
-  const path = window.location.pathname.replace(/\/$/, '');
-  // /guestlist is kept as a back-compat alias for the door check-in tool.
-  return path === '/admin' || path.startsWith('/admin/') || path === '/guestlist';
-}
 
 function MarketingSite() {
   const [showMailingList, setShowMailingList] = useState(false);
@@ -74,8 +66,10 @@ function MarketingSite() {
   );
 }
 
+// The staff console lives in its own PWA at admin.djkmdlegends.com (admin/);
+// /admin and /guestlist on this host are 301s in public/_redirects.
 function App() {
-  return isAdminRoute() ? <Admin /> : <MarketingSite />;
+  return <MarketingSite />;
 }
 
 export default App;

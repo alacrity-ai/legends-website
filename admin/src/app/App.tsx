@@ -1,30 +1,33 @@
 import { useCallback, useEffect, useState } from 'react';
-import { clearPasscode, getPasscode } from '../../services/guestlist.ts';
-import Guestlist from '../guestlist/Guestlist.tsx';
-import EventForm from './EventForm/EventForm.tsx';
-import ManageShows from './ManageShows/ManageShows.tsx';
-import MailingList from './MailingList/MailingList.tsx';
-import AdminSignIn from './AdminSignIn.tsx';
-import styles from './Admin.module.css';
+import { clearPasscode, getPasscode } from '../services/guestlist.ts';
+import Guestlist from '../components/guestlist/Guestlist.tsx';
+import EventForm from '../components/admin/EventForm/EventForm.tsx';
+import ManageShows from '../components/admin/ManageShows/ManageShows.tsx';
+import MailingList from '../components/admin/MailingList/MailingList.tsx';
+import AdminSignIn from '../components/admin/AdminSignIn.tsx';
+import styles from './App.module.css';
 
 type View = 'menu' | 'checkin' | 'events' | 'manage' | 'mailing';
 
 function viewFromPath(): View {
   if (typeof window === 'undefined') return 'menu';
   const path = window.location.pathname.replace(/\/$/, '');
-  if (path === '/admin/events/new') return 'events';
-  if (path === '/admin/events') return 'manage';
-  if (path === '/admin/mailing-list') return 'mailing';
-  if (path === '/admin/checkin' || path === '/guestlist') return 'checkin';
+  // Root-level paths on the admin host; the legacy /admin/* and /guestlist
+  // shapes are accepted so old bookmarks redirected from the public site land.
+  const p = path.replace(/^\/admin(?=\/|$)/, '');
+  if (p === '/events/new') return 'events';
+  if (p === '/events') return 'manage';
+  if (p === '/mailing-list') return 'mailing';
+  if (p === '/checkin' || p === '/guestlist') return 'checkin';
   return 'menu';
 }
 
-export default function Admin() {
+export default function App() {
   const [authed, setAuthed] = useState<boolean>(() => Boolean(getPasscode()));
   const [view, setView] = useState<View>(viewFromPath);
 
   useEffect(() => {
-    document.title = 'Admin · DJKMD Legends';
+    document.title = 'Legends Admin';
     let meta = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
     if (!meta) {
       meta = document.createElement('meta');
@@ -41,14 +44,14 @@ export default function Admin() {
   const navigate = useCallback((to: View) => {
     const path =
       to === 'events'
-        ? '/admin/events/new'
+        ? '/events/new'
         : to === 'manage'
-          ? '/admin/events'
+          ? '/events'
           : to === 'mailing'
-            ? '/admin/mailing-list'
+            ? '/mailing-list'
             : to === 'checkin'
-              ? '/admin/checkin'
-              : '/admin';
+              ? '/checkin'
+              : '/';
     window.history.pushState({}, '', path);
     setView(to);
   }, []);
@@ -82,7 +85,7 @@ export default function Admin() {
     <div className={styles.page}>
       <header className={styles.header}>
         <button className={styles.brand} onClick={() => navigate('menu')} type="button">
-          DJKMD Admin
+          Legends Admin
         </button>
         <button className={styles.signOut} onClick={handleSignOut} type="button">
           Sign out

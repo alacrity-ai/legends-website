@@ -12,7 +12,8 @@
 | Layer | Technology | Where it lives |
 | --- | --- | --- |
 | Frontend | React 19 + TypeScript, Vite 8, CSS Modules | `src/` → built to `dist/`, deployed to **Cloudflare Pages** (`legends-website`) |
-| Backend API | A single **Cloudflare Worker** (`legends-booking-worker`) | `worker/` → served at `djkmdlegends.com/api/*` |
+| Admin PWA | React 19 + TypeScript, Vite 8, CSS Modules — installable, `noindex` | `admin/` → built to `admin/dist/`, deployed to **Cloudflare Pages** (`legends-admin`) at `admin.djkmdlegends.com` |
+| Backend API | A single **Cloudflare Worker** (`legends-booking-worker`) | `worker/` → served at `djkmdlegends.com/api/*` **and** `admin.djkmdlegends.com/api/*` |
 | Data store | **Cloudflare KV** — two namespaces: `MAILING_LIST`, `GUESTLIST` | bound in `worker/wrangler.toml` |
 | Email | **Mailgun** (sending domain `mg.djkmdlegends.com`) | `worker/src/services/mailgun.ts` |
 | Events | **Custom admin form → KV `EVENTS` + Square API** (v0.2). Legacy: Google Calendar (grandfathered until ~Sept 2026) | `worker/src/services/square.ts`, `google-calendar.ts` |
@@ -20,7 +21,7 @@
 | Payments | **Square** checkout links (no API — links are pasted into calendar events) | parsed in `src/utils/parse-description.ts` |
 | Runtime / Deploy | Node 24, Docker for local, GitHub Actions (`workflow_dispatch`) for prod | `Dockerfile`, `docker-compose.yml`, `.github/workflows/deploy.yml` |
 
-There are **two deployable artifacts**: the static frontend (Pages) and the Worker. They are deployed together by the one GitHub Actions workflow, which is **manually triggered** (`workflow_dispatch`).
+There are **three deployable artifacts**: the public frontend (Pages `legends-website`), the admin PWA (Pages `legends-admin`), and the Worker. All three ship from the one GitHub Actions workflow, which is **manually triggered** (`workflow_dispatch`).
 
 ---
 
@@ -44,18 +45,26 @@ A single-page React app (`src/app/App.tsx`). Almost everything visible is one of
 
 Shared primitives (`Button`, `Card`, `Heading`) and layout wrappers (`Section`, `Container`) live under `components/shared` and `components/layout`. Design tokens are in `src/styles/tokens.css`.
 
-## Surface 2 — The guestlist / door check-in app (`/guestlist`)
+## Surface 2 — The Admin PWA (`admin.djkmdlegends.com`)
 
-A second mini-app inside the same React bundle. `App.tsx` route-switches: any path of `/guestlist` renders `components/guestlist/Guestlist.tsx` instead of the marketing site. It is a **staff tool** used at the door:
+A **separate app** in `admin/` (its own Vite build, its own Pages project), installable to a phone home screen. It is the **staff console**; the public site no longer links to it, and the old `djkmdlegends.com/admin` / `/guestlist` URLs 301 here. Design notes: `docs/v0.4/admin-pwa/`.
 
-- Passcode sign-in (`SignIn`) → the passcode is sent as a `Bearer` token to the Worker.
-- Pick a show (`ShowPicker`), search attendees (`SearchBar`), and check parties in/out (`PartyList`, `PartyRow`, `CheckInModal`).
-- Talks to `GET/POST/DELETE /api/guestlist/*`, all gated by `GUESTLIST_PASSCODE`.
-- Rosters are loaded into KV ahead of time from a Square orders CSV via `tools/ingest-guestlist.mjs`.
+- Passcode sign-in (`AdminSignIn`) → the passcode is stored in `localStorage` and sent as a `Bearer` token on every Worker call. One shared code (`ADMIN_PASSCODE`) gates everything.
+- Menu → four tools, each a client-side route:
+
+| Route | Tool | Component | Talks to |
+| --- | --- | --- | --- |
+| `/events/new` | Create a Show (ticket types, capacity, image → Square links) | `components/admin/EventForm` | `POST /api/admin/events` |
+| `/events` | Manage Shows (list, edit, sold-out, QR/share link, delete) | `components/admin/ManageShows` | `GET/PATCH/DELETE /api/admin/events[/:id]` |
+| `/checkin` | Door Check-in (auto roster from Square purchases; legacy CSV rosters) | `components/guestlist/*` | `/api/admin/events/:id/{guests,checkin}`, legacy `/api/guestlist/*` |
+| `/mailing-list` | Mailing List (search, unsubscribed badges, CSV export) | `components/admin/MailingList` | `GET /api/admin/mailing-list` |
+
+- The Worker is routed on the admin host too, so the PWA calls **`/api` same-origin** — no CORS preflight at the door on venue wifi. `services/api-base.ts` defaults to `''` (relative); `VITE_BOOKING_API_URL` is only an optional override.
+- PWA plumbing: `public/manifest.webmanifest` (standalone, portrait, brand icons), a **deliberately no-cache** `public/sw.js` (installable, never serves a stale sign-in or roster), `_headers` (`X-Robots-Tag: noindex`), `robots.txt` Disallow all.
 
 ## Surface 3 — The Worker API (`/api/*`)
 
-One Worker (`worker/src/index.ts`) routes four groups of endpoints. CORS is restricted to `ALLOWED_ORIGINS`.
+One Worker (`worker/src/index.ts`) routes four groups of endpoints, on two routes (`djkmdlegends.com/api/*` for the public site, `admin.djkmdlegends.com/api/*` for the admin PWA). CORS is restricted to `ALLOWED_ORIGINS` (public, admin, and localhost dev origins).
 
 | Endpoint | Method | Purpose | Backing service |
 | --- | --- | --- | --- |
@@ -81,7 +90,7 @@ These are the "moving parts" a dev can't see by reading code alone — they're c
 
 - **Content layer** (`src/content/`) — performers, site copy, social links. Most "content edits" happen here.
 - **Tooling** (`tools/`) — `ingest-guestlist.mjs` (CSV → KV roster), `cropper.html`, `profit_calculator.html`, press-kit source.
-- **Config / secrets** — frontend public vars in `.env.example` (`VITE_*`); Worker secrets in `worker/.dev.vars.example` (`MAILGUN_API_KEY`, `GOOGLE_API_KEY`, `GUESTLIST_PASSCODE`); Worker non-secret vars and KV bindings in `worker/wrangler.toml`.
+- **Config / secrets** — frontend public vars in `.env.example` (`VITE_*`); the admin PWA needs none; Worker secrets in `worker/.dev.vars.example` (`MAILGUN_API_KEY`, `GOOGLE_API_KEY`, `ADMIN_PASSCODE`, Square); Worker non-secret vars, routes and KV/R2 bindings in `worker/wrangler.toml`.
 
 ---
 
@@ -92,7 +101,7 @@ These are the "moving parts" a dev can't see by reading code alone — they're c
 3. **Buy Tickets** → modal parses the Square link out of the description → sends the buyer to Square's hosted checkout.
 4. **Booking form** → Worker → Mailgun emails the team + the inquirer.
 5. **Mailing-list signup** → Worker → KV.
-6. **At the door**, staff open `/guestlist` → sign in with the passcode → Worker reads the pre-loaded roster from KV and records check-ins.
+6. **At the door**, staff open the **Legends Admin** PWA (`admin.djkmdlegends.com`, installed on their phone) → sign in with the passcode → **Door Check-in** → Worker builds the roster from Square purchases in KV and records check-ins.
 
 ---
 

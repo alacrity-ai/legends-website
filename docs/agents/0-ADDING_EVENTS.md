@@ -33,7 +33,7 @@ and secrets are write-only, so **you cannot retrieve it**. Options, in order:
    export CLOUDFLARE_ACCOUNT_ID=$(grep -i 'Account ID' ../DO_NOT_COMMIT.md | grep -oE '[a-f0-9]{32}' | head -1)
    printf '%s' "<temp>" | npx wrangler secret put ADMIN_PASSCODE
    ```
-   ⚠️ `ADMIN_PASSCODE` also gates the door check-in (`/admin`), so this changes the
+   ⚠️ `ADMIN_PASSCODE` also gates the whole Legends Admin app (`admin.djkmdlegends.com`, incl. door check-in), so this changes the
    staff door code until removed. Delete it (`wrangler secret delete ADMIN_PASSCODE`)
    to fall back to the existing `GUESTLIST_PASSCODE`. Prefer option 1.
 
@@ -159,7 +159,7 @@ Removes the KV record, deactivates any cached/legacy Square link(s), deletes the
 - **Future-dated:** create rejects a past `startTime`. (PATCH does not require future, so you can fix/backfill.)
 - **Real money:** the `/checkout` endpoint mints **live** production Square links. When testing logic, use the Square **sandbox** via local `wrangler dev` (`SQUARE_ENVIRONMENT=sandbox`, sandbox token + location `LXEVF5FVYSZSC` from `DO_NOT_COMMIT.md`) — never test-spam the production checkout endpoint.
 - **Source discrepancies:** owner blurbs are messy (missing year, "12-piece" vs "18-piece", etc.). Verify weekdays with `date -d YYYY-MM-DD +%A`, and surface mismatches to the user instead of guessing.
-- **Manage in UI:** humans can list, copy the **share link** (`/?event=<id>`), download its QR, toggle Sold Out, and delete at `/admin → Manage Shows`. You use the API.
+- **Manage in UI:** humans can list, copy the **share link** (`/?event=<id>`), download its QR, toggle Sold Out, and delete in **Legends Admin** (`https://admin.djkmdlegends.com/events`). You use the API.
 
 ## Don't
 

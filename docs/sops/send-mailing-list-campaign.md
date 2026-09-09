@@ -30,7 +30,7 @@ campaign spec (JSON, written per request)
   worker at `/api/mailing-list/unsubscribe`) plus `List-Unsubscribe` /
   `List-Unsubscribe-Post: One-Click` headers (Gmail/Yahoo bulk-sender requirement).
 - Unsubscribes are stored back onto the KV entry (kept, never deleted, so a later ticket
-  purchase can't resubscribe someone). They show as a red badge in **/admin/mailing-list**.
+  purchase can't resubscribe someone). They show as a red badge in **Legends Admin → Mailing List** (`https://admin.djkmdlegends.com/mailing-list`).
 
 ## 2. Prerequisites (agentsecrets)
 
