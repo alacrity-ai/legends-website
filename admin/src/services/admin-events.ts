@@ -18,6 +18,17 @@ export interface EventDraftInput {
   endTime: string; // ISO 8601 with offset
   tickets: TicketInput[];
   capacity?: number | null;
+  /** Reserved seating (v0.5): chart to snapshot onto the show; null/absent = general admission. */
+  seatingChartId?: string | null;
+}
+
+/** Snapshot summary on a show (the admin list omits the layout itself). */
+export interface EventSeatingSummary {
+  chartId: string;
+  chartName: string;
+  chartRevision: number;
+  seatCount: number;
+  attachedAt: string;
 }
 
 export interface CreatedEvent {
@@ -45,6 +56,8 @@ export interface ManagedEvent {
   remaining: number | null;
   createdAt: string;
   source: 'form' | 'google-calendar';
+  /** Present on reserved-seating shows (v0.5). */
+  seating?: EventSeatingSummary;
 }
 
 export async function createEvent(
@@ -147,6 +160,8 @@ export interface EventPatchInput {
   tickets?: TicketInput[];
   capacity?: number | null;
   soldOut?: boolean;
+  /** Attach (`c_…`), swap, or detach (`null`) the seating chart; 409 once tickets have sold. */
+  seatingChartId?: string | null;
   /** Base64 data URL to replace the image. */
   image?: string;
   /** Set true to remove the existing image. */
@@ -160,6 +175,12 @@ export async function updateEvent(id: string, patch: EventPatchInput): Promise<M
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
   });
+  return data.event;
+}
+
+/** Re-snapshot the master seating chart onto a show (only while nothing has sold). */
+export async function resyncSeating(id: string): Promise<ManagedEvent> {
+  const data = await authedRequest<{ event: ManagedEvent }>(`/api/admin/events/${id}/seating/resync`, { method: 'POST' });
   return data.event;
 }
 

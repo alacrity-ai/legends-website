@@ -188,6 +188,11 @@
   font-weight: 600;
 }
 
+.seatingPill {
+  border-color: rgba(212, 175, 55, 0.45);
+  background: rgba(212, 175, 55, 0.08);
+}
+
 /* ── Toolbar (one consistent button system) ───────────────── */
 
 .toolbar {

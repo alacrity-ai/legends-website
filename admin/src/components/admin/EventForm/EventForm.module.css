@@ -185,6 +185,27 @@
   text-align: center;
 }
 
+.hintLeft {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.hintLeft strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.errorInline {
+  color: var(--color-error);
+  font-size: var(--text-sm);
+}
+
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ── Success ─────────────────────────────────────────────── */
 
 .success {

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { createEvent } from '../../../services/admin-events.ts';
 import { UnauthorizedError } from '../../../services/guestlist.ts';
 import { toEasternIso } from '../../../utils/eastern-time.ts';
+import SeatingChartPicker from './SeatingChartPicker.tsx';
 import styles from './EventForm.module.css';
 
 type Status = 'idle' | 'submitting' | 'success' | 'error';
@@ -27,6 +28,8 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
   const [endLocal, setEndLocal] = useState('');
   const [tickets, setTickets] = useState<TicketRow[]>([{ ticketType: '', price: '' }]);
   const [capacity, setCapacity] = useState('');
+  const [seatingChartId, setSeatingChartId] = useState<string | null>(null);
+  const [seatCount, setSeatCount] = useState<number | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -70,7 +73,7 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
         return `Enter a valid price for "${t.ticketType.trim()}".`;
     }
 
-    if (capacity.trim()) {
+    if (!seatingChartId && capacity.trim()) {
       const cap = Number(capacity);
       if (!Number.isInteger(cap) || cap < 1)
         return 'Capacity must be a positive whole number (or leave it blank for unlimited).';
@@ -107,7 +110,8 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
             ticketType: t.ticketType.trim(),
             price: Number(t.price),
           })),
-          capacity: capacity.trim() ? Number(capacity) : null,
+          capacity: seatingChartId ? seatCount : capacity.trim() ? Number(capacity) : null,
+          seatingChartId,
         },
         imageFile as File,
       );
@@ -132,6 +136,8 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
     setEndLocal('');
     setTickets([{ ticketType: '', price: '' }]);
     setCapacity('');
+    setSeatingChartId(null);
+    setSeatCount(null);
     onImageChange(null);
     setStatus('idle');
     setError('');
@@ -271,21 +277,32 @@ export default function EventForm({ onUnauthorized }: EventFormProps) {
         </button>
       </fieldset>
 
+      <SeatingChartPicker
+        value={seatingChartId}
+        onChange={(id, seats) => {
+          setSeatingChartId(id);
+          setSeatCount(seats);
+        }}
+        disabled={submitting}
+        onUnauthorized={onUnauthorized}
+      />
+
       <label className={styles.field}>
-        <span className={styles.label}>Capacity (optional)</span>
+        <span className={styles.label}>{seatingChartId ? 'Capacity' : 'Capacity (optional)'}</span>
         <input
           className={styles.input}
           type="number"
           min="1"
           step="1"
-          value={capacity}
+          value={seatingChartId ? String(seatCount ?? '') : capacity}
           onChange={(e) => setCapacity(e.target.value)}
           placeholder="Leave blank for unlimited"
-          disabled={submitting}
+          disabled={submitting || Boolean(seatingChartId)}
         />
         <span className={styles.hint}>
-          Total tickets across all types. The show flips to “Sold Out” automatically once this
-          many are sold.
+          {seatingChartId
+            ? `Capacity comes from the seating chart (${seatCount ?? '?'} seats).`
+            : 'Total tickets across all types. The show flips to “Sold Out” automatically once this many are sold.'}
         </span>
       </label>
 
