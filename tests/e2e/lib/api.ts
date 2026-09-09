@@ -141,3 +141,45 @@ export function stageThreeLeft(showId: string): void {
 export function stageSoldOut(showId: string): void {
   markSold(showId, [...allOf('o_1', 8), ...allOf('o_2', 8), ...allOf('o_3', 8), ...allOf('o_4', 8), ...allOf('o_5', 6), ...allOf('o_6', 8), ...allOf('o_r', 12)]);
 }
+
+/* ── Purchases through the Square stub ────────────────────────── */
+
+export interface Purchase {
+  holdId?: string;
+  seatLabels?: string[];
+  payUrl: string;
+}
+
+/**
+ * Buy tickets the way the site does, but from Node: hold (seated shows) →
+ * checkout → the stub's pay page → webhook → party on the roster. Returns
+ * once the worker has processed the webhook.
+ */
+export async function purchase(showId: string, qty: number, buyer: { name: string; email?: string }, ticketType = 'Show Only'): Promise<Purchase> {
+  let holdId: string | undefined;
+  let seatLabels: string[] | undefined;
+  const info = await api(`/api/events/${showId}/seating?quantity=${qty}`);
+  if (info.status === 200) {
+    const h = await api(`/api/events/${showId}/seats/hold`, { method: 'POST', headers: JSON_H, body: JSON.stringify({ ticketType, quantity: qty }) });
+    if (h.status !== 200) throw new Error(`hold ${h.status}: ${JSON.stringify(h.body)}`);
+    holdId = h.body.holdId;
+    seatLabels = h.body.seatLabels;
+  }
+  const c = await api(`/api/events/${showId}/checkout`, { method: 'POST', headers: JSON_H, body: JSON.stringify({ ticketType, quantity: qty, ...(holdId ? { holdId } : {}) }) });
+  if (c.status !== 200) throw new Error(`checkout ${c.status}: ${JSON.stringify(c.body)}`);
+  const payUrl = c.body.checkoutUrl as string;
+  const form = new URLSearchParams({ name: buyer.name, email: buyer.email ?? 'buyer@example.com' });
+  const paid = await fetch(payUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form, redirect: 'manual' });
+  if (paid.status !== 302) throw new Error(`stub pay ${paid.status}: ${await paid.text()}`);
+  // The webhook returns 200 before its waitUntil work lands; poll the roster.
+  for (let i = 0; i < 40; i++) {
+    const g = await admin(`/api/admin/events/${showId}/guests`);
+    if (g.body.parties?.some((p: { firstName: string; lastName: string }) => `${p.firstName} ${p.lastName}`.trim() === buyer.name)) break;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  return { holdId, seatLabels, payUrl };
+}
+
+export async function guests(showId: string): Promise<any> {
+  return (await admin(`/api/admin/events/${showId}/guests`)).body;
+}

@@ -39,6 +39,8 @@ export interface Env {
   SQUARE_ACCESS_TOKEN: string;
   SQUARE_LOCATION_ID: string;
   SQUARE_ENVIRONMENT: 'sandbox' | 'production';
+  /** Test/dev only: point the Square client at a stub (e2e runs `--var SQUARE_API_BASE:http://localhost:8798`). */
+  SQUARE_API_BASE?: string;
   SQUARE_WEBHOOK_SIGNATURE_KEY?: string;
   /** HMAC secret for mailing-list unsubscribe tokens (agentsecrets: legends_unsubscribe_secret). */
   UNSUBSCRIBE_SECRET?: string;
@@ -122,6 +124,10 @@ export interface Party {
   purchases: Purchase[];
   orderDate: string;
   notes: string | null;
+  /** Reserved seating (v0.5): the party's seat ids, labels and whether all were secured. */
+  seats?: string[];
+  seatLabels?: string[];
+  seatStatus?: PartySeatStatus;
 }
 
 export interface CheckinRecord {

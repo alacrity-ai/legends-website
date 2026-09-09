@@ -3,6 +3,7 @@ import type { Env } from '../types.ts';
 const SQUARE_API_VERSION = '2025-01-23';
 
 function apiBase(env: Env): string {
+  if (env.SQUARE_API_BASE) return env.SQUARE_API_BASE.replace(/\/$/, '');
   return env.SQUARE_ENVIRONMENT === 'production'
     ? 'https://connect.squareup.com'
     : 'https://connect.squareupsandbox.com';

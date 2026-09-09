@@ -27,6 +27,14 @@ export default function PartyRow({ party, checkedIn, onClick }: PartyRowProps) {
       <span className={styles.left}>
         {checkedIn && <span className={styles.check} aria-hidden="true">✓</span>}
         <span className={styles.name}>{fullName || party.email}</span>
+        {party.seatStatus === 'unassigned' ? (
+          <span className={`${styles.seats} ${styles.seatsWarn}`}>needs seats</span>
+        ) : party.seatLabels && party.seatLabels.length > 0 ? (
+          <span className={styles.seats}>
+            {party.seatLabels.join(', ')}
+            {party.seatStatus === 'partial' && ' · needs more'}
+          </span>
+        ) : null}
       </span>
       <span className={styles.right}>
         <span className={styles.qty}>{party.quantity}×</span>

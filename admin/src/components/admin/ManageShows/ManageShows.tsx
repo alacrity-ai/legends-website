@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   deleteEvent,
   listEvents,
-  resyncSeating,
   setSoldOut,
   type ManagedEvent,
 } from '../../../services/admin-events.ts';
@@ -10,6 +9,7 @@ import { UnauthorizedError } from '../../../services/guestlist.ts';
 import { downloadDataUrl, qrPngDataUrl, slugify } from '../../../utils/qr.ts';
 import EditShow from './EditShow.tsx';
 import ConfirmModal from './ConfirmModal.tsx';
+import SeatingModal from './SeatingModal.tsx';
 import styles from './ManageShows.module.css';
 
 interface ManageShowsProps {
@@ -49,9 +49,9 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [resyncingId, setResyncingId] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<ManagedEvent | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<ManagedEvent | null>(null);
+  const [seatingTarget, setSeatingTarget] = useState<ManagedEvent | null>(null);
 
   const handleSaved = useCallback((updated: ManagedEvent) => {
     const withRemaining: ManagedEvent = {
@@ -100,38 +100,25 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
     [onUnauthorized],
   );
 
-  const handleResync = useCallback(
-    async (ev: ManagedEvent) => {
-      setResyncingId(ev.id);
-      try {
-        const updated = await resyncSeating(ev.id);
-        setEvents((prev) =>
-          prev
-            ? prev.map((e) =>
-                e.id === ev.id
-                  ? {
-                      ...e,
-                      seating: updated.seating,
-                      capacity: updated.capacity,
-                      soldOut: updated.soldOut,
-                      remaining: updated.capacity != null ? Math.max(0, updated.capacity - (updated.sold ?? 0)) : null,
-                    }
-                  : e,
-              )
-            : prev,
-        );
-      } catch (err) {
-        if (err instanceof UnauthorizedError) {
-          onUnauthorized();
-          return;
-        }
-        alert(err instanceof Error ? err.message : 'Failed to re-sync seating');
-      } finally {
-        setResyncingId(null);
-      }
-    },
-    [onUnauthorized],
-  );
+  // Re-sync moved into the Seating chart modal (P4); it reports back here.
+  const handleResynced = useCallback((updated: ManagedEvent) => {
+    setEvents((prev) =>
+      prev
+        ? prev.map((e) =>
+            e.id === updated.id
+              ? {
+                  ...e,
+                  seating: updated.seating,
+                  capacity: updated.capacity,
+                  soldOut: updated.soldOut,
+                  remaining: updated.capacity != null ? Math.max(0, updated.capacity - (updated.sold ?? 0)) : null,
+                }
+              : e,
+          )
+        : prev,
+    );
+    setSeatingTarget((cur) => (cur && cur.id === updated.id ? { ...cur, seating: updated.seating, capacity: updated.capacity } : cur));
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -305,17 +292,6 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
                   >
                     Edit
                   </button>
-                  {ev.seating && sold === 0 && (
-                    <button
-                      type="button"
-                      className={`${styles.btn} ${styles.btnGhost}`}
-                      onClick={() => void handleResync(ev)}
-                      disabled={resyncingId === ev.id}
-                      title="Re-copy the current master layout onto this show (only possible before any ticket sells)"
-                    >
-                      {resyncingId === ev.id ? 'Syncing…' : 'Re-sync chart'}
-                    </button>
-                  )}
                   <button
                     type="button"
                     className={`${styles.btn} ${styles.btnGhost}`}
@@ -328,6 +304,16 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
                         ? 'Mark available'
                         : 'Mark sold out'}
                   </button>
+                  {ev.seating && (
+                    <button
+                      type="button"
+                      className={`${styles.btn} ${styles.btnGhost}`}
+                      onClick={() => setSeatingTarget(ev)}
+                      title="Who sits where, live"
+                    >
+                      Seating chart
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={`${styles.btn} ${styles.btnDanger}`}
@@ -344,6 +330,15 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
           );
         })}
       </ul>
+
+      {seatingTarget && (
+        <SeatingModal
+          event={seatingTarget}
+          onClose={() => setSeatingTarget(null)}
+          onResynced={handleResynced}
+          onUnauthorized={onUnauthorized}
+        />
+      )}
 
       {confirmTarget && (
         <ConfirmModal

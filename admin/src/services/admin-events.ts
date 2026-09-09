@@ -1,5 +1,6 @@
 import { clearPasscode, getPasscode, UnauthorizedError } from './guestlist.ts';
 import type { CheckinMap, Party } from '../types/guestlist.ts';
+import type { SeatingChart } from '@seating/types.ts';
 
 import { apiUrl } from './api-base.ts';
 
@@ -122,9 +123,17 @@ export async function deleteEvent(id: string): Promise<void> {
 
 /* ── Auto-roster door check-in (v0.3) ─────────────────────────── */
 
+/** One seat on the door chart: free, mid-checkout, or sold to `partyId`. */
+export interface SeatOccupancy {
+  status: 'available' | 'held' | 'sold';
+  partyId?: string;
+}
+
 export interface EventGuests {
   parties: Party[];
   checkedIn: CheckinMap;
+  /** Present for reserved-seating shows (v0.5): the snapshot layout + live seat state. */
+  seating?: { layout: SeatingChart; seats: Record<string, SeatOccupancy> };
 }
 
 /** Auto-built roster + check-in state for one event. */

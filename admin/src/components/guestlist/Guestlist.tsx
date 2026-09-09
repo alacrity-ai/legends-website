@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CheckinMap, Party } from '../../types/guestlist.ts';
 import {
   UnauthorizedError,
@@ -14,16 +14,33 @@ import {
   eventUncheck,
   getEventGuests,
   listEvents,
+  type EventGuests,
   type ManagedEvent,
 } from '../../services/admin-events.ts';
 import SignIn from './SignIn.tsx';
 import SearchBar from './SearchBar.tsx';
 import PartyList from './PartyList.tsx';
 import CheckInModal from './CheckInModal.tsx';
+import OccupancyChart from './OccupancyChart.tsx';
+import { occupancyCounts } from './occupancy.ts';
 import { printCheckinSheet } from './print-sheet.ts';
 import styles from './Guestlist.module.css';
 
 type AuthState = 'signed-out' | 'signed-in';
+
+/** Roster presentation for reserved-seating shows (v0.5 P4). */
+type RosterView = 'list' | 'chart';
+const VIEW_KEY = 'guestlist:view';
+/** Chart view refreshes itself so a second phone sees check-ins without touching anything. */
+const POLL_MS = 8000;
+
+function storedView(): RosterView {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'chart' ? 'chart' : 'list';
+  } catch {
+    return 'list';
+  }
+}
 
 /** What the door staff picked to check people into. */
 type Selection =
@@ -70,6 +87,19 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
   const [query, setQuery] = useState('');
   const [selectedParty, setSelectedParty] = useState<Party | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [seating, setSeating] = useState<NonNullable<EventGuests['seating']> | null>(null);
+  const [view, setView] = useState<RosterView>(storedView);
+  /** Parties with a check-in / undo in flight: a poll must not overwrite their optimistic state. */
+  const busyRef = useRef(new Set<string>());
+
+  const changeView = useCallback((next: RosterView) => {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // private mode — the choice just won't persist
+    }
+  }, []);
 
   useEffect(() => {
     document.title = 'Check-in · DJKMD Legends';
@@ -115,6 +145,7 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
   const chooseSelection = useCallback((sel: Selection | null) => {
     setParties(null);
     setCheckedIn({});
+    setSeating(null);
     setQuery('');
     setSelection(sel);
   }, []);
@@ -125,13 +156,14 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
     let cancelled = false;
     (async () => {
       try {
-        const data =
+        const data: EventGuests =
           selection.kind === 'event'
             ? await getEventGuests(selection.id)
             : await getShow(selection.id);
         if (cancelled) return;
         setParties(data.parties);
         setCheckedIn(data.checkedIn);
+        setSeating(data.seating ?? null);
         setLoadError(null);
       } catch (err) {
         if (cancelled) return;
@@ -146,6 +178,57 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
       cancelled = true;
     };
   }, [selection]);
+
+  // Silent refresh for the chart: server state wins except for parties whose
+  // check-in is still in flight on this phone.
+  const refetch = useCallback(async () => {
+    if (!selection || selection.kind !== 'event') return;
+    try {
+      const data = await getEventGuests(selection.id);
+      setParties(data.parties);
+      setSeating(data.seating ?? null);
+      setCheckedIn((prev) => {
+        const next: CheckinMap = { ...data.checkedIn };
+        for (const id of busyRef.current) {
+          if (prev[id]) next[id] = prev[id];
+          else delete next[id];
+        }
+        return next;
+      });
+    } catch (err) {
+      if (err instanceof UnauthorizedError) setAuth('signed-out');
+      // any other hiccup: keep what we have, the next tick will try again
+    }
+  }, [selection]);
+
+  const hasSeating = seating !== null;
+  useEffect(() => {
+    if (view !== 'chart' || !hasSeating || !selection || selection.kind !== 'event') return;
+    let timer: number | null = null;
+    const start = () => {
+      if (timer === null) timer = window.setInterval(() => void refetch(), POLL_MS);
+    };
+    const stop = () => {
+      if (timer !== null) {
+        window.clearInterval(timer);
+        timer = null;
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void refetch();
+        start();
+      } else {
+        stop();
+      }
+    };
+    if (document.visibilityState === 'visible') start();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [view, hasSeating, selection, refetch]);
 
   const handleSignedIn = useCallback(() => setAuth('signed-in'), []);
 
@@ -189,13 +272,15 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
       .filter((p) => checkedIn[p.id])
       .reduce((s, p) => s + p.quantity, 0);
     const checkedInParties = parties.filter((p) => checkedIn[p.id]).length;
-    return { totalParties: parties.length, totalTickets, checkedInParties, checkedInTickets };
-  }, [parties, checkedIn]);
+    const seats = seating ? occupancyCounts(seating.layout, seating.seats, checkedIn) : null;
+    return { totalParties: parties.length, totalTickets, checkedInParties, checkedInTickets, seats };
+  }, [parties, checkedIn, seating]);
 
   const handleCheckIn = useCallback(
     async (party: Party) => {
       if (!selection) return;
       const now = new Date().toISOString();
+      busyRef.current.add(party.id);
       setCheckedIn((prev) => ({ ...prev, [party.id]: now }));
       try {
         const at =
@@ -214,6 +299,8 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
           return;
         }
         alert(err instanceof Error ? err.message : 'Failed to check in');
+      } finally {
+        busyRef.current.delete(party.id);
       }
     },
     [selection],
@@ -247,6 +334,7 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
     async (party: Party) => {
       if (!selection) return;
       const previousAt = checkedIn[party.id];
+      busyRef.current.add(party.id);
       setCheckedIn((prev) => {
         const next = { ...prev };
         delete next[party.id];
@@ -262,6 +350,8 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
           return;
         }
         alert(err instanceof Error ? err.message : 'Failed to undo check-in');
+      } finally {
+        busyRef.current.delete(party.id);
       }
     },
     [selection, checkedIn],
@@ -403,7 +493,27 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
           </div>
         </div>
         <h1 className={styles.title}>{selection.label}</h1>
-        <SearchBar value={query} onChange={setQuery} />
+        {seating && (
+          <div className={styles.segmented} role="group" aria-label="Roster view">
+            <button
+              type="button"
+              className={view === 'list' ? `${styles.segment} ${styles.segmentOn}` : styles.segment}
+              aria-pressed={view === 'list'}
+              onClick={() => changeView('list')}
+            >
+              List
+            </button>
+            <button
+              type="button"
+              className={view === 'chart' ? `${styles.segment} ${styles.segmentOn}` : styles.segment}
+              aria-pressed={view === 'chart'}
+              onClick={() => changeView('chart')}
+            >
+              Chart
+            </button>
+          </div>
+        )}
+        {(!seating || view === 'list') && <SearchBar value={query} onChange={setQuery} />}
         {stats && (
           <div className={styles.stats} aria-live="polite">
             <span>
@@ -412,6 +522,11 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
             <span>
               <strong>{stats.checkedInTickets}</strong> / {stats.totalTickets} tickets
             </span>
+            {stats.seats && (
+              <span>
+                <strong>{stats.seats.arrived}</strong> / {stats.seats.sold} seats arrived
+              </span>
+            )}
           </div>
         )}
       </header>
@@ -419,11 +534,23 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
       <main className={styles.main}>
         {loadError && <p className={styles.error}>{loadError}</p>}
         {!parties && !loadError && <p className={styles.empty}>Loading roster…</p>}
-        {parties && parties.length === 0 && (
-          <p className={styles.empty}>No purchases yet for this show.</p>
-        )}
-        {parties && parties.length > 0 && (
-          <PartyList parties={filteredParties} checkedIn={checkedIn} onSelect={setSelectedParty} />
+        {parties && seating && view === 'chart' ? (
+          <OccupancyChart
+            layout={seating.layout}
+            seats={seating.seats}
+            checkedIn={checkedIn}
+            parties={parties}
+            onPartyTap={setSelectedParty}
+          />
+        ) : (
+          <>
+            {parties && parties.length === 0 && (
+              <p className={styles.empty}>No purchases yet for this show.</p>
+            )}
+            {parties && parties.length > 0 && (
+              <PartyList parties={filteredParties} checkedIn={checkedIn} onSelect={setSelectedParty} />
+            )}
+          </>
         )}
       </main>
 

@@ -48,7 +48,14 @@ function sortedByLastName(parties: Party[]): Party[] {
   });
 }
 
-function partyRow(party: Party, checkedInAt: string | undefined): string {
+function seatsCell(party: Party): string {
+  if (party.seatStatus === 'unassigned') return 'needs seats';
+  const labels = party.seatLabels ?? [];
+  if (!labels.length) return '';
+  return labels.join(', ') + (party.seatStatus === 'partial' ? ' (+more)' : '');
+}
+
+function partyRow(party: Party, checkedInAt: string | undefined, withSeats: boolean): string {
   const name =
     `${party.lastName}, ${party.firstName}`.replace(/^, |, $/, '').trim() ||
     party.email;
@@ -64,18 +71,20 @@ function partyRow(party: Party, checkedInAt: string | undefined): string {
       <tr>
         <td class="box-cell"><span class="box">${checkedInAt ? '&#10003;' : ''}</span></td>
         <td class="name">${escapeHtml(name)}</td>
-        <td class="qty">${party.quantity}</td>
+        <td class="qty">${party.quantity}</td>${withSeats ? `
+        <td class="seats">${escapeHtml(seatsCell(party))}</td>` : ''}
         <td class="arrived"><span class="blank"></span> of ${party.quantity}</td>
         <td class="notes">${escapeHtml(noteBits.join(' · '))}</td>
       </tr>`;
 }
 
-function walkUpRow(): string {
+function walkUpRow(withSeats: boolean): string {
   return `
       <tr>
         <td class="box-cell"><span class="box"></span></td>
         <td></td>
-        <td></td>
+        <td></td>${withSeats ? `
+        <td></td>` : ''}
         <td class="arrived"><span class="blank"></span> of ___</td>
         <td></td>
       </tr>`;
@@ -84,6 +93,8 @@ function walkUpRow(): string {
 export function buildSheetHtml(opts: PrintSheetOptions): string {
   const parties = sortedByLastName(opts.parties);
   const totalTickets = parties.reduce((s, p) => s + p.quantity, 0);
+  // Reserved-seating shows get a Seats column after the quantity.
+  const withSeats = parties.some((p) => p.seatStatus !== undefined);
   const printedAt = new Date().toLocaleString(undefined, {
     month: 'short',
     day: 'numeric',
@@ -132,6 +143,8 @@ export function buildSheetHtml(opts: PrintSheetOptions): string {
   .col-qty { width: 0.45in; }
   .col-arrived { width: 0.95in; }
   .col-name { width: 2.5in; }
+  .col-seats { width: 1.4in; }
+  .seats { font-size: 9pt; white-space: normal; }
   .box-cell, .qty { text-align: center; }
   .name { font-weight: 600; }
   .box {
@@ -170,13 +183,14 @@ export function buildSheetHtml(opts: PrintSheetOptions): string {
       <tr>
         <th class="col-in">In</th>
         <th class="col-name">Guest (last, first)</th>
-        <th class="col-qty">#</th>
+        <th class="col-qty">#</th>${withSeats ? `
+        <th class="col-seats">Seats</th>` : ''}
         <th class="col-arrived">Arrived</th>
         <th>Notes</th>
       </tr>
     </thead>
-    <tbody>${parties.map((p) => partyRow(p, opts.checkedIn[p.id])).join('')}
-      <tr class="walkups"><td colspan="5">Walk-ups / door sales</td></tr>${Array.from({ length: WALK_UP_ROWS }, walkUpRow).join('')}
+    <tbody>${parties.map((p) => partyRow(p, opts.checkedIn[p.id], withSeats)).join('')}
+      <tr class="walkups"><td colspan="${withSeats ? 6 : 5}">Walk-ups / door sales</td></tr>${Array.from({ length: WALK_UP_ROWS }, () => walkUpRow(withSeats)).join('')}
     </tbody>
   </table>
 </body>
