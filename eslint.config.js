@@ -20,4 +20,9 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Test code reads JSON bodies straight off the wire; `any` is the honest type there.
+    files: ['worker/test/**/*.ts', 'tests/e2e/**/*.ts'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
 ])

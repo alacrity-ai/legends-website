@@ -1,17 +1,18 @@
 .PHONY: help dev dev-site dev-worker dev-admin build build-admin lint preview install clean \
        docker-up docker-down docker-build docker-logs \
-       deploy-worker deploy-admin test-shared d1-migrate-local d1-migrate-remote
+       deploy-worker deploy-admin test test-shared test-worker test-e2e d1-migrate-local d1-migrate-remote
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
 # ── Local development ──────────────────────────────────────
 
-install: ## Install dependencies (site + worker + admin + shared tests)
+install: ## Install dependencies (site + worker + admin + shared tests + e2e)
 	npm install
 	cd worker && npm install
 	cd admin && npm install
 	cd shared && npm install
+	cd tests/e2e && npm install && npx playwright install chromium
 
 dev: ## Start site and worker locally (requires two terminals — use docker-up for one command)
 	@echo "Run 'make dev-site' and 'make dev-worker' in separate terminals,"
@@ -35,8 +36,16 @@ build-admin: ## Production build of the admin PWA (outputs to admin/dist/)
 lint: ## Run ESLint
 	npm run lint
 
-test-shared: ## Unit tests for shared/seating (geometry, ids, validation)
+test: test-shared test-worker test-e2e ## Every suite: shared unit → worker integration → browser e2e
+
+test-shared: ## Unit tests for shared/seating (geometry, ids, validation, seat assignment)
 	cd shared && npx vitest run
+
+test-worker: ## Worker integration tests inside workerd (local D1/KV/R2, Square mocked)
+	cd worker && npx vitest run
+
+test-e2e: ## Playwright: buyer flow + door console against a prod build of site/admin + wrangler dev (ports 8797/5183/5184)
+	cd tests/e2e && npx playwright test
 
 preview: ## Preview the production build locally
 	npm run preview

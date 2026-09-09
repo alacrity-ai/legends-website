@@ -1,0 +1,14 @@
+{
+  "name": "legends-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Browser tests for the buyer flow and the door console, driven against a production build of the site + a local wrangler dev worker (own state dir, ports 8797 / 5183 / 5184). `make test-e2e`.",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@types/node": "^24.12.0"
+  }
+}
