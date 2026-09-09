@@ -31,7 +31,7 @@ import { fetchUpcomingEvents } from './services/google-calendar.ts';
 import { buildSalesReport, buildShowBuyers } from './sales.ts';
 import { handleAdminCharts } from './charts.ts';
 import { AttachError, assertSeatingMutable, attachChart, detachChart, resyncChart, stripLayout } from './seating/attach.ts';
-import { HOLD_TTL_MS, attachOrderToHold, confirmHold, deleteShowSeats, findHoldByOrder, getHold, holdSeatIds, type HoldRow } from './seating/db.ts';
+import { HOLD_TTL_MS, attachOrderToHold, confirmHold, deleteShowSeats, findHoldByOrder, getHold, holdSeatIds, occupancy, type HoldRow } from './seating/db.ts';
 import { HOLD_ID_RE, handleSeatingPublic } from './seating/holds.ts';
 import { groupSeatIds, objectNoun, seatNumbersPhrase } from '@seating/assign.ts';
 import { seatLabel } from '@seating/ids.ts';
@@ -1074,6 +1074,8 @@ function partyRecordToParty(r: PartyRecord): Party {
     purchases: [{ variation: 'Unknown', quantity: r.quantity }],
     orderDate: r.purchasedAt,
     notes: r.ticketType || null,
+    // Reserved seating (v0.5): present once the webhook has confirmed seats.
+    ...(r.seats ? { seats: r.seats, seatLabels: r.seatLabels ?? [], seatStatus: r.seatStatus ?? 'assigned' } : {}),
   };
 }
 
@@ -1083,9 +1085,10 @@ async function handleGetEventGuests(
   corsHeaders: Record<string, string>,
   noStore: Record<string, string>,
 ): Promise<Response> {
-  const [partyList, checkinList] = await Promise.all([
+  const [partyList, checkinList, eventRaw] = await Promise.all([
     env.GUESTLIST.list({ prefix: `party:${id}:` }),
     env.GUESTLIST.list({ prefix: `checkin:${id}:` }),
+    env.EVENTS.get(`event:${id}`),
   ]);
 
   const partyRaws = await Promise.all(partyList.keys.map((k) => env.GUESTLIST.get(k.name)));
@@ -1118,7 +1121,18 @@ async function handleGetEventGuests(
     }
   }
 
-  return jsonResponse(200, { parties, checkedIn }, corsHeaders, noStore);
+  // Reserved seating (v0.5 P4): the door chart needs the layout + who sits where.
+  let seating: { layout: EventRecord['seating'] extends infer S ? (S extends { layout: infer L } ? L : never) : never; seats: Record<string, { status: string; partyId?: string }> } | undefined;
+  if (eventRaw) {
+    try {
+      const record = JSON.parse(eventRaw) as EventRecord;
+      if (record.seating) seating = { layout: record.seating.layout, seats: await occupancy(env.SEATING, id) };
+    } catch (err) {
+      console.error('[guests] seating occupancy failed', errorMessage(err));
+    }
+  }
+
+  return jsonResponse(200, { parties, checkedIn, ...(seating ? { seating } : {}) }, corsHeaders, noStore);
 }
 
 async function handleEventCheckin(

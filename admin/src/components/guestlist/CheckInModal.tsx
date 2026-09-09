@@ -71,6 +71,15 @@ export default function CheckInModal({
           <span className={styles.ticketLabel}>{headlineLabel}</span>
         </div>
 
+        {party.seatStatus && (
+          <p className={party.seatStatus === 'assigned' ? styles.seatsLine : `${styles.seatsLine} ${styles.seatsWarn}`} data-testid="party-seats">
+            {party.seatStatus === 'unassigned'
+              ? 'No seats assigned yet'
+              : `Seats: ${(party.seatLabels ?? []).join(', ')}`}
+            {party.seatStatus === 'partial' && ` — needs ${party.quantity - (party.seats?.length ?? 0)} more`}
+          </p>
+        )}
+
         {party.notes && (
           <p className={styles.notes} role="note">
             <span className={styles.notesLabel}>Note</span>

@@ -7,8 +7,10 @@
  *   - a production build of the public site on :5183 (no StrictMode
  *     double-mount, so holds behave exactly like djkmdlegends.com)
  *   - a production build of the admin PWA on :5184
- * Square is never reached: checkout is intercepted in the browser and the
- * worker suites (worker/test) cover the Square round trip with mocks.
+ *   - a tiny Square stub on :8798 (lib/square-stub.mjs) that mints links,
+ *     serves a one-button "checkout" page and fires the signed webhook, so a
+ *     purchase can run end to end offline
+ * Real Square is never reached.
  */
 import { defineConfig } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +19,7 @@ const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 export const WORKER = 'http://localhost:8797';
 export const SITE = 'http://localhost:5183';
 export const ADMIN = 'http://localhost:5184';
+export const SQUARE_STUB = 'http://localhost:8798';
 export const PASSCODE = 'e2e-passcode';
 
 const workerVars = [
@@ -26,6 +29,7 @@ const workerVars = [
   'SQUARE_ACCESS_TOKEN:e2e-not-a-token',
   'SQUARE_LOCATION_ID:L-E2E',
   'SQUARE_WEBHOOK_SIGNATURE_KEY:e2e-whsec',
+  `SQUARE_API_BASE:${SQUARE_STUB}`,
 ]
   .map((v) => `--var ${v}`)
   .join(' ');
@@ -51,6 +55,12 @@ export default defineConfig({
     },
   ],
   webServer: [
+    {
+      command: 'node lib/square-stub.mjs',
+      url: `${SQUARE_STUB}/_test/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
     {
       command: `npx wrangler d1 migrations apply legends-seating --local --persist-to .wrangler/e2e-state && npx wrangler dev --local --port 8797 --persist-to .wrangler/e2e-state ${workerVars}`,
       cwd: `${ROOT}worker`,

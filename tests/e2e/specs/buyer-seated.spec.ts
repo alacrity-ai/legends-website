@@ -6,6 +6,7 @@
 import { expect, test } from '@playwright/test';
 import { activeHolds, createChart, createShow, deleteChart, deleteShow, seatStatuses, stageBusyNight, stageSoldOut, stageThreeLeft, type Show } from '../lib/api.ts';
 import { dialog, interceptCheckout, openAndBuy, sheet } from '../lib/buyer.ts';
+import { shot } from '../lib/shots.ts';
 
 let chartId: string;
 let show: Show;
@@ -36,7 +37,7 @@ test('party of 3, empty room: seated together at the front table, then checkout 
   await expect(dialog(page).getByText('Held for you for 10 minutes.')).toBeVisible();
   await expect(s.legend).toBeVisible();
   await expect(s.legend).not.toContainText('taken');
-  await testInfo.attach('sheet', { body: await page.screenshot(), contentType: 'image/png' });
+  await shot(page, testInfo, 'sheet');
 
   await s.continueBtn.click();
   await page.waitForURL(/purchase=intercepted/);
@@ -61,7 +62,7 @@ test('Change table lists only tables that seat the party, nearest first, and mov
   expect(rows[0]).toMatch(/^Table [13] nearest the stage · 8 seats free/);
   expect(rows.some((r) => r.startsWith('Table 2'))).toBe(false);
   expect(rows[rows.length - 1]).toMatch(/^Row A/);
-  await testInfo.attach('change-table', { body: await page.screenshot(), contentType: 'image/png' });
+  await shot(page, testInfo, 'change-table');
 
   await s.tableRows.filter({ hasText: 'Table 6' }).click();
   await expect(s.title).toHaveText("We've saved seats for your party together at Table 6.");
@@ -102,7 +103,7 @@ test('busy night: taken seats are drawn dimmed with a legend, and a pair still s
   await expect(s.seats('selected')).toHaveCount(2);
   await expect(s.seats('sold')).toHaveCount(45);
   await expect(s.legend).toContainText('taken');
-  await testInfo.attach('busy-night', { body: await page.screenshot(), contentType: 'image/png' });
+  await shot(page, testInfo, 'busy-night');
   await s.changeBtn.click();
   await expect(s.tableRows.first()).toBeVisible();
   const rows = (await s.tableRows.allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
@@ -116,7 +117,7 @@ test('no single table can take 6: the party is split across neighbouring tables 
   await expect(s.title).toHaveText("We've saved seats for your party at Table 4 and Row A, right beside each other.");
   await expect(s.subtitle).toContainText('Seats T4-5, T4-6, T4-7, T4-8, A9, A10');
   await expect(s.seats('selected')).toHaveCount(6);
-  await testInfo.attach('split', { body: await page.screenshot(), contentType: 'image/png' });
+  await shot(page, testInfo, 'split');
   await expect(s.continueBtn).toBeEnabled();
 });
 
@@ -126,7 +127,7 @@ test('only 3 seats left, party of 5: an honest message and a way back', async ({
   const s = await sheet(page);
   await expect(s.title).toHaveText("Sorry — we can't seat a party of 5 together right now");
   await expect(dialog(page).getByText('Only 3 seats are left for this show — try 3 or fewer tickets.')).toBeVisible();
-  await testInfo.attach('not-enough', { body: await page.screenshot(), contentType: 'image/png' });
+  await shot(page, testInfo, 'not-enough');
   expect(activeHolds(show.id)).toBe(0);
   await s.backBtn.click();
   await expect(dialog(page).locator('button[aria-label="Increase Show Only quantity"]')).toBeVisible();

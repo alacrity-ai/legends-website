@@ -275,3 +275,31 @@ export async function confirmHold(db: D1Database, hold: HoldRow, partyKey: strin
     .all<{ seat_id: string }>();
   return (won.results ?? []).map((r) => r.seat_id);
 }
+
+/* ── P4: live occupancy ───────────────────────────────────────── */
+
+export interface SeatOccupancy {
+  status: 'available' | 'held' | 'sold';
+  /** The paymentId of the party sitting here (sold seats only). */
+  partyId?: string;
+}
+
+/** Every seat of a show with who holds it; an expired hold reads as available. */
+export async function occupancy(db: D1Database, showId: string, now = Date.now()): Promise<Record<string, SeatOccupancy>> {
+  const rows = await db
+    .prepare(`SELECT seat_id, status, hold_expires_at, party_key FROM seats WHERE show_id = ?`)
+    .bind(showId)
+    .all<{ seat_id: string; status: string; hold_expires_at: number | null; party_key: string | null }>();
+  const prefix = `party:${showId}:`;
+  const out: Record<string, SeatOccupancy> = {};
+  for (const r of rows.results ?? []) {
+    if (r.status === 'sold') {
+      out[r.seat_id] = { status: 'sold', ...(r.party_key?.startsWith(prefix) ? { partyId: r.party_key.slice(prefix.length) } : {}) };
+    } else if (r.status === 'held' && r.hold_expires_at !== null && r.hold_expires_at >= now) {
+      out[r.seat_id] = { status: 'held' };
+    } else {
+      out[r.seat_id] = { status: 'available' };
+    }
+  }
+  return out;
+}

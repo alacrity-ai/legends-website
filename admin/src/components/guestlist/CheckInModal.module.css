@@ -230,3 +230,15 @@
 .cancel:focus-visible:not(:disabled) {
   border-color: var(--color-accent);
 }
+
+/* Reserved seating (v0.5): where the party sits. */
+.seatsLine {
+  margin: 0 0 0.75rem;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.seatsWarn {
+  color: var(--color-error);
+}
