@@ -26,6 +26,17 @@ import {
 } from '@seating/index.ts';
 
 const CHART_PREFIX = 'chart:';
+/**
+ * Name index: `chartname:<lower-cased name>` → chart id. KV `list()` is
+ * eventually consistent (a chart created a moment ago can be missing from
+ * the listing for up to a minute), so uniqueness is checked with a `get()`
+ * on this key instead of scanning the list.
+ */
+const NAME_PREFIX = 'chartname:';
+
+function nameKey(name: string): string {
+  return `${NAME_PREFIX}${name.trim().toLowerCase()}`;
+}
 
 export interface ChartUsedBy {
   eventId: string;
@@ -87,8 +98,25 @@ async function readChart(env: Env, id: string): Promise<SeatingChart | null> {
   }
 }
 
-async function writeChart(env: Env, chart: SeatingChart): Promise<void> {
+async function writeChart(env: Env, chart: SeatingChart, previousName?: string): Promise<void> {
   await env.EVENTS.put(`${CHART_PREFIX}${chart.id}`, JSON.stringify(chart));
+  if (previousName !== undefined && nameKey(previousName) !== nameKey(chart.name)) {
+    await env.EVENTS.delete(nameKey(previousName));
+  }
+  await env.EVENTS.put(nameKey(chart.name), chart.id);
+}
+
+/** Is `name` already taken by a different chart? Index first, listing as a fallback. */
+async function nameTaken(env: Env, name: string, exceptId?: string): Promise<boolean> {
+  const owner = await env.EVENTS.get(nameKey(name));
+  if (owner) {
+    if (owner === exceptId) return false;
+    // Stale index entry (chart deleted out of band): confirm the owner still exists.
+    if (await env.EVENTS.get(`${CHART_PREFIX}${owner}`)) return true;
+  }
+  const key = name.trim().toLowerCase();
+  const charts = await listChartRecords(env);
+  return charts.some((c) => c.id !== exceptId && c.name.trim().toLowerCase() === key);
 }
 
 export async function listChartRecords(env: Env): Promise<SeatingChart[]> {
@@ -139,12 +167,6 @@ function summarize(chart: SeatingChart, events: EventRecord[]): ChartSummary {
   };
 }
 
-/** Case-insensitive name clash against every other chart. */
-function nameTaken(charts: SeatingChart[], name: string, exceptId?: string): boolean {
-  const key = name.trim().toLowerCase();
-  return charts.some((c) => c.id !== exceptId && c.name.trim().toLowerCase() === key);
-}
-
 /** Parse + validate a draft body; returns a Response on failure. */
 async function readDraft(request: Request, corsHeaders: Record<string, string>): Promise<
   { draft: ChartDraft; revision: number | null } | Response
@@ -187,8 +209,7 @@ async function createChart(request: Request, env: Env, corsHeaders: Record<strin
   if (parsed instanceof Response) return parsed;
   const { draft } = parsed;
 
-  const charts = await listChartRecords(env);
-  if (nameTaken(charts, draft.name)) {
+  if (await nameTaken(env, draft.name)) {
     return jsonResponse(409, { error: `A chart named "${draft.name}" already exists` }, corsHeaders);
   }
 
@@ -236,8 +257,7 @@ async function updateChart(
     );
   }
 
-  const charts = await listChartRecords(env);
-  if (nameTaken(charts, draft.name, id)) {
+  if (await nameTaken(env, draft.name, id)) {
     return jsonResponse(409, { error: `A chart named "${draft.name}" already exists` }, corsHeaders);
   }
 
@@ -248,7 +268,7 @@ async function updateChart(
     revision: existing.revision + 1,
     updatedAt: new Date().toISOString(),
   };
-  await writeChart(env, chart);
+  await writeChart(env, chart, existing.name);
   return jsonResponse(200, { chart }, corsHeaders, NO_STORE);
 }
 
@@ -256,9 +276,8 @@ async function duplicateChart(id: string, env: Env, corsHeaders: Record<string, 
   const source = await readChart(env, id);
   if (!source) return jsonResponse(404, { error: 'Chart not found' }, corsHeaders);
 
-  const charts = await listChartRecords(env);
   let name = `Copy of ${source.name}`.slice(0, 60);
-  for (let n = 2; nameTaken(charts, name); n++) {
+  for (let n = 2; await nameTaken(env, name); n++) {
     const suffix = ` (${n})`;
     name = `Copy of ${source.name}`.slice(0, 60 - suffix.length) + suffix;
   }
@@ -294,5 +313,8 @@ async function deleteChart(id: string, env: Env, corsHeaders: Record<string, str
   }
 
   await env.EVENTS.delete(`${CHART_PREFIX}${id}`);
+  if ((await env.EVENTS.get(nameKey(chart.name))) === id) {
+    await env.EVENTS.delete(nameKey(chart.name));
+  }
   return jsonResponse(200, { ok: true }, corsHeaders, NO_STORE);
 }
