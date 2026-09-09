@@ -17,4 +17,6 @@ export interface CalendarEvent {
   imageUrl?: string | null;
   soldOut?: boolean;
   tickets?: EventTicket[];
+  /** Reserved-seating show (v0.5): buyers pick seats before checkout (P3). */
+  seating?: { seatCount: number };
 }

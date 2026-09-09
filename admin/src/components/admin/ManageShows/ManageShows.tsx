@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   deleteEvent,
   listEvents,
+  resyncSeating,
   setSoldOut,
   type ManagedEvent,
 } from '../../../services/admin-events.ts';
@@ -48,6 +49,7 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [resyncingId, setResyncingId] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<ManagedEvent | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<ManagedEvent | null>(null);
 
@@ -93,6 +95,39 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
         alert(err instanceof Error ? err.message : 'Failed to update sold-out status');
       } finally {
         setTogglingId(null);
+      }
+    },
+    [onUnauthorized],
+  );
+
+  const handleResync = useCallback(
+    async (ev: ManagedEvent) => {
+      setResyncingId(ev.id);
+      try {
+        const updated = await resyncSeating(ev.id);
+        setEvents((prev) =>
+          prev
+            ? prev.map((e) =>
+                e.id === ev.id
+                  ? {
+                      ...e,
+                      seating: updated.seating,
+                      capacity: updated.capacity,
+                      soldOut: updated.soldOut,
+                      remaining: updated.capacity != null ? Math.max(0, updated.capacity - (updated.sold ?? 0)) : null,
+                    }
+                  : e,
+              )
+            : prev,
+        );
+      } catch (err) {
+        if (err instanceof UnauthorizedError) {
+          onUnauthorized();
+          return;
+        }
+        alert(err instanceof Error ? err.message : 'Failed to re-sync seating');
+      } finally {
+        setResyncingId(null);
       }
     },
     [onUnauthorized],
@@ -229,6 +264,12 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
               </div>
 
               <div className={styles.tickets}>
+                {ev.seating && (
+                  <span className={`${styles.ticketPill} ${styles.seatingPill}`} title={`Snapshot of ${ev.seating.chartName} (rev ${ev.seating.chartRevision})`}>
+                    Reserved seating
+                    <span className={styles.ticketPrice}>{ev.seating.chartName} · {ev.seating.seatCount} seats</span>
+                  </span>
+                )}
                 {ev.tickets.map((t) => (
                   <span key={t.ticketType} className={styles.ticketPill}>
                     {t.ticketType}
@@ -264,6 +305,17 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
                   >
                     Edit
                   </button>
+                  {ev.seating && sold === 0 && (
+                    <button
+                      type="button"
+                      className={`${styles.btn} ${styles.btnGhost}`}
+                      onClick={() => void handleResync(ev)}
+                      disabled={resyncingId === ev.id}
+                      title="Re-copy the current master layout onto this show (only possible before any ticket sells)"
+                    >
+                      {resyncingId === ev.id ? 'Syncing…' : 'Re-sync chart'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={`${styles.btn} ${styles.btnGhost}`}

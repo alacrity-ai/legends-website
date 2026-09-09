@@ -56,6 +56,11 @@ which orchestra size, etc.) — see the "discrepancies" note below.
 - `tickets`: 1–10 items, unique `ticketType`, `price` in **US dollars** (e.g. `64.95`).
 - `capacity` *(optional)*: positive integer = total tickets across all types; omit or `null`
   for unlimited. At capacity the show auto-flips to **Sold Out** (via the Square webhook).
+- `seatingChartId` *(optional, v0.5)*: a seating-chart id (`c_xxxxxxxx`, from `GET /api/admin/charts`)
+  to snapshot onto the show for **reserved seating**. `capacity` is then forced to the chart's seat
+  count and the show's seats are materialized in D1. Omit / `null` = general admission. Change or
+  detach later via `PATCH { "seatingChartId": "c_…" | null }` (409 once any ticket has sold);
+  `POST /api/admin/events/:id/seating/resync` re-copies the master layout while `sold = 0`.
 - `image`: JPEG/PNG/WebP, ≤5 MB, sent as a **base64 data URL** (see Step 2). Required at create.
 
 ## Step 2 — Build the request body (image as a data URL)

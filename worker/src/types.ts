@@ -101,6 +101,8 @@ export interface PublicEvent extends CalendarEvent {
   imageUrl?: string | null;
   soldOut?: boolean;
   tickets?: Array<{ ticketType: string; priceCents: number; checkoutUrl?: string }>;
+  /** Present only on reserved-seating shows (v0.5); the layout comes from the no-store seating endpoint. */
+  seating?: { seatCount: number };
 }
 
 export type TicketVariation = 'Show and Meal' | 'Show Only' | 'Unknown';

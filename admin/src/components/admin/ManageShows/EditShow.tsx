@@ -6,6 +6,7 @@ import {
 } from '../../../services/admin-events.ts';
 import { UnauthorizedError } from '../../../services/guestlist.ts';
 import { easternIsoToLocalInput, toEasternIso } from '../../../utils/eastern-time.ts';
+import SeatingChartPicker from '../EventForm/SeatingChartPicker.tsx';
 import styles from '../EventForm/EventForm.module.css';
 
 interface TicketRow {
@@ -43,6 +44,9 @@ export default function EditShow({ event, onCancel, onSaved, onUnauthorized }: E
     event.tickets.map((t) => ({ ticketType: t.ticketType, price: String(t.priceCents / 100) })),
   );
   const [capacity, setCapacity] = useState(event.capacity != null ? String(event.capacity) : '');
+  const [seatingChartId, setSeatingChartId] = useState<string | null>(event.seating?.chartId ?? null);
+  const [seatCount, setSeatCount] = useState<number | null>(event.seating?.seatCount ?? null);
+  const seatingLocked = Boolean(event.seating) && (event.sold ?? 0) > 0;
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -81,7 +85,7 @@ export default function EditShow({ event, onCancel, onSaved, onUnauthorized }: E
         return `Enter a valid price for "${t.ticketType.trim()}".`;
     }
 
-    if (capacity.trim()) {
+    if (!seatingChartId && capacity.trim()) {
       const cap = Number(capacity);
       if (!Number.isInteger(cap) || cap < 1)
         return 'Capacity must be a positive whole number (or leave it blank for unlimited).';
@@ -114,7 +118,8 @@ export default function EditShow({ event, onCancel, onSaved, onUnauthorized }: E
         startTime: toEasternIso(startLocal),
         endTime: toEasternIso(endLocal),
         tickets: tickets.map((t) => ({ ticketType: t.ticketType.trim(), price: Number(t.price) })),
-        capacity: capacity.trim() ? Number(capacity) : null,
+        capacity: seatingChartId ? seatCount : capacity.trim() ? Number(capacity) : null,
+        seatingChartId,
       };
       if (imageFile) patch.image = await readAsDataUrl(imageFile);
 
@@ -241,18 +246,38 @@ export default function EditShow({ event, onCancel, onSaved, onUnauthorized }: E
         </button>
       </fieldset>
 
+      <SeatingChartPicker
+        value={seatingChartId}
+        onChange={(id, seats) => {
+          setSeatingChartId(id);
+          setSeatCount(seats);
+          // Detaching re-enables Capacity, prefilled with the old seat count.
+          if (!id && seatCount != null) setCapacity(String(seatCount));
+        }}
+        disabled={submitting}
+        lockedReason={
+          seatingLocked
+            ? `This show has sold ${event.sold} ticket${event.sold === 1 ? '' : 's'}; seating can no longer be changed.`
+            : null
+        }
+        onUnauthorized={onUnauthorized}
+      />
+
       <label className={styles.field}>
-        <span className={styles.label}>Capacity (optional)</span>
+        <span className={styles.label}>{seatingChartId ? 'Capacity' : 'Capacity (optional)'}</span>
         <input
           className={styles.input}
           type="number"
           min="1"
           step="1"
-          value={capacity}
+          value={seatingChartId ? String(seatCount ?? '') : capacity}
           onChange={(e) => setCapacity(e.target.value)}
           placeholder="Leave blank for unlimited"
-          disabled={submitting}
+          disabled={submitting || Boolean(seatingChartId)}
         />
+        {seatingChartId && (
+          <span className={styles.hintLeft}>Capacity comes from the seating chart ({seatCount ?? '?'} seats).</span>
+        )}
       </label>
 
       <label className={styles.field}>

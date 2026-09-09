@@ -115,7 +115,7 @@ export async function handleAdminCharts(
 
 /* ── storage ─────────────────────────────────────────────────── */
 
-async function readChart(env: Env, id: string): Promise<SeatingChart | null> {
+export async function readChart(env: Env, id: string): Promise<SeatingChart | null> {
   if (!CHART_ID_RE.test(id)) return null;
   const raw = await env.EVENTS.get(`${CHART_PREFIX}${id}`);
   if (!raw) return null;

@@ -30,6 +30,8 @@ import { buildConfirmationEmail } from './templates/confirmation.ts';
 import { fetchUpcomingEvents } from './services/google-calendar.ts';
 import { buildSalesReport, buildShowBuyers } from './sales.ts';
 import { handleAdminCharts } from './charts.ts';
+import { AttachError, assertSeatingMutable, attachChart, detachChart, resyncChart, stripLayout } from './seating/attach.ts';
+import { deleteShowSeats } from './seating/db.ts';
 import { listEventRecords } from './events-store.ts';
 import {
   adminPasscode,
@@ -193,6 +195,7 @@ function eventRecordToPublic(r: EventRecord): PublicEvent {
     description: r.description,
     imageUrl: r.imageKey ? `/api/events/${r.id}/image` : null,
     soldOut: r.soldOut ?? false,
+    ...(r.seating ? { seating: { seatCount: r.seating.seatCount } } : {}),
     tickets: r.tickets.map((t) => ({
       ticketType: t.ticketType,
       priceCents: t.priceCents,
@@ -923,7 +926,8 @@ async function handleAdminEvents(
     if (request.method === 'GET') {
       const records = await listEventRecords(env);
       records.sort((a, b) => b.startTime.localeCompare(a.startTime));
-      const events = records.map((r) => {
+      const events = records.map((record) => {
+        const r = stripLayout(record);
         const sold = r.sold ?? 0;
         const capacity = r.capacity ?? null;
         return {
@@ -956,6 +960,14 @@ async function handleAdminEvents(
       return handleEventUncheck(checkinMatch[1], request, env, corsHeaders);
     }
     return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+  }
+
+  const resyncMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/seating\/resync$/);
+  if (resyncMatch) {
+    if (request.method !== 'POST') {
+      return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+    }
+    return handleResyncSeating(resyncMatch[1], env, corsHeaders, noStore);
   }
 
   const idMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)$/);
@@ -1076,6 +1088,8 @@ async function handleEventUncheck(
 
 interface ParsedCreate {
   draft: EventDraft;
+  /** Seating chart to attach at creation (v0.5); null/absent = general admission. */
+  seatingChartId: string | null;
   imageBytes: ArrayBuffer | ArrayBufferView;
   imageMime: string;
   imageExt: string;
@@ -1115,7 +1129,7 @@ async function parseMultipartCreate(request: Request): Promise<ParsedCreate> {
 
   const payloadRaw = form.get('payload');
   if (typeof payloadRaw !== 'string') throw new Error('payload is required');
-  const draft = parseEventDraft(JSON.parse(payloadRaw));
+  const { seatingChartId = null, ...draft } = parseEventDraft(JSON.parse(payloadRaw));
 
   // FormData.get returns an uploaded file we duck-type (worker FormDataEntryValue omits File).
   const imageEntry: unknown = form.get('image');
@@ -1126,6 +1140,7 @@ async function parseMultipartCreate(request: Request): Promise<ParsedCreate> {
 
   return {
     draft,
+    seatingChartId,
     imageBytes: await imageEntry.arrayBuffer(),
     imageMime: imageEntry.type,
     imageExt,
@@ -1151,7 +1166,7 @@ async function parseJsonCreate(request: Request): Promise<ParsedCreate> {
 
   // Separate the image fields; the rest must match the form's draft contract.
   const { image, imageBase64, imageType, ...rest } = body as Record<string, unknown>;
-  const draft = parseEventDraft(rest);
+  const { seatingChartId = null, ...draft } = parseEventDraft(rest);
 
   const imageInput =
     typeof image === 'string' ? image : typeof imageBase64 === 'string' ? imageBase64 : null;
@@ -1162,7 +1177,7 @@ async function parseJsonCreate(request: Request): Promise<ParsedCreate> {
     imageInput,
     typeof imageType === 'string' ? imageType : undefined,
   );
-  return { draft, imageBytes: decoded.bytes, imageMime: decoded.mime, imageExt: decoded.ext };
+  return { draft, seatingChartId, imageBytes: decoded.bytes, imageMime: decoded.mime, imageExt: decoded.ext };
 }
 
 function decodeBase64Image(
@@ -1209,7 +1224,7 @@ async function finalizeEventCreation(
   corsHeaders: Record<string, string>,
   noStore: Record<string, string>,
 ): Promise<Response> {
-  const { draft, imageBytes, imageMime, imageExt } = parsed;
+  const { draft, seatingChartId, imageBytes, imageMime, imageExt } = parsed;
   const id = crypto.randomUUID();
 
   // Store the image in R2.
@@ -1223,8 +1238,9 @@ async function finalizeEventCreation(
     return jsonResponse(500, { error: 'Failed to store image' }, corsHeaders);
   }
 
-  // Persist the event record (commit point).
-  const record: EventRecord = {
+  // Build the record; a seating chart (v0.5) is snapshotted in and its seats
+  // materialized in D1 BEFORE the single KV write, so the record is written once.
+  let record: EventRecord = {
     id,
     ...draft,
     tickets: draft.tickets, // stored as {ticketType, priceCents} configs
@@ -1234,10 +1250,23 @@ async function finalizeEventCreation(
     createdAt: new Date().toISOString(),
     source: 'form',
   };
+  if (seatingChartId) {
+    try {
+      record = await attachChart(env, record, seatingChartId);
+    } catch (err) {
+      await env.EVENT_IMAGES.delete(imageKey).catch(() => {});
+      const status = err instanceof AttachError ? err.status : 500;
+      if (status === 500) console.error('Seat materialization failed:', errorMessage(err));
+      return jsonResponse(status, { error: status === 500 ? 'Failed to set up seating' : errorMessage(err) }, corsHeaders);
+    }
+  }
+
+  // Persist the event record (commit point).
   try {
     await env.EVENTS.put(`event:${id}`, JSON.stringify(record));
   } catch (err) {
     await env.EVENT_IMAGES.delete(imageKey).catch(() => {});
+    if (record.seating) await deleteShowSeats(env.SEATING, id).catch(() => {});
     console.error('Event KV write failed:', errorMessage(err));
     return jsonResponse(500, { error: 'Failed to save event' }, corsHeaders);
   }
@@ -1287,6 +1316,8 @@ async function handleDeleteEvent(
   if (record.imageKey) {
     await env.EVENT_IMAGES.delete(record.imageKey).catch(() => {});
   }
+  // Reserved seating (v0.5): drop the show's seat rows + holds.
+  await deleteShowSeats(env.SEATING, id).catch((err) => console.error('[delete] seat cleanup failed', errorMessage(err)));
   // Deactivate any legacy per-ticket links and any on-demand cached links.
   await Promise.all(
     record.tickets
@@ -1353,7 +1384,7 @@ async function handlePatchEvent(
   }
 
   // Parse the body: metadata/ticket fields via parseEventPatch, image directives separately.
-  let patch: Partial<EventDraft> & { soldOut?: boolean };
+  let patch: Partial<EventDraft> & { soldOut?: boolean; seatingChartId?: string | null };
   let imageAction: { type: 'none' } | { type: 'remove' } | { type: 'replace'; bytes: Uint8Array; mime: string; ext: string };
   try {
     const body: unknown = await request.json();
@@ -1380,8 +1411,29 @@ async function handlePatchEvent(
     return jsonResponse(400, { error: 'No fields to update' }, corsHeaders);
   }
 
+  // Reserved seating (v0.5): attach / swap / detach a chart. Refused once
+  // tickets have sold; the D1 rows are written before the KV commit below.
+  const { seatingChartId, ...fields } = patch;
+  patch = fields;
+  let seated: EventRecord = existing;
+  if (seatingChartId !== undefined) {
+    const currentId = existing.seating?.chartId ?? null;
+    if (seatingChartId !== currentId) {
+      try {
+        assertSeatingMutable(existing);
+        seated = seatingChartId ? await attachChart(env, existing, seatingChartId) : await detachChart(env, existing);
+      } catch (err) {
+        const status = err instanceof AttachError ? err.status : 500;
+        if (status === 500) console.error('Seating change failed:', errorMessage(err));
+        return jsonResponse(status, { error: status === 500 ? 'Failed to change seating' : errorMessage(err) }, corsHeaders);
+      }
+    }
+  }
+  // While a chart is attached, capacity is the seat count — the forms send it disabled.
+  if (seated.seating) patch.capacity = seated.seating.seatCount;
+
   // Merge metadata and validate cross-field date ordering.
-  const merged = { ...existing, ...patch };
+  const merged = { ...seated, ...patch };
   if (new Date(merged.endTime).getTime() <= new Date(merged.startTime).getTime()) {
     return jsonResponse(400, { error: 'endTime must be after startTime' }, corsHeaders);
   }
@@ -1419,7 +1471,7 @@ async function handlePatchEvent(
 
   // Commit the updated record. `tickets` are stored as plain price configs.
   const updated: EventRecord = {
-    ...existing,
+    ...seated,
     ...patch,
     tickets: patch.tickets ?? existing.tickets,
     imageKey,
@@ -1439,6 +1491,33 @@ async function handlePatchEvent(
   }
 
   return jsonResponse(200, { event: updated }, corsHeaders, noStore);
+}
+
+/** Re-snapshot the master chart onto a show that has not sold anything yet (v0.5). */
+async function handleResyncSeating(
+  id: string,
+  env: Env,
+  corsHeaders: Record<string, string>,
+  noStore: Record<string, string>,
+): Promise<Response> {
+  const raw = await env.EVENTS.get(`event:${id}`);
+  if (!raw) return jsonResponse(404, { error: 'Event not found' }, corsHeaders);
+  let record: EventRecord;
+  try {
+    record = JSON.parse(raw) as EventRecord;
+  } catch {
+    return jsonResponse(500, { error: 'Event is malformed' }, corsHeaders);
+  }
+  let updated: EventRecord;
+  try {
+    updated = await resyncChart(env, record);
+  } catch (err) {
+    const status = err instanceof AttachError ? err.status : 500;
+    if (status === 500) console.error('Seating re-sync failed:', errorMessage(err));
+    return jsonResponse(status, { error: status === 500 ? 'Failed to re-sync seating' : errorMessage(err) }, corsHeaders);
+  }
+  await env.EVENTS.put(`event:${id}`, JSON.stringify(updated));
+  return jsonResponse(200, { event: stripLayout(updated) }, corsHeaders, noStore);
 }
 
 async function handleEventImage(

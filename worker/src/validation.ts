@@ -1,4 +1,8 @@
 import type { BookingInquiry, EventDraft, TicketConfig } from './types.ts';
+import { CHART_ID_RE } from '@seating/ids.ts';
+
+/** Create/patch bodies may name a seating chart to attach (`null` = general admission). */
+export type SeatingChartRef = { seatingChartId?: string | null };
 
 const MAX_PAYLOAD_FIELDS = 8;
 const MAX_FIELD_LENGTH = 5000;
@@ -107,7 +111,7 @@ export function parseCheckinPaymentPayload(body: unknown): { paymentId: string }
   return { paymentId };
 }
 
-export function parseEventDraft(body: unknown): EventDraft {
+export function parseEventDraft(body: unknown): EventDraft & SeatingChartRef {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     throw new Error('Invalid request body');
   }
@@ -122,6 +126,7 @@ export function parseEventDraft(body: unknown): EventDraft {
     'endTime',
     'tickets',
     'capacity',
+    'seatingChartId',
   ]);
   for (const key of Object.keys(obj)) {
     if (!allowedKeys.has(key)) {
@@ -146,7 +151,18 @@ export function parseEventDraft(body: unknown): EventDraft {
   const tickets = parseTickets(obj.tickets);
   const capacity = parseCapacity(obj.capacity);
 
-  return { showName, description, venueName, venueAddress, startTime, endTime, tickets, capacity };
+  const draft: EventDraft & SeatingChartRef = { showName, description, venueName, venueAddress, startTime, endTime, tickets, capacity };
+  if ('seatingChartId' in obj) draft.seatingChartId = parseSeatingChartId(obj.seatingChartId);
+  return draft;
+}
+
+/** `c_xxxxxxxx` to attach, `null`/empty to detach (general admission). */
+function parseSeatingChartId(value: unknown): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !CHART_ID_RE.test(value)) {
+    throw new Error('seatingChartId is invalid');
+  }
+  return value;
 }
 
 /** Optional positive-integer capacity; `null`/absent means uncapped. */
@@ -165,7 +181,7 @@ function parseCapacity(value: unknown): number | null {
  * directives are handled separately by the caller. Returns {} if no draft
  * fields are present (an image-only patch is valid).
  */
-export function parseEventPatch(body: unknown): Partial<EventDraft> & { soldOut?: boolean } {
+export function parseEventPatch(body: unknown): Partial<EventDraft> & { soldOut?: boolean } & SeatingChartRef {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     throw new Error('Invalid request body');
   }
@@ -181,6 +197,7 @@ export function parseEventPatch(body: unknown): Partial<EventDraft> & { soldOut?
     'tickets',
     'capacity',
     'soldOut',
+    'seatingChartId',
   ]);
   for (const key of Object.keys(obj)) {
     if (!allowedKeys.has(key)) {
@@ -188,7 +205,7 @@ export function parseEventPatch(body: unknown): Partial<EventDraft> & { soldOut?
     }
   }
 
-  const patch: Partial<EventDraft> & { soldOut?: boolean } = {};
+  const patch: Partial<EventDraft> & { soldOut?: boolean } & SeatingChartRef = {};
   if ('showName' in obj) patch.showName = boundedString(obj, 'showName', 200);
   if ('description' in obj) patch.description = boundedString(obj, 'description', MAX_FIELD_LENGTH);
   if ('venueName' in obj) patch.venueName = boundedString(obj, 'venueName', 200);
@@ -201,6 +218,7 @@ export function parseEventPatch(body: unknown): Partial<EventDraft> & { soldOut?
     if (typeof obj.soldOut !== 'boolean') throw new Error('soldOut must be a boolean');
     patch.soldOut = obj.soldOut;
   }
+  if ('seatingChartId' in obj) patch.seatingChartId = parseSeatingChartId(obj.seatingChartId);
 
   return patch;
 }
