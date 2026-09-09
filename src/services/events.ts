@@ -72,6 +72,8 @@ export interface HeldSeats {
   objects: { id: string; label: string; kind: ChartObject['kind']; seats: number[] }[];
   split: boolean;
   message: string;
+  /** Seats already sold or held by others (drawn dimmed). */
+  taken: string[];
   layout: SeatingChart;
 }
 

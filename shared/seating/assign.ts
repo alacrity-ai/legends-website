@@ -6,10 +6,11 @@
  * Rule (DESIGN §6.2, Leif's call 2026-09-09):
  *   1. Together first — an object (table or row) with `quantity` free seats
  *      side by side (consecutive seat numbers; round tables wrap).
- *   2. Tightest fit, then nearest the stage — among fits prefer the object
- *      with the fewest free seats (no stranded singles), then the smallest
- *      distance from its centre to the stage; within the object prefer the
- *      run that leaves the remaining free seats contiguous.
+ *   2. Nearest the stage, without stranding a single seat — among fits
+ *      prefer objects where placing the party does not leave exactly one
+ *      free seat behind, then the smallest distance from the object's centre
+ *      to the stage, then the tighter fit; within the object prefer the run
+ *      that leaves the remaining free seats contiguous.
  *   3. Split only when necessary — take the largest run, then fill from the
  *      nearest objects (by centre distance) with the fewest pieces.
  *   4. `objectId` restricts step 1 to one object (Change table); no split.
@@ -145,11 +146,12 @@ export function chooseSeats(
   const stage = stageCenter(layout);
   const pool = layout.objects.filter(seated).filter((o) => !opts.objectId || o.id === opts.objectId);
 
-  // 1 + 2: together, tightest fit, nearest stage.
+  // 1 + 2: together; front first; never strand a lone seat if another table avoids it.
   const fits = pool
     .map((o) => ({ o, free: freeSeatNumbers(o, freeIds).length, run: bestRunInObject(o, freeIds, quantity), d: dist(objectCenter(o), stage) }))
     .filter((c): c is typeof c & { run: number[] } => c.run !== null)
-    .sort((a, b) => a.free - b.free || a.d - b.d || a.o.label.localeCompare(b.o.label));
+    .map((c) => ({ ...c, strands: c.free - quantity === 1 ? 1 : 0 }))
+    .sort((a, b) => a.strands - b.strands || a.d - b.d || a.free - b.free || a.o.label.localeCompare(b.o.label));
   if (fits.length) return toAssignment(layout, [{ objectId: fits[0].o.id, seats: fits[0].run }]);
 
   if (opts.objectId || opts.allowSplit === false) return null;

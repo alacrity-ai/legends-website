@@ -28,6 +28,7 @@ type State =
 
 const DIAGRAM_W = 320;
 const DIAGRAM_H = 200;
+const WHOLE_ROOM_MAX_OBJECTS = 14;
 
 export default function SeatSheet({ eventId, ticketType, quantity, priceLabel, onBack }: SeatSheetProps) {
   const [state, setState] = useState<State>({ status: 'holding' });
@@ -55,12 +56,19 @@ export default function SeatSheet({ eventId, ticketType, quantity, priceLabel, o
     [eventId, ticketType, quantity],
   );
 
-  // Hold on open.
+  // Hold on open. If the sheet is gone by the time the hold lands (closed
+  // quickly, or React's dev double-mount), give the seats straight back —
+  // otherwise they would sit held for 12 minutes with nobody attached.
   useEffect(() => {
     let cancelled = false;
     take()
       .then(({ hold }) => {
-        if (!cancelled) setState({ status: 'ready', hold });
+        if (cancelled) {
+          releaseHold(eventId, hold.holdId);
+          if (holdRef.current === hold) holdRef.current = null;
+          return;
+        }
+        setState({ status: 'ready', hold });
       })
       .catch((err) => {
         if (!cancelled) setState({ status: 'failed', message: err instanceof Error ? err.message : 'Could not hold seats.' });
@@ -68,7 +76,7 @@ export default function SeatSheet({ eventId, ticketType, quantity, priceLabel, o
     return () => {
       cancelled = true;
     };
-  }, [take]);
+  }, [take, eventId]);
 
   // Release on unmount unless we are leaving for Square.
   useEffect(() => {
@@ -139,6 +147,7 @@ export default function SeatSheet({ eventId, ticketType, quantity, priceLabel, o
   const seatStates = useMemo(() => {
     if (state.status !== 'ready') return {};
     const out: Record<string, SeatState> = {};
+    for (const id of state.hold.taken ?? []) out[id] = 'sold';
     for (const id of state.hold.seatIds) out[id] = 'selected';
     return out;
   }, [state]);
@@ -146,6 +155,9 @@ export default function SeatSheet({ eventId, ticketType, quantity, priceLabel, o
   const viewBox = useMemo(() => {
     if (state.status !== 'ready') return { x: 0, y: 0, w: 1200, h: 800 };
     const layout = state.hold.layout;
+    // Small rooms: show the whole floor so the buyer sees where they sit relative to
+    // everything. Big rooms: zoom to the party's table(s) with the stage in frame.
+    if (layout.objects.length <= WHOLE_ROOM_MAX_OBJECTS) return fitViewBox(layoutBounds(layout), DIAGRAM_W, DIAGRAM_H, 30);
     const ids = new Set(state.hold.objects.map((o) => o.id));
     const stage = layout.objects.find((o) => o.kind === 'stage');
     const focus = layout.objects.filter((o) => ids.has(o.id) || (stage && o.id === stage.id));
@@ -162,10 +174,17 @@ export default function SeatSheet({ eventId, ticketType, quantity, priceLabel, o
   }
 
   if (state.status === 'failed') {
+    const soldOut = /sold out/i.test(state.message);
     return (
       <div className={styles.sheet}>
-        <h3 className={styles.title}>Sorry — we couldn't seat your party</h3>
-        <p className={styles.body}>{state.message}</p>
+        <h3 className={styles.title}>
+          {soldOut
+            ? 'Sorry — this show has just sold out'
+            : quantity === 1
+              ? "Sorry — we can't find a seat right now"
+              : `Sorry — we can't seat a party of ${quantity} together right now`}
+        </h3>
+        <p className={styles.body}>{soldOut ? 'Please check back in case seats free up, or pick another show.' : state.message}</p>
         <div className={styles.actions}>
           <button type="button" className={styles.secondary} onClick={onBack}>
             ← Back to tickets
@@ -193,9 +212,15 @@ export default function SeatSheet({ eventId, ticketType, quantity, priceLabel, o
 
           <div className={styles.diagram} aria-label="Where your seats are">
             <SeatMap layout={hold.layout} mode="pick" viewBox={viewBox} seatStates={seatStates} />
-            <span className={styles.legend}>
-              <span className={styles.legendYou} /> your seats
-            </span>
+          </div>
+          <div className={styles.legend}>
+            <span className={styles.legendYou} /> your seats
+            <span className={styles.legendOpen} /> open
+            {(hold.taken?.length ?? 0) > 0 && (
+              <>
+                <span className={styles.legendTaken} /> taken
+              </>
+            )}
           </div>
 
           <p className={styles.held}>Held for you for 10 minutes.</p>

@@ -219,7 +219,7 @@ shared/seating/SeatMap.tsx       the renderer (mode: "edit" | "pick" | "view")
 ### 6.2 Assignment rule (`shared/seating/assign.ts`, unit-tested; reused by P5 admin reassignment)
 
 1. **Together first.** Find every object (table or row — rows count as tables) with a run of `quantity` free seats side by side (consecutive seat numbers; round tables wrap).
-2. **Tightest fit, then nearest the stage.** Among fits, prefer the object with the fewest free seats (so single seats are not stranded and later parties can still sit together), then the smallest distance from the object's centre to the stage's centre (canvas top if no stage). Within the object, prefer the run whose leftover free seats stay contiguous.
+2. **Nearest the stage, without stranding a single seat.** Among fits, skip any object where placing the party would leave exactly one free seat behind (if another fit avoids it), then take the smallest distance from the object's centre to the stage's centre (canvas top if no stage), then the tighter fit. Within the object, prefer the run whose leftover free seats stay contiguous. (Revised 2026-09-09 after Leif's review: an early party in an empty room gets a front table, not the smallest one at the back.)
 3. **Split only when necessary.** If nothing fits, take the largest run available, then fill from the nearest objects by centre distance, fewest pieces first (a party of 6 → 4 + 2 at neighbouring tables). The sheet always says when a party is split.
 4. `objectId` (Change table) restricts step 1 to that object; 409 if it cannot seat the party.
 

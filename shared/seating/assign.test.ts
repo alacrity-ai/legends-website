@@ -36,23 +36,33 @@ describe('freeRuns', () => {
 });
 
 describe('chooseSeats', () => {
-  it('seats the party together at the nearest-stage table when everything is free (tie on tightness)', () => {
+  it('seats the party together at the nearest-stage table when everything is free', () => {
     const a = chooseSeats(layout, allFree(), 4)!;
     expect(a.split).toBe(false);
-    expect(a.objects[0].id).toBe('o_1'); // T1 and T2 tie on free seats; T1 is closer to the stage centre (600,60)? no: T2 is symmetric — labels break the tie
+    expect(a.objects[0].id).toBe('o_1'); // T1 and T2 are symmetric about the stage; labels break the tie
     expect(a.seatIds).toEqual(['o_1.1', 'o_1.2', 'o_1.3', 'o_1.4']);
     expect(a.seatLabels).toEqual(['T1-1', 'T1-2', 'T1-3', 'T1-4']);
   });
 
-  it('prefers the tightest fit over the nearest table', () => {
-    // T3 (far) has exactly 2 free; T1/T2 near the stage have 8 free.
+  it('prefers the table nearest the stage even when a far table is a tighter fit', () => {
+    // T3 (far) has exactly 2 free; T1/T2 near the stage have 8 free → front table wins.
     const free = minus(allFree(), 'o_3.1', 'o_3.2', 'o_3.3', 'o_3.4', 'o_3.5', 'o_3.6');
     const a = chooseSeats(layout, free, 2)!;
-    expect(a.objects[0].id).toBe('o_3');
-    expect(a.seatIds).toEqual(['o_3.7', 'o_3.8']);
+    expect(a.objects[0].id).toBe('o_1');
   });
 
-  it('rows count as tables and prefer a run at the end so the leftover stays contiguous', () => {
+  it('avoids stranding a single seat when another table avoids it', () => {
+    // T1 (front) has 3 free → a party of 2 would strand one seat; T2 (front) has 4 free → no strand.
+    const free = minus(allFree(), 'o_1.1', 'o_1.2', 'o_1.3', 'o_1.4', 'o_1.5', 'o_2.1', 'o_2.2', 'o_2.3', 'o_2.4');
+    const a = chooseSeats(layout, free, 2)!;
+    expect(a.objects[0].id).toBe('o_2');
+    // …but a strand is accepted when every fitting table would strand one.
+    const free2 = minus(allFree(), 'o_1.1', 'o_1.2', 'o_1.3', 'o_1.4', 'o_1.5', 'o_2.1', 'o_2.2', 'o_2.3', 'o_2.4', 'o_2.5', 'o_3.1', 'o_3.2', 'o_3.3', 'o_3.4', 'o_3.5', ...Array.from({ length: 9 }, (_, i) => `o_a.${i + 1}`));
+    const b = chooseSeats(layout, free2, 2)!;
+    expect(b.objects[0].id).toBe('o_1');
+  });
+
+  it('rows count as tables and take seats from the end so the leftover stays contiguous', () => {
     const free = minus(allFree(), ...['o_1', 'o_2', 'o_3'].flatMap((o) => Array.from({ length: 8 }, (_, i) => `${o}.${i + 1}`)));
     const a = chooseSeats(layout, free, 3)!;
     expect(a.objects[0].id).toBe('o_a');
@@ -61,8 +71,8 @@ describe('chooseSeats', () => {
   });
 
   it('uses the wrap-around run on a round table', () => {
-    const free = minus(allFree(), 'o_1.2', 'o_1.3', 'o_1.4', 'o_1.5', 'o_1.6', 'o_2.1', 'o_2.2', 'o_2.3', 'o_2.4', 'o_2.5', 'o_2.6', 'o_3.1', 'o_3.2', 'o_3.3', 'o_3.4', 'o_3.5', 'o_3.6');
-    // Every table has 3 free: T1 [7,8,1], T2 [7,8], T3 [7,8]; row A 12 free.
+    const free = minus(allFree(), 'o_1.2', 'o_1.3', 'o_1.4', 'o_1.5', 'o_1.6', 'o_2.1', 'o_2.2', 'o_2.3', 'o_2.4', 'o_2.5', 'o_2.6', 'o_3.1', 'o_3.2', 'o_3.3', 'o_3.4', 'o_3.5', 'o_3.6', ...Array.from({ length: 12 }, (_, i) => `o_a.${i + 1}`));
+    // T1 has [7,8,1] (wraps), T2 [7,8], T3 [7,8]; row A full → only T1 seats 3 together.
     const a = chooseSeats(layout, free, 3)!;
     expect(a.objects[0].id).toBe('o_1');
     expect(a.seatIds).toEqual(['o_1.7', 'o_1.8', 'o_1.1']);

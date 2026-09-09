@@ -40,6 +40,8 @@ export interface HoldResponse {
   objects: Assignment['objects'];
   split: boolean;
   message: string;
+  /** Seat ids already sold or held by someone else (drawn dimmed on the sheet). */
+  taken: string[];
   layout: EventRecord['seating'] extends infer S ? (S extends { layout: infer L } ? L : never) : never;
 }
 
@@ -170,16 +172,13 @@ async function handleHold(id: string, request: Request, env: Env, ctx: Execution
     const assignment = chooseSeats(layout, free, body.quantity, { objectId: body.objectId });
     if (!assignment) {
       const party = body.quantity === 1 ? 'one seat' : `a party of ${body.quantity}`;
-      return jsonResponse(
-        409,
-        {
-          error: objectName
-            ? `${objectName} can't seat ${party} together — pick another table.`
-            : `There are no seats left for ${party}. Try a smaller number of tickets.`,
-        },
-        corsHeaders,
-        NO_STORE,
-      );
+      const left = free.size;
+      const error = objectName
+        ? `${objectName} can't seat ${party} together — pick another table.`
+        : left === 0
+          ? 'This show has just sold out.'
+          : `Only ${left} ${left === 1 ? 'seat is' : 'seats are'} left for this show — try ${left === 1 ? '1 ticket' : `${left} or fewer tickets`}.`;
+      return jsonResponse(409, { error, seatsLeft: left }, corsHeaders, NO_STORE);
     }
 
     const holdId = newHoldId();
@@ -205,6 +204,8 @@ async function handleHold(id: string, request: Request, env: Env, ctx: Execution
       ctx.waitUntil(deactivateSupersededLinks(env, claim.superseded));
     }
 
+    const mine = new Set(assignment.seatIds);
+    const takenNow = await availability(env.SEATING, id);
     const response: HoldResponse = {
       holdId,
       expiresAt,
@@ -213,6 +214,7 @@ async function handleHold(id: string, request: Request, env: Env, ctx: Execution
       objects: assignment.objects,
       split: assignment.split,
       message: `We've saved seats for your party ${describeAssignment(assignment.objects)}.`,
+      taken: Object.entries(takenNow).filter(([sid, st]) => st === 'taken' && !mine.has(sid)).map(([sid]) => sid),
       layout,
     };
     return jsonResponse(200, response as unknown as Record<string, unknown>, corsHeaders, NO_STORE);

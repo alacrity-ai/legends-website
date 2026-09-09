@@ -76,25 +76,39 @@
 }
 
 .legend {
-  position: absolute;
-  right: 8px;
-  bottom: 6px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  font-size: var(--text-xs);
+  margin-top: calc(-1 * var(--space-sm));
+  font-size: var(--text-sm);
   color: var(--color-text-muted);
-  background: rgba(11, 10, 15, 0.7);
-  padding: 2px 8px;
-  border-radius: 999px;
+}
+
+.legendYou,
+.legendOpen,
+.legendTaken {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-left: 10px;
+  flex-shrink: 0;
 }
 
 .legendYou {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  margin-left: 0;
   background: var(--color-primary);
   border: 1px solid var(--color-primary-light);
+}
+
+.legendOpen {
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.75);
+}
+
+.legendTaken {
+  background: rgba(191, 181, 163, 0.25);
+  border: 1px solid rgba(191, 181, 163, 0.35);
 }
 
 /* ── Actions ──────────────────────────────────────────────── */
