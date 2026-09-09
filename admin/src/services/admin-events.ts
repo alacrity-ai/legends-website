@@ -158,6 +158,20 @@ export async function eventUncheck(id: string, paymentId: string): Promise<void>
   });
 }
 
+/**
+ * Give a party its seats (unassigned → assigned), top it up, or move it.
+ * Fewer seats than tickets leaves it `partial`; `[]` releases them all.
+ * 409 when a seat was taken meanwhile — the message names it; pick again.
+ */
+export async function setPartySeats(eventId: string, paymentId: string, seatIds: string[]): Promise<Party> {
+  const data = await authedRequest<{ party: Party }>(`/api/admin/events/${eventId}/parties/${encodeURIComponent(paymentId)}/seats`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ seatIds }),
+  });
+  return data.party;
+}
+
 /** Fields accepted by a partial event update (PATCH). All optional. */
 export interface EventPatchInput {
   showName?: string;

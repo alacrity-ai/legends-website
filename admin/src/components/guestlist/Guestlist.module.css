@@ -179,3 +179,20 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
+
+/* "Assign seats" on the needs-seats banner (chart view). */
+.assignBtn {
+  flex-shrink: 0;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assignBtn:hover {
+  border-color: var(--color-accent);
+}

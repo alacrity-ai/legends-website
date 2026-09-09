@@ -155,7 +155,14 @@ export interface Purchase {
  * checkout → the stub's pay page → webhook → party on the roster. Returns
  * once the worker has processed the webhook.
  */
-export async function purchase(showId: string, qty: number, buyer: { name: string; email?: string }, ticketType = 'Show Only'): Promise<Purchase> {
+export async function purchase(
+  showId: string,
+  qty: number,
+  buyer: { name: string; email?: string },
+  ticketType = 'Show Only',
+  /** Runs between checkout and payment — e.g. lapse the hold to stage a late payer. */
+  beforePay?: (holdId: string | undefined) => void,
+): Promise<Purchase> {
   let holdId: string | undefined;
   let seatLabels: string[] | undefined;
   const info = await api(`/api/events/${showId}/seating?quantity=${qty}`);
@@ -168,6 +175,7 @@ export async function purchase(showId: string, qty: number, buyer: { name: strin
   const c = await api(`/api/events/${showId}/checkout`, { method: 'POST', headers: JSON_H, body: JSON.stringify({ ticketType, quantity: qty, ...(holdId ? { holdId } : {}) }) });
   if (c.status !== 200) throw new Error(`checkout ${c.status}: ${JSON.stringify(c.body)}`);
   const payUrl = c.body.checkoutUrl as string;
+  beforePay?.(holdId);
   const form = new URLSearchParams({ name: buyer.name, email: buyer.email ?? 'buyer@example.com' });
   const paid = await fetch(payUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form, redirect: 'manual' });
   if (paid.status !== 302) throw new Error(`stub pay ${paid.status}: ${await paid.text()}`);
@@ -182,4 +190,10 @@ export async function purchase(showId: string, qty: number, buyer: { name: strin
 
 export async function guests(showId: string): Promise<any> {
   return (await admin(`/api/admin/events/${showId}/guests`)).body;
+}
+
+/** Age a hold past its TTL so its seats read as free (a late payer in the making). */
+export function expireHold(holdId: string): void {
+  const past = Date.now() - 1000;
+  d1(`UPDATE seat_holds SET expires_at=${past} WHERE id='${holdId}'; UPDATE seats SET hold_expires_at=${past} WHERE hold_id='${holdId}'`);
 }

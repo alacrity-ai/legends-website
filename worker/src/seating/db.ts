@@ -303,3 +303,55 @@ export async function occupancy(db: D1Database, showId: string, now = Date.now()
   }
   return out;
 }
+
+/* ── P5: admin (re)assignment ─────────────────────────────────── */
+
+export type ReassignResult = { ok: true } | { ok: false; unavailable: string[] };
+
+/**
+ * Give `partyKey` exactly `seatIds` (sold), releasing whatever it held before.
+ * One batch: release the old rows, then a conditional claim of the new ones
+ * (free, or held past expiry — the party's own just-released seats count as
+ * free). If any seat was not won the whole move is undone — the new claims are
+ * released and the old assignment restored — and the seats that could not be
+ * taken are named so staff can pick again.
+ */
+export async function reassign(db: D1Database, showId: string, partyKey: string, seatIds: readonly string[], now = Date.now()): Promise<ReassignResult> {
+  const before = await db.prepare(`SELECT seat_id FROM seats WHERE show_id = ? AND party_key = ?`).bind(showId, partyKey).all<{ seat_id: string }>();
+  const old = (before.results ?? []).map((r) => r.seat_id);
+
+  const statements: D1PreparedStatement[] = [
+    db.prepare(`UPDATE seats SET status = 'available', party_key = NULL, updated_at = ? WHERE show_id = ? AND party_key = ?`).bind(now, showId, partyKey),
+  ];
+  for (const ids of chunk(seatIds)) {
+    statements.push(
+      db
+        .prepare(
+          `UPDATE seats SET status = 'sold', party_key = ?, hold_id = NULL, hold_expires_at = NULL, updated_at = ?
+           WHERE show_id = ? AND seat_id IN (${placeholders(ids.length)})
+             AND (status = 'available' OR (status = 'held' AND (hold_expires_at IS NULL OR hold_expires_at < ?)))`,
+        )
+        .bind(partyKey, now, showId, ...ids, now),
+    );
+  }
+  const results = await db.batch(statements);
+  const won = results.slice(1).reduce((n, r) => n + Number(r.meta?.changes ?? 0), 0);
+  if (won === seatIds.length) return { ok: true };
+
+  // Shortfall: find out which seats we did not get, then put things back.
+  const owned = await db.prepare(`SELECT seat_id FROM seats WHERE show_id = ? AND party_key = ?`).bind(showId, partyKey).all<{ seat_id: string }>();
+  const ownedSet = new Set((owned.results ?? []).map((r) => r.seat_id));
+  const unavailable = seatIds.filter((id) => !ownedSet.has(id));
+  const restore: D1PreparedStatement[] = [
+    db.prepare(`UPDATE seats SET status = 'available', party_key = NULL, updated_at = ? WHERE show_id = ? AND party_key = ?`).bind(now, showId, partyKey),
+  ];
+  for (const ids of chunk(old)) {
+    restore.push(
+      db
+        .prepare(`UPDATE seats SET status = 'sold', party_key = ?, hold_id = NULL, hold_expires_at = NULL, updated_at = ? WHERE show_id = ? AND seat_id IN (${placeholders(ids.length)}) AND status = 'available'`)
+        .bind(partyKey, now, showId, ...ids),
+    );
+  }
+  await db.batch(restore);
+  return { ok: false, unavailable };
+}

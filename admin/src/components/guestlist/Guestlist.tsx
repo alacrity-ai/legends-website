@@ -14,6 +14,7 @@ import {
   eventUncheck,
   getEventGuests,
   listEvents,
+  setPartySeats,
   type EventGuests,
   type ManagedEvent,
 } from '../../services/admin-events.ts';
@@ -22,6 +23,7 @@ import SearchBar from './SearchBar.tsx';
 import PartyList from './PartyList.tsx';
 import CheckInModal from './CheckInModal.tsx';
 import OccupancyChart from './OccupancyChart.tsx';
+import SeatAssignSheet from './SeatAssignSheet.tsx';
 import { occupancyCounts } from './occupancy.ts';
 import { printCheckinSheet } from './print-sheet.ts';
 import styles from './Guestlist.module.css';
@@ -88,6 +90,8 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
   const [selectedParty, setSelectedParty] = useState<Party | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [seating, setSeating] = useState<NonNullable<EventGuests['seating']> | null>(null);
+  /** Party whose seats are being assigned / changed (reserved-seating shows). */
+  const [assignParty, setAssignParty] = useState<Party | null>(null);
   const [view, setView] = useState<RosterView>(storedView);
   /** Parties with a check-in / undo in flight: a poll must not overwrite their optimistic state. */
   const busyRef = useRef(new Set<string>());
@@ -200,6 +204,21 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
       // any other hiccup: keep what we have, the next tick will try again
     }
   }, [selection]);
+
+  const saveSeats = useCallback(
+    async (party: Party, seatIds: string[]) => {
+      if (!selection || selection.kind !== 'event') return;
+      try {
+        const updated = await setPartySeats(selection.id, party.id, seatIds);
+        setParties((prev) => (prev ? prev.map((p) => (p.id === updated.id ? updated : p)) : prev));
+        setAssignParty(null);
+      } finally {
+        // Whether it saved or a seat was just taken, show the room as it is now.
+        void refetch();
+      }
+    },
+    [selection, refetch],
+  );
 
   const hasSeating = seating !== null;
   useEffect(() => {
@@ -541,6 +560,11 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
             checkedIn={checkedIn}
             parties={parties}
             onPartyTap={setSelectedParty}
+            needsSeatsAction={(p) => (
+              <button type="button" className={styles.assignBtn} onClick={() => setAssignParty(p)}>
+                Assign seats
+              </button>
+            )}
           />
         ) : (
           <>
@@ -567,6 +591,24 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
             await handleUncheck(selectedParty);
             setSelectedParty(null);
           }}
+          onChangeSeats={
+            seating
+              ? () => {
+                  setAssignParty(selectedParty);
+                  setSelectedParty(null);
+                }
+              : undefined
+          }
+        />
+      )}
+
+      {assignParty && seating && (
+        <SeatAssignSheet
+          layout={seating.layout}
+          seats={seating.seats}
+          party={parties?.find((p) => p.id === assignParty.id) ?? assignParty}
+          onSave={(ids) => saveSeats(assignParty, ids)}
+          onClose={() => setAssignParty(null)}
         />
       )}
     </div>

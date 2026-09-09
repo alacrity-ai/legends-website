@@ -58,7 +58,7 @@ A **separate app** in `admin/` (its own Vite build, its own Pages project), inst
 | `/events/new` | Create a Show (ticket types, capacity, image → Square links) | `components/admin/EventForm` | `POST /api/admin/events` |
 | `/events` | Manage Shows (list, edit, sold-out, QR/share link, delete) | `components/admin/ManageShows` | `GET/PATCH/DELETE /api/admin/events[/:id]` |
 | `/charts`, `/charts/new`, `/charts/:id` | Seating Charts (v0.5): venue layouts — tables, rows, stage on an SVG floor plan; renderer shared from `shared/seating/SeatMap.tsx` | `components/admin/Charts` | `GET/POST /api/admin/charts`, `GET/PUT/DELETE /api/admin/charts/:id`, `POST …/:id/duplicate` (KV `chart:<id>`) |
-| `/checkin` | Door Check-in (auto roster from Square purchases; legacy CSV rosters) | `components/guestlist/*` | `/api/admin/events/:id/{guests,checkin}`, legacy `/api/guestlist/*` |
+| `/checkin` | Door Check-in (auto roster from Square purchases; legacy CSV rosters). Seated shows (v0.5): **List \| Chart** toggle, tap-a-seat check-in, 8 s polling, assign / change a party's seats | `components/guestlist/*` (`OccupancyChart`, `SeatAssignSheet`) | `/api/admin/events/:id/{guests,checkin}`, `PUT …/:id/parties/:paymentId/seats`, legacy `/api/guestlist/*` |
 | `/mailing-list` | Mailing List (search, unsubscribed badges, CSV export) | `components/admin/MailingList` | `GET /api/admin/mailing-list` |
 
 - The Worker is routed on the admin host too, so the PWA calls **`/api` same-origin** — no CORS preflight at the door on venue wifi. `services/api-base.ts` defaults to `''` (relative); `VITE_BOOKING_API_URL` is only an optional override.
@@ -74,6 +74,8 @@ One Worker (`worker/src/index.ts`) routes four groups of endpoints, on two route
 | `/api/admin/events` | POST/GET/DELETE | Create/list/delete shows (admin-gated); creates Square links + stores image | KV `EVENTS`, R2, Square API |
 | `/api/events/:id/seating?quantity=N` | GET | Reserved seating (v0.5): layout, live availability, which tables seat N together | KV snapshot + D1 `seats`, no-store |
 | `/api/events/:id/seats/hold[/:holdId]` | POST/DELETE | Choose + hold seats for a party (server-side, atomic, 12 min) / release; `POST …/checkout` then requires the `holdId` on seated shows | D1 `seats`, `seat_holds` |
+| `/api/admin/events/:id/guests` | GET | Door roster; on seated shows also `seating { layout, seats: { status, partyId } }` and per-party `seats / seatLabels / seatStatus` | KV `GUESTLIST` + D1 |
+| `/api/admin/events/:id/parties/:paymentId/seats` | PUT | Staff assign / top up / move a party's seats (`{ seatIds }`); 409 names seats taken meanwhile | D1 `seats` (one batch, restored on conflict) + KV party |
 | `/api/booking` | POST | Booking inquiry → emails the team + confirmation to sender | Mailgun |
 | `/api/mailing-list` | POST | Save a signup (email + optional name) | KV `MAILING_LIST` |
 | `/api/guestlist/...` | GET/POST/DELETE | List shows, fetch a roster, check parties in/out | KV `GUESTLIST`, passcode-gated |

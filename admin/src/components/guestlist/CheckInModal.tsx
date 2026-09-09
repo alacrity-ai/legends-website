@@ -8,6 +8,8 @@ interface CheckInModalProps {
   onClose: () => void;
   onCheckIn: () => Promise<void> | void;
   onUncheck: () => Promise<void> | void;
+  /** Reserved-seating shows: open the seat picker for this party. */
+  onChangeSeats?: () => void;
 }
 
 function variationLabel(v: TicketVariation): string {
@@ -29,6 +31,7 @@ export default function CheckInModal({
   onClose,
   onCheckIn,
   onUncheck,
+  onChangeSeats,
 }: CheckInModalProps) {
   const [busy, setBusy] = useState(false);
   const fullName = `${party.firstName} ${party.lastName}`.trim() || party.email;
@@ -143,6 +146,11 @@ export default function CheckInModal({
               disabled={busy}
             >
               {busy ? 'Checking in…' : `Check in ${fullName}`}
+            </button>
+          )}
+          {onChangeSeats && (
+            <button type="button" className={`${styles.button} ${styles.cancel}`} onClick={onChangeSeats} disabled={busy}>
+              {party.seatStatus === 'unassigned' || !party.seats?.length ? 'Assign seats' : 'Change seats'}
             </button>
           )}
           <button

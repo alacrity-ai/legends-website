@@ -63,9 +63,10 @@ Shows are created through the **Legends Admin** app at `https://admin.djkmdlegen
    - **Start time** / **End time** — must be in the future; end after start (New England local time).
    - **Ticket types & prices** — one row per ticket type (e.g. "Show Only" $45, "Dinner + Show" $75). Click **+ Add ticket type** for more; most shows have 1–2. Each becomes its own Square checkout + its own Buy button on the site.
    - **Show image** — upload a JPEG/PNG/WebP (≤ 5 MB) from your computer; a preview appears.
+   - **Seating chart** *(optional, v0.5)* — pick one of your saved layouts to sell **reserved seats** at this show. Capacity then locks to the layout's seat count. Leave it on *General admission* for a normal show. Build layouts first with [SOP 7](#sop-7--build-a-seating-chart-). You can change or remove the chart from **Manage Shows → Edit** right up until the first ticket sells.
 3. Click **Create Show**. This takes a few seconds (it's creating the Square links + saving the image). Wait for the green confirmation.
 
-**Verify:** within a minute, the show appears under **Upcoming Shows** with its image; **Buy Tickets** opens a modal with one Buy button per ticket type, each going to its Square checkout.
+**Verify:** within a minute, the show appears under **Upcoming Shows** with its image; **Buy Tickets** opens a modal with one Buy button per ticket type, each going to its Square checkout. On a reserved-seating show, Buy first shows "We've saved seats for your party…" with a little map — **Looks good, continue** takes the buyer to Square; **Change table** offers other tables that fit the party. Seats stay held for 12 minutes while they pay.
 
 **Remove a show:** Legends Admin → **Manage Shows** → delete it. This also deactivates its Square links and removes the image.
 
@@ -148,6 +149,18 @@ The **Door Check-in** tool in Legends Admin (`https://admin.djkmdlegends.com/che
 
 **Re-uploading:** running the script again for the same `--show` overwrites the roster (`roster:<date>`) but leaves check-ins intact.
 
+### Reserved-seating shows at the door (v0.5)
+
+On a show with a seating chart, the roster header gains a **List | Chart** toggle (the phone remembers your choice).
+
+- **Chart** shows the room: open seats outlined, **sold gold**, **arrived green**, held (mid-checkout) hatched, with "12 / 40 seats arrived". **Tap a sold seat** → that party's card → **Check in**. The seat turns green at once, and every other phone on the same show catches up within about 8 seconds on its own.
+- **List** works exactly as before; each party row also shows its seats ("T2-1, T2-2"), and the party card shows "Seats: …".
+- A party marked **needs seats** paid after their held seats lapsed (rare: they sat on the Square page past 12 minutes while someone else bought the seats). Give them seats: **Chart → Assign seats** (or open the party → **Assign seats**), tap seats on the room — or **Best available** — then **Save**. Taken seats are dimmed and cannot be tapped. To move any party, open it and tap **Change seats**.
+- If a seat gets bought between your tap and Save, the app tells you which one ("Seat T4-2 was just taken — pick again") and the party keeps the seats it had.
+- **Print list** includes a **Seats** column on these shows.
+
+The same live room is also under **Manage Shows → Seating chart** for the box office.
+
 ---
 
 ## SOP 5b — Check ticket sales 🎤
@@ -180,6 +193,25 @@ All three artifacts (public site → Pages `legends-website`, admin PWA → Page
 
 ---
 
+## SOP 7 — Build a seating chart 🎤
+
+Reserved seating starts with a **layout** of the room, drawn once in Legends Admin and reused for every show at that venue. Layouts are copied onto a show when you attach them, so editing a layout later never changes a show that is already selling.
+
+1. Open **Legends Admin → Seating Charts** → **New chart**. Name it after the room ("Elks Lodge — dinner").
+2. Add pieces from the palette: **round table**, **rectangular table**, **row of seats**, **stage**. Drag to place; tap a piece to select it, then use the inspector to set its **label** (T1, T2… or A, B for rows), the **number of seats**, size and rotation. Tables and rows are numbered clockwise / left-to-right from seat 1.
+3. Put the **stage** where it really is — buyers are seated **nearest the stage first**, so the geometry matters.
+4. Tap **Save**. The list shows a thumbnail and the seat count; **Duplicate** copies a layout for a variant (e.g. cabaret vs. banquet).
+5. Attach the layout when creating the show ([SOP 2](#sop-2--add-a-new-show--event-)) or later from **Manage Shows → Edit → Seating chart** (only until the first ticket sells). **Manage Shows → Seating chart** opens the live room for that show; **Re-sync from layout** there re-copies a corrected layout while nothing has sold.
+
+**How buyers are seated:** the site picks seats for them — the whole party together at the table nearest the stage that has room (a table is skipped only if it would leave one lone empty seat and another table avoids that); if no table fits, the party is split across neighbouring tables, and the buyer is told. Buyers never tap individual seats; they can only switch tables. Tickets sold before a chart is attached are not affected because attaching is refused once anything has sold.
+
+**Gotchas:**
+- Two layouts can't share a name.
+- Deleting a layout that a show uses is refused — detach it from the show first (or delete the show).
+- Capacity on a seated show is always the seat count; edit the layout, not the capacity.
+
+---
+
 ## Quick reference — which task, what's needed
 
 | Task | Type | Edit | Deploy? |
@@ -187,7 +219,10 @@ All three artifacts (public site → Pages `legends-website`, admin PWA → Page
 | Add/edit/reorder an artist | 🧑‍💻 | `src/content/performers.ts` + image in `public/assets/images/` | **Yes** |
 | Add a show | 🎤 | Legends Admin (`admin.djkmdlegends.com`) → Create a Show (auto-creates Square links) | No |
 | Change ticket price/checkout | 🎤 | Legends Admin → Manage Shows → edit (or delete + recreate) | No |
-| Check guests in at the door | 🎤 | Legends Admin → Door Check-in | No |
+| Check guests in at the door | 🎤 | Legends Admin → Door Check-in (List, or Chart on seated shows — tap a seat) | No |
+| Build / edit a venue layout | 🎤 | Legends Admin → Seating Charts (SOP 7) | No |
+| Sell reserved seats at a show | 🎤 | Legends Admin → Create a Show → Seating chart (SOP 2) | No |
+| Give a party seats / move them | 🎤 | Door Check-in → party → Assign / Change seats (SOP 5) | No |
 | Grandfathered (legacy) shows | 🎤 | Leave in Google Calendar until ~Sept 2026 | No |
 | Set the YouTube video | 🧑‍💻 | `VITE_YOUTUBE_VIDEO_ID` GitHub secret | **Yes** |
 | Edit site copy | 🧑‍💻 | `src/content/site.ts` (and `social.ts`) | **Yes** |
