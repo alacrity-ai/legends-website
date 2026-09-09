@@ -91,10 +91,6 @@ export const ticketComingSoonMessage =
 
 /* ── Calendar ──────────────────────────────────────────────── */
 
-/** @see .env.example — VITE_GOOGLE_CALENDAR_PUBLIC_URL */
-export const googleCalendarPublicUrl =
-  import.meta.env.VITE_GOOGLE_CALENDAR_PUBLIC_URL ||
-  'https://calendar.google.com/calendar/u/0/r?cid=placeholder';
 export const calendarCopy = 'See where Legends is appearing next.';
 
 /* ── Mailing list ──────────────────────────────────────────── */

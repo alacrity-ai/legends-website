@@ -89,7 +89,6 @@ cp .env.example .env.local
 | ----------------------------------- | ------------------------------------ |
 | `VITE_BOOKING_API_URL`              | Worker URL (`http://localhost:8787` for local dev) |
 | `VITE_YOUTUBE_VIDEO_ID`             | YouTube video ID for Media section   |
-| `VITE_GOOGLE_CALENDAR_PUBLIC_URL`   | Google Calendar public link (fallback) |
 
 > **Note:** The site runs locally without any `.env` file — all values have placeholder fallbacks. The booking form and calendar require the worker to be running.
 
@@ -111,7 +110,7 @@ cp worker/.dev.vars.example worker/.dev.vars
 
 These are read automatically by `wrangler dev`. In production they are stored as Cloudflare Worker secrets (`wrangler secret put`).
 
-**Worker bindings** (`worker/wrangler.toml`): KV namespaces `MAILING_LIST`, `GUESTLIST`, `EVENTS` (custom events), and R2 bucket `EVENT_IMAGES` (show images). See `docs/v0.2/event_form/` for the event-form feature. The worker has two routes (`djkmdlegends.com/api/*`, `admin.djkmdlegends.com/api/*`); `ALLOWED_ORIGINS` lists the public, admin, and local dev origins.
+**Worker bindings** (`worker/wrangler.toml`): KV namespaces `MAILING_LIST`, `GUESTLIST`, `EVENTS` (custom events), and R2 bucket `EVENT_IMAGES` (show images). See `docs/v0.2/event_form/` for the event-form feature. The worker has three routes (`djkmdlegends.com/api/*`, `www.djkmdlegends.com/api/*`, `admin.djkmdlegends.com/api/*` — `www` is a Pages custom domain, not a redirect, so it needs its own route); `ALLOWED_ORIGINS` lists the public, admin, and local dev origins.
 
 ## Build
 

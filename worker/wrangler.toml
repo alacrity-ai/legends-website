@@ -15,6 +15,14 @@ zone_name = "djkmdlegends.com"
 pattern = "admin.djkmdlegends.com/api/*"
 zone_name = "djkmdlegends.com"
 
+# www is an active Pages custom domain for the public site (not a redirect), so
+# the SPA's same-origin `/api/*` calls land here too. Without this route Pages'
+# `/* /index.html 200` catch-all answers them with HTML and the Calendar section
+# shows "Unable to load upcoming shows."
+[[routes]]
+pattern = "www.djkmdlegends.com/api/*"
+zone_name = "djkmdlegends.com"
+
 [[kv_namespaces]]
 binding = "MAILING_LIST"
 id = "87b3a569d4e145a4a7458c26d88ad8fa"
