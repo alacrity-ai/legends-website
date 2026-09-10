@@ -14,6 +14,7 @@ import {
   eventUncheck,
   getEventGuests,
   listEvents,
+  resendConfirmation,
   setPartySeats,
   type EventGuests,
   type ManagedEvent,
@@ -596,6 +597,14 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
               ? () => {
                   setAssignParty(selectedParty);
                   setSelectedParty(null);
+                }
+              : undefined
+          }
+          onResendConfirmation={
+            selection?.kind === 'event'
+              ? async () => {
+                  const updated = await resendConfirmation(selection.id, selectedParty.id);
+                  setParties((prev) => (prev ? prev.map((p) => (p.id === updated.id ? updated : p)) : prev));
                 }
               : undefined
           }

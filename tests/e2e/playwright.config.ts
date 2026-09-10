@@ -30,6 +30,9 @@ const workerVars = [
   'SQUARE_LOCATION_ID:L-E2E',
   'SQUARE_WEBHOOK_SIGNATURE_KEY:e2e-whsec',
   `SQUARE_API_BASE:${SQUARE_STUB}`,
+  'MAILGUN_API_KEY:e2e-mailgun',
+  'MAILGUN_DOMAIN:mg.e2e',
+  `MAILGUN_API_BASE:${SQUARE_STUB}`,
 ]
   .map((v) => `--var ${v}`)
   .join(' ');

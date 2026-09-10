@@ -145,6 +145,7 @@ export interface SquareMock {
   links: any[];
   /** Payment-link ids passed to DELETE (deactivations). */
   deactivated: string[];
+  /** Bodies of every CreateLocation call. Must stay EMPTY — Square bills $149/month per location. */
   locations: any[];
 }
 

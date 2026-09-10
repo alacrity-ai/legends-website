@@ -101,11 +101,11 @@ cp worker/.dev.vars.example worker/.dev.vars
 | Variable          | Purpose                              |
 | ----------------- | ------------------------------------ |
 | `MAILGUN_API_KEY` | Mailgun API key                      |
-| `MAILGUN_DOMAIN`  | Mailgun sending domain (`mg.djkmdlegends.com`) |
+| `MAILGUN_DOMAIN`  | Mailgun sending domain (`mg.djkmdlegends.com`); booking mail and the buyer's ticket confirmation (`tickets@…`) go through it. `MAILGUN_API_BASE` / `SQUARE_API_BASE` (optional) point the worker at the e2e stubs. |
 | `GOOGLE_API_KEY`  | Google Calendar API key (legacy events) |
 | `ADMIN_PASSCODE`  | Shared passcode gating the admin PWA (`admin.djkmdlegends.com`: check-in, shows, mailing list) |
 | `SQUARE_ACCESS_TOKEN` | Square API token (use **sandbox** locally) |
-| `SQUARE_LOCATION_ID`  | Square location for payment links    |
+| `SQUARE_LOCATION_ID`  | The account's one Square location — every payment link is minted here. **Never create Square Locations (or Team members, or anything else Square bills per seat) from code**: the per-venue locations LGD-3 minted cost $149/month each under Square Premium (LGD-21). Buyers get the venue address from the Legends confirmation email instead. |
 | `SQUARE_ENVIRONMENT`  | `sandbox` (local) / `production`     |
 
 These are read automatically by `wrangler dev`. In production they are stored as Cloudflare Worker secrets (`wrangler secret put`).

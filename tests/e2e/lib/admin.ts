@@ -12,8 +12,8 @@ export async function openAdmin(page: Page, path: string): Promise<void> {
 /** Door Check-in → pick a show by name. */
 export async function openDoorRoster(page: Page, showName: string): Promise<void> {
   await openAdmin(page, '/checkin');
-  await page.getByRole('button', { name: new RegExp(showName) }).first().click();
-  await expect(page.getByRole('heading', { name: showName })).toBeVisible();
+  await page.getByRole('button', { name: showName }).first().click();
+  await expect(page.getByRole('heading', { name: showName, exact: true })).toBeVisible();
 }
 
 export const chart = (page: Page) => page.getByTestId('occupancy-chart');

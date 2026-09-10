@@ -9,7 +9,7 @@ import { api, checkout, createEvent, expireHold, hold, holdRow, mockSquareChecko
 const SHOW_ONLY = { ticketType: 'Show Only' };
 
 describe('general admission (unchanged legacy contract)', () => {
-  it('mints a quick_pay link priced unit x quantity at the venue location', async () => {
+  it('mints a quick_pay link priced unit x quantity at the account location', async () => {
     const sq = mockSquareCheckout();
     const ga = await createEvent({ capacity: 120 });
     const r = await checkout(ga.id, { ...SHOW_ONLY, quantity: 2 });
@@ -20,11 +20,10 @@ describe('general admission (unchanged legacy contract)', () => {
     expect(link.quick_pay.name).toMatch(/^Show Only × 2 · .* · Billerica Elks$/);
     expect(link.quick_pay.name).not.toContain('Table');
     expect(link.quick_pay.price_money).toEqual({ amount: 7990, currency: 'USD' });
-    expect(link.quick_pay.location_id).toBe('L-VENUE');
+    expect(link.quick_pay.location_id).toBe('L-DEFAULT');
     expect(link.payment_note).toBe(`legends-event:${ga.id}:Show Only:2`);
     expect(link.checkout_options.redirect_url).toBe('http://localhost:5173/?purchase=success');
     expect(link.checkout_options.custom_fields).toEqual([{ title: 'Full name (for the guest list)' }]);
-    expect(sq.locations[0].location.address.postal_code).toBe('01821');
     const cached = await env.EVENTS.get(`link:${ga.id}:Show Only:2:PL1`, 'json');
     expect(cached).toEqual({ checkoutUrl: 'https://sandbox.square.link/u/PL1', squarePaymentLinkId: 'PL1', squareOrderId: 'ORD1' });
   });
@@ -38,17 +37,16 @@ describe('general admission (unchanged legacy contract)', () => {
     expect(holds?.n).toBe(0);
   });
 
-  it('reuses the venue location across checkouts and falls back to the default location when the address cannot be parsed', async () => {
+  it('NEVER creates a Square location, whatever the venue address looks like (each one bills $149/month)', async () => {
     const sq = mockSquareCheckout();
-    const ga = await createEvent({ capacity: 120 });
-    await checkout(ga.id, { ...SHOW_ONLY, quantity: 1 });
-    await checkout(ga.id, { ...SHOW_ONLY, quantity: 1 });
-    expect(sq.locations).toHaveLength(1);
+    const parseable = await createEvent({ capacity: 120, venueAddress: '20 Howley St, Peabody, MA 01960' });
     const odd = await createEvent({ capacity: 120, venueAddress: 'Somewhere on Main Street' });
-    const r = await checkout(odd.id, { ...SHOW_ONLY, quantity: 1 });
-    expect(r.status).toBe(200);
-    expect(sq.links[2].quick_pay.location_id).toBe('L-DEFAULT');
-    expect(sq.locations).toHaveLength(1);
+    for (const ev of [parseable, parseable, odd]) {
+      const r = await checkout(ev.id, { ...SHOW_ONLY, quantity: 1 });
+      expect(r.status).toBe(200);
+    }
+    expect(sq.links.map((l) => l.quick_pay.location_id)).toEqual(['L-DEFAULT', 'L-DEFAULT', 'L-DEFAULT']);
+    expect(sq.locations).toHaveLength(0);
   });
 
   it('validates the body and refuses sold-out shows', async () => {

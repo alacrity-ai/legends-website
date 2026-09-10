@@ -41,3 +41,6 @@ admin/dist-e2e/
 tests/e2e/test-results/
 tests/e2e/playwright-report/
 worker/campaign-preview.*
+
+# Playwright e2e local state (wrangler dev --persist-to)
+tests/e2e/.wrangler/

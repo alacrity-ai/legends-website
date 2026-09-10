@@ -19,6 +19,8 @@ export interface Party {
   seats?: string[];
   seatLabels?: string[];
   seatStatus?: 'assigned' | 'partial' | 'unassigned';
+  /** When the Legends confirmation email last went to the buyer; absent = never (no email, or Mailgun failed). */
+  confirmationSentAt?: string;
 }
 
 export type CheckinMap = Record<string, string>;

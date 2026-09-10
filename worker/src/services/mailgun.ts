@@ -1,3 +1,9 @@
+export interface EmailAttachment {
+  filename: string;
+  content: string;
+  contentType: string;
+}
+
 export interface EmailMessage {
   from: string;
   to: string;
@@ -5,12 +11,17 @@ export interface EmailMessage {
   text: string;
   html: string;
   replyTo?: string;
+  attachments?: EmailAttachment[];
 }
+
+const MAILGUN_API = 'https://api.mailgun.net';
 
 export async function sendEmail(
   message: EmailMessage,
   apiKey: string,
   domain: string,
+  /** Override the Mailgun API base (the e2e suite points this at its stub). */
+  apiBase?: string,
 ): Promise<{ success: boolean; error?: string }> {
   const form = new FormData();
   form.append('from', message.from);
@@ -21,8 +32,11 @@ export async function sendEmail(
   if (message.replyTo) {
     form.append('h:Reply-To', message.replyTo);
   }
+  for (const a of message.attachments ?? []) {
+    form.append('attachment', new Blob([a.content], { type: a.contentType }), a.filename);
+  }
 
-  const url = `https://api.mailgun.net/v3/${domain}/messages`;
+  const url = `${(apiBase || MAILGUN_API).replace(/\/$/, '')}/v3/${domain}/messages`;
   const auth = btoa(`api:${apiKey}`);
 
   try {

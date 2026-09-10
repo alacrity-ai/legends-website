@@ -172,6 +172,17 @@ export async function setPartySeats(eventId: string, paymentId: string, seatIds:
   return data.party;
 }
 
+/**
+ * Re-send the Legends confirmation email (venue, seats, calendar file) to the
+ * buyer. Returns the party with its new `confirmationSentAt`.
+ */
+export async function resendConfirmation(eventId: string, paymentId: string): Promise<Party> {
+  const data = await authedRequest<{ sentTo: string; party: Party }>(`/api/admin/events/${eventId}/parties/${encodeURIComponent(paymentId)}/confirmation`, {
+    method: 'POST',
+  });
+  return data.party;
+}
+
 /** Fields accepted by a partial event update (PATCH). All optional. */
 export interface EventPatchInput {
   showName?: string;

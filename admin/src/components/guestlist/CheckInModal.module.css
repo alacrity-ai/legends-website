@@ -242,3 +242,9 @@
 .seatsWarn {
   color: var(--color-error);
 }
+
+.error {
+  margin: 0.5rem 0 0;
+  color: var(--color-error, #e5484d);
+  font-size: var(--text-sm);
+}

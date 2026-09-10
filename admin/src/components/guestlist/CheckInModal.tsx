@@ -10,12 +10,20 @@ interface CheckInModalProps {
   onUncheck: () => Promise<void> | void;
   /** Reserved-seating shows: open the seat picker for this party. */
   onChangeSeats?: () => void;
+  /** Re-send the buyer's confirmation email (only offered when the party has an email). */
+  onResendConfirmation?: () => Promise<void>;
 }
 
 function variationLabel(v: TicketVariation): string {
   if (v === 'Show and Meal') return 'Meal + Show';
   if (v === 'Show Only') return 'Show Only';
   return 'Ticket';
+}
+
+function formatDateTime(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 function formatTime(iso: string | null): string | null {
@@ -32,8 +40,11 @@ export default function CheckInModal({
   onCheckIn,
   onUncheck,
   onChangeSeats,
+  onResendConfirmation,
 }: CheckInModalProps) {
   const [busy, setBusy] = useState(false);
+  const [resend, setResend] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+  const [resendError, setResendError] = useState<string | null>(null);
   const fullName = `${party.firstName} ${party.lastName}`.trim() || party.email;
   const checkedTime = formatTime(checkedInAt);
 
@@ -60,7 +71,21 @@ export default function CheckInModal({
     }
   };
 
+  const handleResend = async () => {
+    if (!onResendConfirmation || busy || resend === 'sending') return;
+    setResend('sending');
+    setResendError(null);
+    try {
+      await onResendConfirmation();
+      setResend('sent');
+    } catch (err) {
+      setResend('failed');
+      setResendError(err instanceof Error ? err.message : 'Could not send the email.');
+    }
+  };
+
   const headlineLabel = party.quantity === 1 ? 'ticket' : 'tickets';
+  const confirmedAt = party.confirmationSentAt ? formatDateTime(party.confirmationSentAt) : null;
 
   return (
     <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal="true">
@@ -120,7 +145,19 @@ export default function CheckInModal({
           )}
           <dt>Ordered</dt>
           <dd>{party.orderDate}</dd>
+          {party.email && (
+            <>
+              <dt>Confirmation</dt>
+              <dd data-testid="party-confirmation">{resend === 'sent' ? 'Sent just now' : confirmedAt ? `Emailed ${confirmedAt}` : 'Not emailed yet'}</dd>
+            </>
+          )}
         </dl>
+
+        {resendError && (
+          <p className={styles.error} role="alert">
+            {resendError}
+          </p>
+        )}
 
         {checkedInAt && checkedTime && (
           <p className={styles.status}>
@@ -151,6 +188,11 @@ export default function CheckInModal({
           {onChangeSeats && (
             <button type="button" className={`${styles.button} ${styles.cancel}`} onClick={onChangeSeats} disabled={busy}>
               {party.seatStatus === 'unassigned' || !party.seats?.length ? 'Assign seats' : 'Change seats'}
+            </button>
+          )}
+          {onResendConfirmation && party.email && (
+            <button type="button" className={`${styles.button} ${styles.cancel}`} onClick={() => void handleResend()} disabled={busy || resend === 'sending'}>
+              {resend === 'sending' ? 'Sending…' : resend === 'sent' ? 'Confirmation sent ✓' : 'Resend confirmation email'}
             </button>
           )}
           <button
