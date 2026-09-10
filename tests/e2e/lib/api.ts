@@ -28,7 +28,15 @@ export const ROOM = {
 };
 
 export async function api(path: string, init: RequestInit = {}): Promise<{ status: number; body: any }> {
-  const res = await fetch(WORKER + path, init);
+  let res: Response;
+  try {
+    res = await fetch(WORKER + path, init);
+  } catch (err) {
+    // wrangler dev occasionally drops a kept-alive socket ("other side closed");
+    // one retry is enough and the calls here are all safe to repeat.
+    if (!(err instanceof TypeError)) throw err;
+    res = await fetch(WORKER + path, init);
+  }
   const body = await res.json().catch(() => ({}));
   return { status: res.status, body };
 }
