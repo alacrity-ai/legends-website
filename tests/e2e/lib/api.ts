@@ -5,7 +5,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { PASSCODE, WORKER } from '../playwright.config.ts';
+import { PASSCODE, SQUARE_STUB, WORKER } from '../playwright.config.ts';
 
 const WORKER_DIR = fileURLToPath(new URL('../../../worker', import.meta.url));
 const AUTH = { Authorization: `Bearer ${PASSCODE}` };
@@ -51,7 +51,9 @@ export async function createShow(opts: { seatingChartId?: string; capacity?: num
   const r = await admin('/api/admin/events', {
     method: 'POST',
     body: JSON.stringify({
-      showName: opts.name ?? (opts.seatingChartId ? 'Rat Pack Night' : 'Summer GA Show'),
+      // Unique per call so the door picker (matched by name) can never land on a
+      // same-named show left behind by an earlier run in the persisted local state.
+      showName: `${opts.name ?? (opts.seatingChartId ? 'Rat Pack Night' : 'Summer GA Show')} ${Date.now().toString(36).slice(-4)}`,
       description: 'Dinner seating at the Elks. Doors 7, show 8.',
       venueName: 'Billerica Elks',
       venueAddress: '14 Webb Brook Rd, Billerica, MA 01821',
@@ -196,4 +198,19 @@ export async function guests(showId: string): Promise<any> {
 export function expireHold(holdId: string): void {
   const past = Date.now() - 1000;
   d1(`UPDATE seat_holds SET expires_at=${past} WHERE id='${holdId}'; UPDATE seats SET hold_expires_at=${past} WHERE hold_id='${holdId}'`);
+}
+
+export interface StubMail {
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  attachments: { filename: string; content: string }[];
+}
+
+/** Confirmation emails the worker has sent through the stub "Mailgun" since the last reset. */
+export async function sentMail(): Promise<StubMail[]> {
+  const res = await fetch(`${SQUARE_STUB}/_test/mail`);
+  return (await res.json()) as StubMail[];
 }

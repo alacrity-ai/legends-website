@@ -4,7 +4,7 @@
  * browser; the only stand-in is the Square stub.
  */
 import { expect, test } from '@playwright/test';
-import { createShow, deleteShow, guests, seatedShow, seatStatuses, type Show } from '../lib/api.ts';
+import { createShow, deleteShow, guests, seatedShow, seatStatuses, sentMail, type Show } from '../lib/api.ts';
 import { openAndBuy, sheet } from '../lib/buyer.ts';
 
 test('reserved seating: pay on the (stub) Square page and land back on the site with the seats sold', async ({ page }) => {
@@ -28,6 +28,21 @@ test('reserved seating: pay on the (stub) Square page and land back on the site 
     const status = seatStatuses(show.id);
     expect(status['o_2.1']).toBe('sold');
     expect(status['o_2.2']).toBe('sold');
+
+    // The buyer's Legends confirmation (LGD-24): venue + map, seats, calendar file.
+    const mail = (await sentMail()).filter((m) => m.to === 'buyer@example.com' && m.subject.includes(show.showName));
+    expect(mail).toHaveLength(1);
+    expect(mail[0].from).toBe('DJKMD Legends <tickets@mg.e2e>');
+    expect(mail[0].subject).toBe(`Your tickets: ${show.showName} — Jun 1, 2027, 8:00 PM`);
+    expect(mail[0].text).toContain('14 Webb Brook Rd, Billerica, MA 01821');
+    expect(mail[0].text).toContain('https://www.google.com/maps/search/?api=1&query=');
+    expect(mail[0].text).toContain('2 × Dinner + Show');
+    expect(mail[0].text).toContain('Total paid: $119.90');
+    expect(mail[0].text).toContain('Your seats: Table 2, seats 1–2.');
+    expect(mail[0].text).toContain('At the door: give the name "Dean Martin"');
+    expect(mail[0].attachments.map((a) => a.filename)).toEqual(['djkmd-legends-show.ics']);
+    expect(mail[0].attachments[0].content).toContain('LOCATION:Billerica Elks');
+    expect((await guests(show.id)).parties[0].confirmationSentAt).toBeTruthy();
 
     // The next buyer sees those seats taken and is placed beside them.
     await openAndBuy(page, show.id, 2);

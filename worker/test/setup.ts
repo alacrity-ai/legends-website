@@ -2,6 +2,7 @@ import { applyD1Migrations, env, fetchMock } from 'cloudflare:test';
 import { afterEach, beforeAll, beforeEach } from 'vitest';
 
 const SQUARE = 'https://connect.squareupsandbox.com';
+const MAILGUN = 'https://api.mailgun.net';
 
 // Fresh schema per isolated-storage test.
 beforeAll(async () => {
@@ -17,5 +18,6 @@ beforeEach(() => {
 // drops them so one test's Square never answers the next test's calls.
 afterEach(async () => {
   await (fetchMock.get(SQUARE) as unknown as { close(): Promise<void> }).close();
+  await (fetchMock.get(MAILGUN) as unknown as { close(): Promise<void> }).close();
   fetchMock.deactivate();
 });

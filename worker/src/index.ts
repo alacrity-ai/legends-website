@@ -27,6 +27,7 @@ import {
 } from './services/mailing-list.ts';
 import { buildNotificationEmail } from './templates/notification.ts';
 import { buildConfirmationEmail } from './templates/confirmation.ts';
+import { buildTicketConfirmationEmail } from './templates/ticket-confirmation.ts';
 import { fetchUpcomingEvents } from './services/google-calendar.ts';
 import { buildSalesReport, buildShowBuyers } from './sales.ts';
 import { handleAdminCharts } from './charts.ts';
@@ -45,12 +46,10 @@ import {
 } from './http.ts';
 import {
   createPaymentLink,
-  createVenueLocation,
   deactivatePaymentLink,
   getCustomerContact,
   getOrderDetails,
   getPaymentDetails,
-  parseVenueAddress,
   verifyWebhookSignature,
 } from './services/square.ts';
 
@@ -285,17 +284,9 @@ async function handleCheckout(
       .join('; ');
   }
 
-  // Buyer receipts render the order's location (address + map), so mint the
-  // link at a Square location matching the show's venue — never the account
-  // default, whose registered address is not a public venue (LGD-3).
-  let venueLocationId: string | null = null;
-  try {
-    venueLocationId = await resolveVenueLocationId(env, event);
-  } catch (err) {
-    // Never block a sale on venue-location plumbing; the default location's
-    // address is kept pointing at a public venue as the safe fallback.
-    console.error('[checkout] venue location resolution failed:', errorMessage(err));
-  }
+  // The link is minted at the account's one Square location. LGD-3 used to
+  // create a location per venue for prettier receipts; that cost $149/month
+  // per location on Square Premium and was reverted (see services/square.ts).
 
   // IMPORTANT: never reuse a previously minted link. A Square quick_pay link is
   // backed by a single order; once a buyer pays, that order is settled and any
@@ -311,7 +302,6 @@ async function handleCheckout(
       redirectUrl: primaryOrigin(env) + '/?purchase=success',
       paymentNote: `legends-event:${id}:${ticketType}:${quantity}`,
       customFieldTitle: 'Full name (for the guest list)',
-      ...(venueLocationId ? { locationId: venueLocationId } : {}),
     });
   } catch (err) {
     return jsonResponse(502, { error: `Square: ${errorMessage(err)}` }, corsHeaders);
@@ -339,39 +329,6 @@ async function handleCheckout(
   }
 
   return jsonResponse(200, { checkoutUrl: link.checkoutUrl }, corsHeaders, noStore);
-}
-
-/**
- * Resolve (or create) the Square location for an event's venue, cached in KV
- * under `sqloc:<venue name|address>`. One Square location exists per distinct
- * venue string; all events at the same venue share it. Returns null when the
- * venue address can't be parsed — the caller then uses the default location.
- */
-async function resolveVenueLocationId(env: Env, event: EventRecord): Promise<string | null> {
-  const parsed = parseVenueAddress(event.venueAddress);
-  if (!parsed) {
-    console.warn('[checkout] unparseable venue address, using default location:', event.venueAddress);
-    return null;
-  }
-
-  const cacheKey =
-    'sqloc:' + `${event.venueName}|${event.venueAddress}`.toLowerCase().replace(/\s+/g, ' ').trim();
-  const cached = await env.EVENTS.get(cacheKey);
-  if (cached) {
-    try {
-      const entry = JSON.parse(cached) as { locationId?: string };
-      if (entry.locationId) return entry.locationId;
-    } catch {
-      // fall through and re-create
-    }
-  }
-
-  const locationId = await createVenueLocation(env, event.venueName, parsed);
-  await env.EVENTS.put(
-    cacheKey,
-    JSON.stringify({ locationId, venueName: event.venueName, venueAddress: event.venueAddress }),
-  );
-  return locationId;
 }
 
 /* ── Square webhook → auto-roster + sold counter ──────────────── */
@@ -550,6 +507,23 @@ async function processCompletedPayment(
     }
   }
   await env.GUESTLIST.put(partyKey, JSON.stringify(party));
+
+  // Legends-branded confirmation (LGD-24): the buyer's real receipt for the
+  // night — venue address + map link, seats, calendar file. Square's receipt
+  // only knows our single Location. A mail problem never touches the sale.
+  if (party.email && eventRecord) {
+    try {
+      const sent = await sendTicketConfirmation(env, eventRecord, party, party.email);
+      if (sent.success) {
+        party.confirmationSentAt = new Date().toISOString();
+        await env.GUESTLIST.put(partyKey, JSON.stringify(party));
+      } else {
+        console.error('[webhook] confirmation email failed', sent.error);
+      }
+    } catch (err) {
+      console.error('[webhook] confirmation email failed', errorMessage(err));
+    }
+  }
 
   // Every buyer joins the mailing list; never let this break the sale flow.
   if (party.email) {
@@ -1045,6 +1019,15 @@ async function handleAdminEvents(
     return handleSetPartySeats(seatsMatch[1], seatsMatch[2], request, env, corsHeaders, noStore);
   }
 
+  // Confirmation email (LGD-24): staff re-send to the buyer, or send a copy elsewhere.
+  const confirmMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/parties\/([A-Za-z0-9_-]{6,64})\/confirmation$/);
+  if (confirmMatch) {
+    if (request.method !== 'POST') {
+      return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+    }
+    return handleResendConfirmation(confirmMatch[1], confirmMatch[2], request, env, corsHeaders, noStore);
+  }
+
   const resyncMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/seating\/resync$/);
   if (resyncMatch) {
     if (request.method !== 'POST') {
@@ -1085,6 +1068,7 @@ function partyRecordToParty(r: PartyRecord): Party {
     notes: r.ticketType || null,
     // Reserved seating (v0.5): present once the webhook has confirmed seats.
     ...(r.seats ? { seats: r.seats, seatLabels: r.seatLabels ?? [], seatStatus: r.seatStatus ?? 'assigned' } : {}),
+    ...(r.confirmationSentAt ? { confirmationSentAt: r.confirmationSentAt } : {}),
   };
 }
 
@@ -1152,6 +1136,106 @@ function labelsFor(layout: NonNullable<EventRecord['seating']>['layout'], seatId
     const o = byObject.get(sid.slice(0, dot));
     return o ? seatLabel(o, Number(sid.slice(dot + 1))) : sid;
   });
+}
+
+/* ── Ticket confirmation email (LGD-24) ───────────────────────── */
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Send the Legends confirmation for one party to `to`. Used by the webhook
+ * (to the buyer) and by staff re-sends. Never throws on Mailgun errors — the
+ * result says what happened.
+ */
+async function sendTicketConfirmation(
+  env: Env,
+  event: EventRecord,
+  party: PartyRecord,
+  to: string,
+): Promise<{ success: boolean; error?: string }> {
+  const seatSummary =
+    event.seating && party.seats?.length
+      ? groupSeatIds(event.seating.layout, party.seats)
+          .map((o) => `${objectNoun(o)}, ${seatNumbersPhrase(o.seats)}`)
+          .join('; ')
+      : null;
+  const mail = buildTicketConfirmationEmail({
+    event,
+    party,
+    when: formatEventDateTime(event.startTime),
+    origin: primaryOrigin(env),
+    seatSummary,
+  });
+  return sendEmail(
+    {
+      from: `DJKMD Legends <tickets@${env.MAILGUN_DOMAIN}>`,
+      to,
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
+      replyTo: env.BOOKING_EMAIL,
+      attachments: [{ filename: 'djkmd-legends-show.ics', content: mail.ics, contentType: 'text/calendar; charset=utf-8; method=PUBLISH' }],
+    },
+    env.MAILGUN_API_KEY,
+    env.MAILGUN_DOMAIN,
+    env.MAILGUN_API_BASE,
+  );
+}
+
+/**
+ * POST /api/admin/events/:id/parties/:paymentId/confirmation { to? }
+ * Re-send the confirmation to the buyer (records `confirmationSentAt`), or
+ * send a copy to `to` without touching the party (support / verification).
+ */
+async function handleResendConfirmation(
+  id: string,
+  paymentId: string,
+  request: Request,
+  env: Env,
+  corsHeaders: Record<string, string>,
+  noStore: Record<string, string>,
+): Promise<Response> {
+  let body: { to?: unknown } = {};
+  const raw = await request.text();
+  if (raw.trim()) {
+    try {
+      body = JSON.parse(raw) as typeof body;
+    } catch {
+      return jsonResponse(400, { error: 'Invalid JSON body' }, corsHeaders);
+    }
+  }
+  if (typeof body !== 'object' || body === null || Object.keys(body).some((k) => k !== 'to')) {
+    return jsonResponse(400, { error: 'Body must be { to? }' }, corsHeaders);
+  }
+  const override = body.to;
+  if (override !== undefined && (typeof override !== 'string' || !EMAIL_RE.test(override.trim()))) {
+    return jsonResponse(400, { error: 'to must be an email address' }, corsHeaders);
+  }
+
+  const eventRaw = await env.EVENTS.get(`event:${id}`);
+  if (!eventRaw) return jsonResponse(404, { error: 'Event not found' }, corsHeaders);
+  let event: EventRecord;
+  try {
+    event = JSON.parse(eventRaw) as EventRecord;
+  } catch {
+    return jsonResponse(500, { error: 'Event is malformed' }, corsHeaders);
+  }
+  const partyKey = `party:${id}:${paymentId}`;
+  const party = await env.GUESTLIST.get<PartyRecord>(partyKey, 'json');
+  if (!party) return jsonResponse(404, { error: 'Party not found' }, corsHeaders);
+
+  const to = typeof override === 'string' ? override.trim() : party.email;
+  if (!to) return jsonResponse(400, { error: 'This party has no email address on file' }, corsHeaders);
+
+  const sent = await sendTicketConfirmation(env, event, party, to);
+  if (!sent.success) {
+    return jsonResponse(502, { error: `Email: ${sent.error ?? 'send failed'}` }, corsHeaders);
+  }
+  if (typeof override !== 'string') {
+    party.confirmationSentAt = new Date().toISOString();
+    await env.GUESTLIST.put(partyKey, JSON.stringify(party));
+  }
+  return jsonResponse(200, { sentTo: to, party: partyRecordToParty(party) }, corsHeaders, noStore);
 }
 
 /**

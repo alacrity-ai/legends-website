@@ -75,7 +75,7 @@ test('the view choice survives a reload, and general-admission shows have no tog
 
   const ga = await createShow({ capacity: 40, name: 'GA Night' });
   try {
-    await openDoorRoster(page, 'GA Night');
+    await openDoorRoster(page, ga.showName);
     await expect(page.getByRole('button', { name: 'Chart', exact: true })).toHaveCount(0);
     await expect(page.getByText('seats arrived')).toHaveCount(0);
   } finally {

@@ -22,6 +22,8 @@ import type { EventSeating, PartySeatStatus } from '@seating/types.ts';
 export interface Env {
   MAILGUN_API_KEY: string;
   MAILGUN_DOMAIN: string;
+  /** Optional Mailgun API base override (e2e stub). */
+  MAILGUN_API_BASE?: string;
   BOOKING_EMAIL: string;
   ALLOWED_ORIGINS: string;
   GOOGLE_API_KEY: string;
@@ -128,6 +130,9 @@ export interface Party {
   seats?: string[];
   seatLabels?: string[];
   seatStatus?: PartySeatStatus;
+  /** When the Legends confirmation email last went to the buyer (LGD-24); absent = never sent. */
+  /** Legends confirmation email last sent (LGD-24); absent = never. */
+  confirmationSentAt?: string;
 }
 
 export interface CheckinRecord {
@@ -155,4 +160,6 @@ export interface PartyRecord {
   /** Human labels for `seats` ("T1-3"), derived from the show's snapshot at confirmation. */
   seatLabels?: string[];
   seatStatus?: PartySeatStatus;
+  /** When the Legends confirmation email last went to the buyer (LGD-24); absent = never sent. */
+  confirmationSentAt?: string;
 }

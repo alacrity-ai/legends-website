@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { UnauthorizedError } from '../../../services/guestlist.ts';
-import { eventCheckIn, eventUncheck, getEventGuests, resyncSeating, setPartySeats, type EventGuests, type ManagedEvent } from '../../../services/admin-events.ts';
+import { eventCheckIn, eventUncheck, getEventGuests, resendConfirmation, resyncSeating, setPartySeats, type EventGuests, type ManagedEvent } from '../../../services/admin-events.ts';
 import type { CheckinMap, Party } from '../../../types/guestlist.ts';
 import OccupancyChart from '../../guestlist/OccupancyChart.tsx';
 import CheckInModal from '../../guestlist/CheckInModal.tsx';
@@ -207,6 +207,10 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
           onChangeSeats={() => {
             setAssignParty(selectedParty);
             setSelectedParty(null);
+          }}
+          onResendConfirmation={async () => {
+            await resendConfirmation(event.id, selectedParty.id);
+            void refetch();
           }}
         />
       )}

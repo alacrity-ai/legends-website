@@ -76,6 +76,7 @@ One Worker (`worker/src/index.ts`) routes four groups of endpoints, on two route
 | `/api/events/:id/seats/hold[/:holdId]` | POST/DELETE | Choose + hold seats for a party (server-side, atomic, 12 min) / release; `POST …/checkout` then requires the `holdId` on seated shows | D1 `seats`, `seat_holds` |
 | `/api/admin/events/:id/guests` | GET | Door roster; on seated shows also `seating { layout, seats: { status, partyId } }` and per-party `seats / seatLabels / seatStatus` | KV `GUESTLIST` + D1 |
 | `/api/admin/events/:id/parties/:paymentId/seats` | PUT | Staff assign / top up / move a party's seats (`{ seatIds }`); 409 names seats taken meanwhile | D1 `seats` (one batch, restored on conflict) + KV party |
+| `/api/admin/events/:id/parties/:paymentId/confirmation` | POST | Re-send the buyer's Legends confirmation email (`{ to? }` sends a copy elsewhere without touching the party) | Mailgun |
 | `/api/booking` | POST | Booking inquiry → emails the team + confirmation to sender | Mailgun |
 | `/api/mailing-list` | POST | Save a signup (email + optional name) | KV `MAILING_LIST` |
 | `/api/guestlist/...` | GET/POST/DELETE | List shows, fetch a roster, check parties in/out | KV `GUESTLIST`, passcode-gated |
@@ -89,7 +90,7 @@ These are the "moving parts" a dev can't see by reading code alone — they're c
 - **Square** — ticketing. As of v0.2, the admin Event Form creates Square **payment links programmatically** via the API (one per ticket type); see `worker/src/services/square.ts`. Legacy shows still use manually-pasted `square.link` URLs in calendar descriptions.
 - **Google Calendar** — *legacy* source for the 2 grandfathered shows only, kept until ~Sept 2026 (`LEGACY_CALENDAR_ENABLED` flag). New shows live in KV `EVENTS`. Event description on legacy events doubles as ticket data (see `parse-description.ts`).
 - **Square** — ticketing. Each show gets a manually-created checkout "Payment Link"; the URL is pasted into the calendar event. There is no Square API integration.
-- **Mailgun** — transactional email for booking inquiries.
+- **Mailgun** — transactional email: booking inquiries, and the buyer's ticket confirmation (venue address + map link, seats, `.ics`) sent from the Square `payment.updated` webhook. The Square receipt itself only carries our single Square Location — **never create Square Locations (or other per-seat-billed objects) from code**; each one cost $149/month under Square Premium (LGD-21).
 - **Cloudflare KV** — two namespaces persist the mailing list and guestlist rosters/check-ins.
 
 ## Surface 5 — Content, tooling & config

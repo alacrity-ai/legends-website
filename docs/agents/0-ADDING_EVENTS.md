@@ -63,6 +63,9 @@ which orchestra size, etc.) — see the "discrepancies" note below.
   `POST /api/admin/events/:id/seating/resync` re-copies the master layout while `sold = 0`.
   After sales: `GET /api/admin/events/:id/guests` returns each party's `seats` / `seatLabels` /
   `seatStatus` (`assigned` | `partial` | `unassigned`) plus `seating.seats` occupancy;
+  `POST /api/admin/events/:id/parties/:paymentId/confirmation { "to"?: "…" }` re-sends the buyer's
+  Legends confirmation email (venue + map link, seats, calendar file); with `to` it sends a copy
+  elsewhere and leaves the party untouched.
   `PUT /api/admin/events/:id/parties/:paymentId/seats { "seatIds": ["o_2.1", "o_2.2"] }` assigns
   or moves a party (409 with `unavailable` if a seat was taken meanwhile).
 - `image`: JPEG/PNG/WebP, ≤5 MB, sent as a **base64 data URL** (see Step 2). Required at create.

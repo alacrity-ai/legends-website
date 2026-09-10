@@ -68,6 +68,8 @@ Shows are created through the **Legends Admin** app at `https://admin.djkmdlegen
 
 **Verify:** within a minute, the show appears under **Upcoming Shows** with its image; **Buy Tickets** opens a modal with one Buy button per ticket type, each going to its Square checkout. On a reserved-seating show, Buy first shows "We've saved seats for your party…" with a little map — **Looks good, continue** takes the buyer to Square; **Change table** offers other tables that fit the party. Seats stay held for 12 minutes while they pay.
 
+**What the buyer receives:** Square's receipt for the payment, plus a **DJKMD Legends confirmation email** (from `tickets@mg.djkmdlegends.com`, replies go to the booking mailbox) with the show, date/time, **venue name + address + a Google Maps link**, what they bought, their seats (or "first come, first served" / "staff will seat you"), the name to give at the door, and a calendar file. So the **Venue address** you type is exactly what buyers navigate to — get it right. (Square's own receipt always shows our one Square location, Princeton Station; that's expected and not fixable without paying Square $149/month per extra "location".)
+
 **Remove a show:** Legends Admin → **Manage Shows** → delete it. This also deactivates its Square links and removes the image.
 
 **Gotchas:**
@@ -158,6 +160,8 @@ On a show with a seating chart, the roster header gains a **List | Chart** toggl
 - A party marked **needs seats** paid after their held seats lapsed (rare: they sat on the Square page past 12 minutes while someone else bought the seats). Give them seats: **Chart → Assign seats** (or open the party → **Assign seats**), tap seats on the room — or **Best available** — then **Save**. Taken seats are dimmed and cannot be tapped. To move any party, open it and tap **Change seats**.
 - If a seat gets bought between your tap and Save, the app tells you which one ("Seat T4-2 was just taken — pick again") and the party keeps the seats it had.
 - **Print list** includes a **Seats** column on these shows.
+
+**"I never got my email" (any show, seated or not):** open the party's card → **Resend confirmation email**. The card shows when it was last emailed ("Emailed Sep 20, 7:02 PM" / "Not emailed yet"). A party with no email on file (rare: they paid without one) gets no button — check them in by name.
 
 The same live room is also under **Manage Shows → Seating chart** for the box office.
 

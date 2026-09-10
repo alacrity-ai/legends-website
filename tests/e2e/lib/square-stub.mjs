@@ -11,6 +11,9 @@
  *   POST /pay/:id                             → signs + delivers payment.updated
  *                                              to the worker, then redirects to
  *                                              the link's redirect_url
+ *   POST /v3/:domain/messages                 → Mailgun stand-in: records the
+ *                                              confirmation emails the worker sends
+ *   GET  /_test/mail                          → those emails (to, subject, text, attachments)
  *   GET  /_test/health · POST /_test/reset      → readiness / forget everything
  *
  * Started by playwright.config.ts on :8798; the worker runs with
@@ -35,6 +38,25 @@ const links = new Map();
 const orders = new Map();
 /** paymentId → { orderId, amount, email } */
 const payments = new Map();
+/** Emails the worker asked "Mailgun" to send, in order. */
+const mail = [];
+
+/** Just enough multipart/form-data to read what the worker posts to Mailgun. */
+function parseMultipart(body, contentType) {
+  const m = contentType.match(/boundary=("?)([^";]+)\1/);
+  if (!m) return [];
+  const parts = [];
+  for (const chunk of body.split(`--${m[2]}`)) {
+    if (!chunk.trim() || chunk.trim() === '--') continue;
+    const sep = chunk.indexOf('\r\n\r\n');
+    if (sep < 0) continue;
+    const head = chunk.slice(0, sep);
+    let value = chunk.slice(sep + 4);
+    if (value.endsWith('\r\n')) value = value.slice(0, -2);
+    parts.push({ name: head.match(/ name="([^"]*)"/)?.[1] ?? '', filename: head.match(/ filename="([^"]*)"/)?.[1], value });
+  }
+  return parts;
+}
 
 function json(res, status, body) {
   res.writeHead(status, { 'content-type': 'application/json' });
@@ -66,7 +88,24 @@ createServer(async (req, res) => {
     links.clear();
     orders.clear();
     payments.clear();
+    mail.length = 0;
     return json(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && path === '/_test/mail') return json(res, 200, mail);
+
+  if (req.method === 'POST' && /^\/v3\/[^/]+\/messages$/.test(path)) {
+    const parts = parseMultipart(await readBody(req), req.headers['content-type'] || '');
+    const field = (n) => parts.find((p) => p.name === n && p.filename === undefined)?.value ?? '';
+    mail.push({
+      from: field('from'),
+      to: field('to'),
+      subject: field('subject'),
+      text: field('text'),
+      html: field('html'),
+      attachments: parts.filter((p) => p.name === 'attachment').map((p) => ({ filename: p.filename, content: p.value })),
+    });
+    return json(res, 200, { id: `<${mail.length}@stub>`, message: 'Queued. Thank you.' });
   }
 
   if (req.method === 'POST' && path === '/v2/locations') {
