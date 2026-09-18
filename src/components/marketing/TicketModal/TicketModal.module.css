@@ -205,6 +205,18 @@
   border-radius: var(--radius-md);
 }
 
+.cancelledNote {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.cancelledNote a {
+  color: var(--color-accent);
+}
+
 .checkoutError {
   color: var(--color-error, #ff6b6b);
   font-size: var(--text-sm);

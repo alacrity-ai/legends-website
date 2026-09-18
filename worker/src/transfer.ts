@@ -58,6 +58,7 @@ export async function transferParty(
 ): Promise<TransferResult> {
   if (fromId === toId) throw new TransferError(400, 'Source and target are the same show');
   const [from, to] = await Promise.all([readEvent(env, fromId, 'Source'), readEvent(env, toId, 'Target')]);
+  if (to.cancelledAt) throw new TransferError(409, 'The target show has been cancelled');
   // Seats live in D1 and would have to be released and re-picked; not built yet.
   if (from.seating || to.seating) {
     throw new TransferError(409, 'Transfers between reserved-seating shows are not supported yet');

@@ -52,6 +52,7 @@ export default function TicketModal({ selectedEvent, onClose }: TicketModalProps
 
   const imageSrc = eventImageSrc(selectedEvent);
   const soldOut = selectedEvent.soldOut === true;
+  const cancelled = selectedEvent.cancelled === true;
 
   const qtyFor = (ticketType: string) => quantities[ticketType] ?? 1;
   const setQty = (ticketType: string, next: number) =>
@@ -103,7 +104,15 @@ export default function TicketModal({ selectedEvent, onClose }: TicketModalProps
             onBack={() => setSeatStep(null)}
           />
         ) : hasTickets ? (
-          soldOut ? (
+          cancelled ? (
+            <div className={styles.soldOut}>
+              This show has been cancelled
+              <p className={styles.cancelledNote}>
+                Already have tickets? Write to{' '}
+                <a href="mailto:booking@djkmdlegends.com">booking@djkmdlegends.com</a> about a refund or another show.
+              </p>
+            </div>
+          ) : soldOut ? (
             <div className={styles.soldOut}>Sold Out</div>
           ) : (
             <div className={styles.ticketList}>

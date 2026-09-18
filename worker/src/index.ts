@@ -202,6 +202,7 @@ function eventRecordToPublic(r: EventRecord): PublicEvent {
     description: r.description,
     imageUrl: r.imageKey ? `/api/events/${r.id}/image` : null,
     soldOut: r.soldOut ?? false,
+    ...(r.cancelledAt ? { cancelled: true } : {}),
     ...(r.seating ? { seating: { seatCount: r.seating.seatCount } } : {}),
     tickets: r.tickets.map((t) => ({
       ticketType: t.ticketType,
@@ -255,6 +256,10 @@ async function handleCheckout(
 
   const ticket = event.tickets.find((t) => t.ticketType === ticketType);
   if (!ticket) return jsonResponse(404, { error: 'Unknown ticket type' }, corsHeaders);
+
+  if (event.cancelledAt) {
+    return jsonResponse(409, { error: 'This show has been cancelled' }, corsHeaders);
+  }
 
   // Capacity gate. Small oversell is acceptable, so we only block once fully sold out.
   if (event.soldOut || (event.capacity != null && (event.sold ?? 0) >= event.capacity)) {
@@ -1712,7 +1717,7 @@ async function handlePatchEvent(
   }
 
   // Parse the body: metadata/ticket fields via parseEventPatch, image directives separately.
-  let patch: Partial<EventDraft> & { soldOut?: boolean; seatingChartId?: string | null };
+  let patch: Partial<EventDraft> & { soldOut?: boolean; cancelled?: boolean; seatingChartId?: string | null };
   let imageAction: { type: 'none' } | { type: 'remove' } | { type: 'replace'; bytes: Uint8Array; mime: string; ext: string };
   try {
     const body: unknown = await request.json();
@@ -1798,12 +1803,17 @@ async function handlePatchEvent(
   }
 
   // Commit the updated record. `tickets` are stored as plain price configs.
+  // `cancelled` is a switch on the wire and a timestamp at rest; restoring clears it.
+  const { cancelled, ...metadata } = patch;
   const updated: EventRecord = {
     ...seated,
-    ...patch,
+    ...metadata,
     tickets: patch.tickets ?? existing.tickets,
     imageKey,
   };
+  if (cancelled === true) updated.cancelledAt = existing.cancelledAt ?? new Date().toISOString();
+  if (cancelled === false) delete updated.cancelledAt;
+  const newlyCancelled = cancelled === true && !existing.cancelledAt;
   try {
     await env.EVENTS.put(`event:${id}`, JSON.stringify(updated));
   } catch (err) {
@@ -1813,7 +1823,8 @@ async function handlePatchEvent(
   }
 
   // Best-effort cleanup of resources the old record referenced.
-  if (ticketsChanged) await clearLinkCache(env, id);
+  // A cancelled show must not stay payable through a checkout link minted earlier.
+  if (ticketsChanged || newlyCancelled) await clearLinkCache(env, id);
   if (oldImageKeyToDelete) {
     await env.EVENT_IMAGES.delete(oldImageKeyToDelete).catch(() => {});
   }

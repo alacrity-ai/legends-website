@@ -85,6 +85,8 @@ export interface EventRecord extends EventDraft {
   tickets: EventTicket[];
   sold: number; // tickets sold so far (driven by the Square webhook)
   soldOut: boolean; // capacity reached, or manually toggled
+  /** When staff cancelled the show; absent = on. Nothing sells while set. Refunds stay with staff, in Square. */
+  cancelledAt?: string;
   createdAt: string;
   source: 'form' | 'google-calendar';
   /** Reserved seating (v0.5): a snapshot of the attached layout. Absent = general admission. */
@@ -104,6 +106,8 @@ export interface PublicEvent extends CalendarEvent {
   endTime?: string | null;
   imageUrl?: string | null;
   soldOut?: boolean;
+  /** Staff called the show off: still listed so ticket holders see it, never sold. */
+  cancelled?: boolean;
   tickets?: Array<{ ticketType: string; priceCents: number; checkoutUrl?: string }>;
   /** Present only on reserved-seating shows (v0.5); the layout comes from the no-store seating endpoint. */
   seating?: { seatCount: number };

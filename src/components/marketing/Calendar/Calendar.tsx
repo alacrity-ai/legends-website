@@ -86,7 +86,11 @@ export default function Calendar() {
                     loading="lazy"
                   />
                 )}
-                {event.soldOut && <span className={styles.soldOutBadge}>Sold Out</span>}
+                {event.cancelled ? (
+                  <span className={`${styles.soldOutBadge} ${styles.cancelledBadge}`}>Cancelled</span>
+                ) : (
+                  event.soldOut && <span className={styles.soldOutBadge}>Sold Out</span>
+                )}
                 <h3 className={styles.eventTitle}>{event.title}</h3>
                 <p className={styles.eventDateTime}>
                   {formatDate(event.date)}
@@ -109,7 +113,7 @@ export default function Calendar() {
                   className={styles.cardButton}
                   onClick={() => setTicketEvent(event)}
                 >
-                  {event.soldOut ? 'Sold Out' : 'Buy Tickets'}
+                  {event.cancelled ? 'Cancelled' : event.soldOut ? 'Sold Out' : 'Buy Tickets'}
                 </Button>
               </article>
               );

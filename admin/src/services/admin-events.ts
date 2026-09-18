@@ -54,6 +54,8 @@ export interface ManagedEvent {
   capacity: number | null;
   sold: number;
   soldOut: boolean;
+  /** When staff cancelled the show; absent = on. */
+  cancelledAt?: string;
   remaining: number | null;
   createdAt: string;
   source: 'form' | 'google-calendar';
@@ -194,6 +196,8 @@ export interface EventPatchInput {
   tickets?: TicketInput[];
   capacity?: number | null;
   soldOut?: boolean;
+  /** Cancel (true) or restore (false) the show. Cancelling stops sales; it refunds nobody. */
+  cancelled?: boolean;
   /** Attach (`c_…`), swap, or detach (`null`) the seating chart; 409 once tickets have sold. */
   seatingChartId?: string | null;
   /** Base64 data URL to replace the image. */
@@ -221,4 +225,9 @@ export async function resyncSeating(id: string): Promise<ManagedEvent> {
 /** Toggle a show's manual sold-out flag. */
 export function setSoldOut(id: string, soldOut: boolean): Promise<ManagedEvent> {
   return updateEvent(id, { soldOut });
+}
+
+/** Cancel a show, or restore a cancelled one. */
+export function setCancelled(id: string, cancelled: boolean): Promise<ManagedEvent> {
+  return updateEvent(id, { cancelled });
 }
