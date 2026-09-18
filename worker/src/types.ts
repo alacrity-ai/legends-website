@@ -162,4 +162,22 @@ export interface PartyRecord {
   seatStatus?: PartySeatStatus;
   /** When the Legends confirmation email last went to the buyer (LGD-24); absent = never sent. */
   confirmationSentAt?: string;
+  /** Set on the target show's record when staff moved these tickets here from another show. */
+  transferredFrom?: PartyTransfer;
+  /**
+   * Tickets staff moved off this show. When every ticket has gone the record
+   * stays behind at quantity 0: the party key is the webhook's dedupe marker,
+   * so a later Square event for the same payment (a partial refund, say)
+   * cannot put the buyer back on the show they left.
+   */
+  transferredOut?: PartyTransfer[];
+}
+
+/** One staff ticket transfer, as seen from either side of it. */
+export interface PartyTransfer {
+  eventId: string;
+  showName: string;
+  startTime: string;
+  quantity: number;
+  at: string;
 }
