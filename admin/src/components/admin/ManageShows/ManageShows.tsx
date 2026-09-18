@@ -198,138 +198,154 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
     );
   }
 
+  // A show is past once its end time has gone — the same rule the public site uses to drop it.
+  const now = Date.now();
+  const isPast = (ev: ManagedEvent) => new Date(ev.endTime).getTime() < now;
+  const upcoming = events.filter((ev) => !isPast(ev)).sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const past = events.filter(isPast).sort((a, b) => b.startTime.localeCompare(a.startTime));
+
+  const renderCard = (ev: ManagedEvent, ended: boolean) => {
+    const sold = ev.sold ?? 0;
+    const capped = ev.capacity != null;
+    const pct = capped ? Math.min(100, Math.round((sold / ev.capacity!) * 100)) : 0;
+    const full = capped && sold >= ev.capacity!;
+    return (
+      <li key={ev.id} className={styles.card}>
+        <div className={styles.cardHead}>
+          <div className={styles.headText}>
+            <h2 className={styles.name}>{ev.showName}</h2>
+            <p className={styles.when}>{formatDateTime(ev.startTime)}</p>
+            <p className={styles.where}>
+              {ev.venueName} · {ev.venueAddress}
+            </p>
+          </div>
+          <span
+            className={`${styles.status} ${ended ? styles.statusEnded : ev.soldOut ? styles.statusSold : styles.statusLive}`}
+          >
+            {ended ? 'Ended' : ev.soldOut ? 'Sold Out' : 'Live'}
+          </span>
+        </div>
+
+        <div className={styles.capacity}>
+          {capped ? (
+            <>
+              <div className={styles.meter}>
+                <div
+                  className={`${styles.meterFill} ${full ? styles.meterFillFull : ''}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className={styles.capacityText}>
+                <strong>{sold}</strong> / {ev.capacity} sold
+                {ev.remaining != null && <> · {ev.remaining} left</>}
+              </span>
+            </>
+          ) : (
+            <span className={styles.capacityText}>
+              <strong>{sold}</strong> sold · unlimited capacity
+            </span>
+          )}
+        </div>
+
+        <div className={styles.tickets}>
+          {ev.seating && (
+            <span className={`${styles.ticketPill} ${styles.seatingPill}`} title={`Snapshot of ${ev.seating.chartName} (rev ${ev.seating.chartRevision})`}>
+              Reserved seating
+              <span className={styles.ticketPrice}>{ev.seating.chartName} · {ev.seating.seatCount} seats</span>
+            </span>
+          )}
+          {ev.tickets.map((t) => (
+            <span key={t.ticketType} className={styles.ticketPill}>
+              {t.ticketType}
+              <span className={styles.ticketPrice}>{formatPrice(t.priceCents)}</span>
+            </span>
+          ))}
+        </div>
+
+        <div className={styles.toolbar}>
+          <div className={styles.toolGroup}>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost}`}
+              onClick={() => void handleCopy(ev.id, shareUrl(ev.id))}
+              title={shareUrl(ev.id)}
+            >
+              {copiedKey === ev.id ? 'Copied!' : 'Copy link'}
+            </button>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost}`}
+              onClick={() => handleDownloadQr(ev.showName, shareUrl(ev.id))}
+              title="Download a QR code that opens this show on the site"
+            >
+              QR code
+            </button>
+          </div>
+          <div className={styles.toolGroup}>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnPrimary}`}
+              onClick={() => setEditingEvent(ev)}
+            >
+              Edit
+            </button>
+            {!ended && (
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnGhost}`}
+                onClick={() => void handleToggleSoldOut(ev)}
+                disabled={togglingId === ev.id}
+              >
+                {togglingId === ev.id
+                  ? 'Saving…'
+                  : ev.soldOut
+                    ? 'Mark available'
+                    : 'Mark sold out'}
+              </button>
+            )}
+            {ev.seating && (
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnGhost}`}
+                onClick={() => setSeatingTarget(ev)}
+                title="Who sits where, live"
+              >
+                Seating chart
+              </button>
+            )}
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnDanger}`}
+              onClick={() => setConfirmTarget(ev)}
+              disabled={deletingId === ev.id}
+            >
+              {deletingId === ev.id ? 'Deleting…' : 'Delete'}
+            </button>
+          </div>
+        </div>
+
+        <span className={styles.id}>{ev.id}</span>
+      </li>
+    );
+  };
+
   return (
     <div className={styles.wrap}>
       <span className={styles.overline}>Box Office</span>
       <h1 className={styles.title}>Manage Shows</h1>
       <p className={styles.subtitle}>
-        {events.length} show{events.length === 1 ? '' : 's'} on the books.
+        {upcoming.length} upcoming{past.length > 0 && <> · {past.length} past</>}
       </p>
 
-      <ul className={styles.list}>
-        {events.map((ev) => {
-          const sold = ev.sold ?? 0;
-          const capped = ev.capacity != null;
-          const pct = capped ? Math.min(100, Math.round((sold / ev.capacity!) * 100)) : 0;
-          const full = capped && sold >= ev.capacity!;
-          return (
-            <li key={ev.id} className={styles.card}>
-              <div className={styles.cardHead}>
-                <div className={styles.headText}>
-                  <h2 className={styles.name}>{ev.showName}</h2>
-                  <p className={styles.when}>{formatDateTime(ev.startTime)}</p>
-                  <p className={styles.where}>
-                    {ev.venueName} · {ev.venueAddress}
-                  </p>
-                </div>
-                <span
-                  className={`${styles.status} ${ev.soldOut ? styles.statusSold : styles.statusLive}`}
-                >
-                  {ev.soldOut ? 'Sold Out' : 'Live'}
-                </span>
-              </div>
+      {upcoming.length === 0 && <p className={styles.empty}>No upcoming shows.</p>}
+      <ul className={styles.list}>{upcoming.map((ev) => renderCard(ev, false))}</ul>
 
-              <div className={styles.capacity}>
-                {capped ? (
-                  <>
-                    <div className={styles.meter}>
-                      <div
-                        className={`${styles.meterFill} ${full ? styles.meterFillFull : ''}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <span className={styles.capacityText}>
-                      <strong>{sold}</strong> / {ev.capacity} sold
-                      {ev.remaining != null && <> · {ev.remaining} left</>}
-                    </span>
-                  </>
-                ) : (
-                  <span className={styles.capacityText}>
-                    <strong>{sold}</strong> sold · unlimited capacity
-                  </span>
-                )}
-              </div>
-
-              <div className={styles.tickets}>
-                {ev.seating && (
-                  <span className={`${styles.ticketPill} ${styles.seatingPill}`} title={`Snapshot of ${ev.seating.chartName} (rev ${ev.seating.chartRevision})`}>
-                    Reserved seating
-                    <span className={styles.ticketPrice}>{ev.seating.chartName} · {ev.seating.seatCount} seats</span>
-                  </span>
-                )}
-                {ev.tickets.map((t) => (
-                  <span key={t.ticketType} className={styles.ticketPill}>
-                    {t.ticketType}
-                    <span className={styles.ticketPrice}>{formatPrice(t.priceCents)}</span>
-                  </span>
-                ))}
-              </div>
-
-              <div className={styles.toolbar}>
-                <div className={styles.toolGroup}>
-                  <button
-                    type="button"
-                    className={`${styles.btn} ${styles.btnGhost}`}
-                    onClick={() => void handleCopy(ev.id, shareUrl(ev.id))}
-                    title={shareUrl(ev.id)}
-                  >
-                    {copiedKey === ev.id ? 'Copied!' : 'Copy link'}
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.btn} ${styles.btnGhost}`}
-                    onClick={() => handleDownloadQr(ev.showName, shareUrl(ev.id))}
-                    title="Download a QR code that opens this show on the site"
-                  >
-                    QR code
-                  </button>
-                </div>
-                <div className={styles.toolGroup}>
-                  <button
-                    type="button"
-                    className={`${styles.btn} ${styles.btnPrimary}`}
-                    onClick={() => setEditingEvent(ev)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.btn} ${styles.btnGhost}`}
-                    onClick={() => void handleToggleSoldOut(ev)}
-                    disabled={togglingId === ev.id}
-                  >
-                    {togglingId === ev.id
-                      ? 'Saving…'
-                      : ev.soldOut
-                        ? 'Mark available'
-                        : 'Mark sold out'}
-                  </button>
-                  {ev.seating && (
-                    <button
-                      type="button"
-                      className={`${styles.btn} ${styles.btnGhost}`}
-                      onClick={() => setSeatingTarget(ev)}
-                      title="Who sits where, live"
-                    >
-                      Seating chart
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className={`${styles.btn} ${styles.btnDanger}`}
-                    onClick={() => setConfirmTarget(ev)}
-                    disabled={deletingId === ev.id}
-                  >
-                    {deletingId === ev.id ? 'Deleting…' : 'Delete'}
-                  </button>
-                </div>
-              </div>
-
-              <span className={styles.id}>{ev.id}</span>
-            </li>
-          );
-        })}
-      </ul>
+      {past.length > 0 && (
+        <details className={styles.past}>
+          <summary className={styles.pastSummary}>Past shows ({past.length})</summary>
+          <ul className={styles.list}>{past.map((ev) => renderCard(ev, true))}</ul>
+        </details>
+      )}
 
       {seatingTarget && (
         <SeatingModal
