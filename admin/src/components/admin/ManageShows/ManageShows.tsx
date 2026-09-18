@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   deleteEvent,
+  getEventGuests,
   listEvents,
+  setCancelled,
   setSoldOut,
   type ManagedEvent,
 } from '../../../services/admin-events.ts';
 import { UnauthorizedError } from '../../../services/guestlist.ts';
 import { downloadDataUrl, qrPngDataUrl, slugify } from '../../../utils/qr.ts';
 import EditShow from './EditShow.tsx';
+import { downloadTicketHolders } from '../../../utils/ticket-holders.ts';
+import CancelShowModal from './CancelShowModal.tsx';
 import ConfirmModal from './ConfirmModal.tsx';
 import SeatingModal from './SeatingModal.tsx';
 import styles from './ManageShows.module.css';
@@ -52,6 +56,9 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
   const [editingEvent, setEditingEvent] = useState<ManagedEvent | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<ManagedEvent | null>(null);
   const [seatingTarget, setSeatingTarget] = useState<ManagedEvent | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<ManagedEvent | null>(null);
+  const [restoreTarget, setRestoreTarget] = useState<ManagedEvent | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const handleSaved = useCallback((updated: ManagedEvent) => {
     const withRemaining: ManagedEvent = {
@@ -78,6 +85,49 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
     const dataUrl = qrPngDataUrl(url);
     downloadDataUrl(dataUrl, `qr-${slugify(showName)}.png`);
   }, []);
+
+  const handleSetCancelled = useCallback(
+    async (ev: ManagedEvent, cancelled: boolean) => {
+      setCancellingId(ev.id);
+      try {
+        const updated = await setCancelled(ev.id, cancelled);
+        setEvents((prev) =>
+          prev ? prev.map((e) => (e.id === ev.id ? { ...e, cancelledAt: updated.cancelledAt } : e)) : prev,
+        );
+        setCancelTarget(null);
+        setRestoreTarget(null);
+      } catch (err) {
+        if (err instanceof UnauthorizedError) {
+          onUnauthorized();
+          return;
+        }
+        alert(err instanceof Error ? err.message : 'Failed to update the show');
+      } finally {
+        setCancellingId(null);
+      }
+    },
+    [onUnauthorized],
+  );
+
+  const handleDownloadHolders = useCallback(
+    async (ev: ManagedEvent) => {
+      try {
+        const { parties } = await getEventGuests(ev.id);
+        if (parties.length === 0) {
+          alert('Nobody holds tickets to this show.');
+          return;
+        }
+        downloadTicketHolders(ev, parties);
+      } catch (err) {
+        if (err instanceof UnauthorizedError) {
+          onUnauthorized();
+          return;
+        }
+        alert(err instanceof Error ? err.message : 'Failed to load the ticket holders');
+      }
+    },
+    [onUnauthorized],
+  );
 
   const handleToggleSoldOut = useCallback(
     async (ev: ManagedEvent) => {
@@ -206,6 +256,7 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
 
   const renderCard = (ev: ManagedEvent, ended: boolean) => {
     const sold = ev.sold ?? 0;
+    const cancelled = !!ev.cancelledAt;
     const capped = ev.capacity != null;
     const pct = capped ? Math.min(100, Math.round((sold / ev.capacity!) * 100)) : 0;
     const full = capped && sold >= ev.capacity!;
@@ -220,9 +271,9 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
             </p>
           </div>
           <span
-            className={`${styles.status} ${ended ? styles.statusEnded : ev.soldOut ? styles.statusSold : styles.statusLive}`}
+            className={`${styles.status} ${cancelled ? styles.statusCancelled : ended ? styles.statusEnded : ev.soldOut ? styles.statusSold : styles.statusLive}`}
           >
-            {ended ? 'Ended' : ev.soldOut ? 'Sold Out' : 'Live'}
+            {cancelled ? 'Cancelled' : ended ? 'Ended' : ev.soldOut ? 'Sold Out' : 'Live'}
           </span>
         </div>
 
@@ -289,7 +340,7 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
             >
               Edit
             </button>
-            {!ended && (
+            {!ended && !cancelled && (
               <button
                 type="button"
                 className={`${styles.btn} ${styles.btnGhost}`}
@@ -313,6 +364,24 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
                 Seating chart
               </button>
             )}
+            {cancelled && (
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnGhost}`}
+                onClick={() => void handleDownloadHolders(ev)}
+                title="Names, emails and phone numbers of everyone holding tickets (CSV)"
+              >
+                Ticket holders
+              </button>
+            )}
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost}`}
+              onClick={() => (cancelled ? setRestoreTarget(ev) : setCancelTarget(ev))}
+              disabled={cancellingId === ev.id}
+            >
+              {cancelled ? 'Restore show' : 'Cancel show'}
+            </button>
             <button
               type="button"
               className={`${styles.btn} ${styles.btnDanger}`}
@@ -353,6 +422,31 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
           onClose={() => setSeatingTarget(null)}
           onResynced={handleResynced}
           onUnauthorized={onUnauthorized}
+        />
+      )}
+
+      {cancelTarget && (
+        <CancelShowModal
+          event={cancelTarget}
+          busy={cancellingId === cancelTarget.id}
+          onConfirm={() => void handleSetCancelled(cancelTarget, true)}
+          onClose={() => setCancelTarget(null)}
+        />
+      )}
+
+      {restoreTarget && (
+        <ConfirmModal
+          title={`Restore “${restoreTarget.showName}”?`}
+          message={
+            new Date(restoreTarget.endTime).getTime() < Date.now()
+              ? 'The show goes back to Ended.'
+              : 'The show goes back on sale on the website right away.'
+          }
+          confirmLabel="Restore show"
+          cancelLabel="Leave cancelled"
+          busy={cancellingId === restoreTarget.id}
+          onConfirm={() => void handleSetCancelled(restoreTarget, false)}
+          onCancel={() => setRestoreTarget(null)}
         />
       )}
 

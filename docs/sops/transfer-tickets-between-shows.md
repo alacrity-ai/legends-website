@@ -101,6 +101,11 @@ only send when Leif asks.
 
 ## 6. What this does not do
 
-- Cancel the old show. If the night is off, mark it Sold Out (stops sales) or delete it in
-  Manage Shows once every party has been moved or refunded — see who is left on its door list.
+- Cancel the old show. If the night is off, use **Manage Shows → Cancel show** (LGD-27): sales
+  stop at once, outstanding checkout links are killed, and the show reads **Cancelled** in the
+  admin and on the website (still listed, so ticket holders see it). The modal — and the
+  **Ticket holders** button on a cancelled card — downloads a CSV of everyone still holding
+  tickets (name, email, phone, Square payment id) to work through. Tickets can be transferred
+  *off* a cancelled show, never onto one. **Restore show** reverses it. Cancelling refunds and
+  emails nobody.
 - Refund anyone, or settle a price difference between the two shows.

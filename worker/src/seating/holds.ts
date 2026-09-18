@@ -154,6 +154,7 @@ async function handleHold(id: string, request: Request, env: Env, ctx: Execution
   const event = await loadSeatedEvent(env, id);
   if (!event?.seating) return jsonResponse(404, { error: 'This show has no seating chart' }, corsHeaders);
   if (!event.tickets.some((t) => t.ticketType === body.ticketType)) return jsonResponse(404, { error: 'Unknown ticket type' }, corsHeaders);
+  if (event.cancelledAt) return jsonResponse(409, { error: 'This show has been cancelled' }, corsHeaders);
   if (event.soldOut || new Date(event.endTime).getTime() < Date.now()) return jsonResponse(409, { error: 'Sold out' }, corsHeaders);
 
   const layout = event.seating.layout;

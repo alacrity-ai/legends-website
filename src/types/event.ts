@@ -16,6 +16,8 @@ export interface CalendarEvent {
   description: string | null;
   imageUrl?: string | null;
   soldOut?: boolean;
+  /** Staff called the show off: still listed so ticket holders see it, never sold. */
+  cancelled?: boolean;
   tickets?: EventTicket[];
   /** Reserved-seating show (v0.5): buyers pick seats before checkout (P3). */
   seating?: { seatCount: number };

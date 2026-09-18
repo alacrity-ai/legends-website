@@ -23,6 +23,11 @@
   box-shadow: var(--shadow-glow);
 }
 
+.cancelledBadge {
+  color: #fff;
+  background-color: #b3261e;
+}
+
 .soldOutBadge {
   display: inline-block;
   margin-bottom: var(--space-xs);
