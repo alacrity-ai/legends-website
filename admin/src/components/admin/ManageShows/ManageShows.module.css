@@ -121,6 +121,12 @@
   background: rgba(63, 165, 91, 0.08);
 }
 
+.statusEnded {
+  color: var(--color-text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+}
+
 .statusSold {
   color: #f3d9d9;
   border: 1px solid var(--color-error);
@@ -312,4 +318,24 @@
   .toolGroup .btn {
     flex: 1;
   }
+}
+
+/* ── Past shows ───────────────────────────────────────────── */
+
+.past {
+  margin-top: var(--space-xl);
+}
+
+.pastSummary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: var(--space-sm) 0;
+  margin-bottom: var(--space-md);
+}
+
+.past .card {
+  opacity: 0.75;
 }
