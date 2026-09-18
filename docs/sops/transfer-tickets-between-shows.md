@@ -80,6 +80,11 @@ Read the "Would transfer" list and the expected sold counts back to Leif. On his
 re-run the same command with `--apply`. The script prints both shows before and after;
 the after-counts must equal the "Expected after" line.
 
+> The **sold** counts are right immediately. The "parties / tickets on the list" figure for the
+> new show can lag by up to a minute (KV key listing is eventually consistent) — on the first
+> run it still read "1 parties / 10 tickets" straight after the move and was correct 12 s
+> later. Re-run without `--move` to re-read before worrying.
+
 Then look at it the way staff will: **Check-in** for the new show lists the people with the
 "Transferred from" note; **Manage Shows** shows the new counts.
 
