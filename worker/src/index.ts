@@ -37,6 +37,7 @@ import { HOLD_ID_RE, handleSeatingPublic } from './seating/holds.ts';
 import { groupSeatIds, objectNoun, seatNumbersPhrase } from '@seating/assign.ts';
 import { SEAT_ID_RE, seatLabel } from '@seating/ids.ts';
 import { listEventRecords } from './events-store.ts';
+import { TransferError, isTransferredAway, transferParty } from './transfer.ts';
 import {
   adminPasscode,
   errorMessage,
@@ -1028,6 +1029,15 @@ async function handleAdminEvents(
     return handleResendConfirmation(confirmMatch[1], confirmMatch[2], request, env, corsHeaders, noStore);
   }
 
+  // Ticket transfer: staff move a party (or part of it) to another show.
+  const transferMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/parties\/([A-Za-z0-9_-]{6,64})\/transfer$/);
+  if (transferMatch) {
+    if (request.method !== 'POST') {
+      return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+    }
+    return handleTransferParty(transferMatch[1], transferMatch[2], request, env, corsHeaders, noStore);
+  }
+
   const resyncMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/seating\/resync$/);
   if (resyncMatch) {
     if (request.method !== 'POST') {
@@ -1055,6 +1065,15 @@ async function handleAdminEvents(
 
 /* ── Admin: auto-roster + door check-in (v0.3) ────────────────── */
 
+/** The door note: what they bought, and where the tickets came from if staff moved them here. */
+function partyNote(r: PartyRecord): string | null {
+  const from = r.transferredFrom;
+  const moved = from
+    ? `Transferred from ${from.showName} (${new Date(from.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })})`
+    : '';
+  return [r.ticketType, moved].filter(Boolean).join(' · ') || null;
+}
+
 function partyRecordToParty(r: PartyRecord): Party {
   return {
     id: r.paymentId,
@@ -1065,7 +1084,7 @@ function partyRecordToParty(r: PartyRecord): Party {
     quantity: r.quantity,
     purchases: [{ variation: 'Unknown', quantity: r.quantity }],
     orderDate: r.purchasedAt,
-    notes: r.ticketType || null,
+    notes: partyNote(r),
     // Reserved seating (v0.5): present once the webhook has confirmed seats.
     ...(r.seats ? { seats: r.seats, seatLabels: r.seatLabels ?? [], seatStatus: r.seatStatus ?? 'assigned' } : {}),
     ...(r.confirmationSentAt ? { confirmationSentAt: r.confirmationSentAt } : {}),
@@ -1089,7 +1108,9 @@ async function handleGetEventGuests(
   for (const raw of partyRaws) {
     if (!raw) continue;
     try {
-      parties.push(partyRecordToParty(JSON.parse(raw) as PartyRecord));
+      const record = JSON.parse(raw) as PartyRecord;
+      if (isTransferredAway(record)) continue; // every ticket moved to another show
+      parties.push(partyRecordToParty(record));
     } catch {
       // skip malformed entry
     }
@@ -1147,6 +1168,47 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * (to the buyer) and by staff re-sends. Never throws on Mailgun errors — the
  * result says what happened.
  */
+async function handleTransferParty(
+  id: string,
+  paymentId: string,
+  request: Request,
+  env: Env,
+  corsHeaders: Record<string, string>,
+  noStore: Record<string, string>,
+): Promise<Response> {
+  let body: { toEventId?: unknown; quantity?: unknown };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return jsonResponse(400, { error: 'Invalid JSON' }, corsHeaders);
+  }
+  if (typeof body.toEventId !== 'string' || !/^[a-f0-9-]+$/.test(body.toEventId)) {
+    return jsonResponse(400, { error: 'toEventId is required' }, corsHeaders);
+  }
+  if (body.quantity !== undefined && typeof body.quantity !== 'number') {
+    return jsonResponse(400, { error: 'quantity must be a number' }, corsHeaders);
+  }
+  try {
+    const r = await transferParty(env, id, paymentId, body.toEventId, body.quantity);
+    if (r.targetNowSoldOut) await clearLinkCache(env, body.toEventId);
+    return jsonResponse(
+      200,
+      {
+        moved: r.moved,
+        remainingOnSource: r.source.quantity,
+        sourceSold: r.sourceSold,
+        targetSold: r.targetSold,
+        party: partyRecordToParty(r.target),
+      },
+      corsHeaders,
+      noStore,
+    );
+  } catch (err) {
+    if (err instanceof TransferError) return jsonResponse(err.status, { error: err.message }, corsHeaders);
+    throw err;
+  }
+}
+
 async function sendTicketConfirmation(
   env: Env,
   event: EventRecord,
@@ -1222,7 +1284,7 @@ async function handleResendConfirmation(
   }
   const partyKey = `party:${id}:${paymentId}`;
   const party = await env.GUESTLIST.get<PartyRecord>(partyKey, 'json');
-  if (!party) return jsonResponse(404, { error: 'Party not found' }, corsHeaders);
+  if (!party || isTransferredAway(party)) return jsonResponse(404, { error: 'Party not found' }, corsHeaders);
 
   const to = typeof override === 'string' ? override.trim() : party.email;
   if (!to) return jsonResponse(400, { error: 'This party has no email address on file' }, corsHeaders);
@@ -1326,8 +1388,8 @@ async function handleEventCheckin(
     return jsonResponse(400, { error: errorMessage(err) }, corsHeaders);
   }
 
-  const exists = await env.GUESTLIST.get(`party:${id}:${payload.paymentId}`);
-  if (!exists) {
+  const exists = await env.GUESTLIST.get<PartyRecord>(`party:${id}:${payload.paymentId}`, 'json');
+  if (!exists || isTransferredAway(exists)) {
     return jsonResponse(404, { error: 'Party not found in show' }, corsHeaders);
   }
 

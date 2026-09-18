@@ -1,4 +1,5 @@
 import type { Env, EventRecord, PartyRecord } from './types.ts';
+import { isTransferredAway } from './transfer.ts';
 
 /* ── Sales report (LGD-10) ─────────────────────────────────────
  * Aggregates ticket sales from our own KV: EVENTS (shows + ticket prices)
@@ -54,7 +55,9 @@ async function listParties(env: Env, eventId: string): Promise<PartyRecord[]> {
   for (const raw of raws) {
     if (!raw) continue;
     try {
-      parties.push(JSON.parse(raw) as PartyRecord);
+      const party = JSON.parse(raw) as PartyRecord;
+      if (isTransferredAway(party)) continue; // every ticket moved to another show
+      parties.push(party);
     } catch {
       // skip malformed entry
     }
