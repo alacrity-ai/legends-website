@@ -64,15 +64,51 @@ function ctaButton(label, url) {
 </table>`;
 }
 
+/** Full-bleed campaign art above the headline (hero layout). */
+function heroImage(url, alt, href) {
+  const img = `<img src="${escapeHtml(url)}" width="600" alt="${escapeHtml(alt ?? '')}"
+       style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:12px;" />`;
+  return `
+<tr><td align="center" style="padding:0 0 6px;">
+  ${href ? `<a href="${escapeHtml(href)}" target="_blank" style="text-decoration:none;">${img}</a>` : img}
+</td></tr>`;
+}
+
+/** Gold-labelled rows — When / Where / Tickets / On stage / Opening. */
+function factsBlock(facts) {
+  const rows = facts
+    .map(
+      (f) =>
+        `<span style="color:${GOLD};">${escapeHtml(f.label)}</span>&nbsp; ${escapeHtml(f.value)}`,
+    )
+    .join('<br />\n        ');
+  return `
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+       style="margin:8px 0 4px;background:${CARD};border:1px solid ${BORDER};border-radius:12px;">
+  <tr><td style="padding:22px 26px;font-size:15px;line-height:1.85;color:${TEXT};">
+        ${rows}
+  </td></tr>
+</table>`;
+}
+
 /**
  * @param spec  {subject, preheader, headline, intro: string[], outro?: string[],
  *               cta?: {label, url}, event?: {name, startTime, venueName,
- *               venueAddress, imageUrl?, priceLine?}}
+ *               venueAddress, imageUrl?, priceLine?},
+ *               hero?: {url, alt}, facts?: {label, value}[], ctaNote?: string}
+ *
+ * `hero` opts into the hero layout: art on top, a centered lead paragraph and a
+ * facts block in place of the event card. Without it the classic layout renders
+ * exactly as before.
  * @param unsubUrl  per-recipient unsubscribe URL (Mailgun `%recipient.unsub%`
  *                  during real sends; a concrete URL for previews/tests)
  */
 export function renderCampaignHtml(spec, unsubUrl) {
   const ev = spec.event;
+  const facts = spec.facts?.length ? spec.facts : null;
+  // Hero layout: the first paragraph is the centered lead, the rest sit under the CTA.
+  const lead = (spec.intro ?? []).slice(0, 1);
+  const body = (spec.intro ?? []).slice(1);
   const eventCard = ev
     ? `
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
@@ -110,20 +146,29 @@ export function renderCampaignHtml(spec, unsubUrl) {
   </td></tr>
   <tr><td style="border-top:2px solid ${GOLD};font-size:0;line-height:0;">&nbsp;</td></tr>
 
-  <!-- Headline + intro -->
-  <tr><td style="padding:26px 6px 4px;font-family:${SERIF};">
+  ${spec.hero ? heroImage(spec.hero.url, spec.hero.alt ?? spec.headline, spec.cta?.url) : ''}
+
+  <!-- Headline + lead -->
+  <tr><td style="padding:26px 6px 4px;font-family:${SERIF};"${spec.hero ? ' align="center"' : ''}>
     <h1 style="margin:0 0 18px;font-size:30px;line-height:1.25;color:${GOLD};font-weight:bold;">${escapeHtml(spec.headline)}</h1>
-    ${paragraphs(spec.intro)}
+    ${spec.hero ? paragraphs(lead, MUTED) : paragraphs(spec.intro)}
   </td></tr>
 
-  <!-- Event card -->
-  ${eventCard ? `<tr><td style="padding:6px 0;font-family:${SERIF};">${eventCard}</td></tr>` : ''}
+  <!-- Facts block (hero layout) or the classic event card -->
+  ${facts ? `<tr><td style="padding:6px 0;font-family:${SERIF};">${factsBlock(facts)}</td></tr>` : ''}
+  ${!facts && eventCard ? `<tr><td style="padding:6px 0;font-family:${SERIF};">${eventCard}</td></tr>` : ''}
 
   <!-- CTA -->
   ${spec.cta ? `<tr><td>${ctaButton(spec.cta.label, spec.cta.url)}</td></tr>` : ''}
+  ${spec.ctaNote ? `<tr><td align="center" style="padding:0 6px 6px;font-family:${SERIF};"><p style="margin:0;font-size:14px;line-height:1.6;color:${MUTED};">${escapeHtml(spec.ctaNote)}</p></td></tr>` : ''}
+
+  <!-- Body copy (hero layout keeps the rest of the intro here, under the CTA) -->
+  ${spec.hero && body.length ? `<tr><td style="padding:14px 6px 0;font-family:${SERIF};">${paragraphs(body)}</td></tr>` : ''}
 
   <!-- Outro -->
   ${spec.outro?.length ? `<tr><td style="padding:4px 6px 0;font-family:${SERIF};">${paragraphs(spec.outro, MUTED)}</td></tr>` : ''}
+
+  ${spec.hero && spec.cta ? `<tr><td align="center" style="padding:18px 6px 0;font-family:${SERIF};"><a href="${escapeHtml(spec.cta.url)}" target="_blank" style="font-size:14px;color:${GOLD};text-decoration:underline;">${escapeHtml(spec.cta.label)} &rsaquo;</a></td></tr>` : ''}
 
   <!-- Footer -->
   <tr><td style="padding:34px 6px 0;border-top:1px solid ${BORDER};font-family:${SERIF};" align="center">
@@ -154,7 +199,9 @@ export function renderCampaignText(spec, unsubUrl) {
     '',
     ...(spec.intro ?? []),
   ];
-  if (ev) {
+  if (spec.facts?.length) {
+    lines.push('', ...spec.facts.map((f) => `${f.label}: ${f.value}`));
+  } else if (ev) {
     lines.push(
       '',
       ev.name,
@@ -164,6 +211,7 @@ export function renderCampaignText(spec, unsubUrl) {
     if (ev.priceLine) lines.push(ev.priceLine);
   }
   if (spec.cta) lines.push('', `${spec.cta.label}: ${spec.cta.url}`);
+  if (spec.ctaNote) lines.push(spec.ctaNote);
   if (spec.outro?.length) lines.push('', ...spec.outro);
   lines.push('', '---', POSTAL_ADDRESS, `Unsubscribe: ${unsubUrl}`);
   return lines.join('\n');
