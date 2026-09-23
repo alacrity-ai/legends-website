@@ -1,5 +1,18 @@
 import qrcode from 'qrcode-generator';
 
+/**
+ * The public site. NOT `window.location.origin`: this console is served from
+ * admin.djkmdlegends.com, and a share link or printed QR built from the admin
+ * host sends the customer to the staff passcode screen (LGD-31). The admin app
+ * takes no build-time config, so the public origin is a constant here.
+ */
+const SITE = 'https://djkmdlegends.com';
+
+/** The on-site share/QR target that opens a show with the quantity stepper. */
+export function shareUrl(eventId: string): string {
+  return `${SITE}/?event=${eventId}`;
+}
+
 // The @types/qrcode-generator definitions omit these runtime methods.
 interface QrModel {
   getModuleCount(): number;
