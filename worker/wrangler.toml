@@ -23,6 +23,17 @@ zone_name = "djkmdlegends.com"
 pattern = "www.djkmdlegends.com/api/*"
 zone_name = "djkmdlegends.com"
 
+# Campaign links (LGD-28): /go/:slug is a first-party click-tracking redirect,
+# so it needs its own route — the three routes above are all /api/*, and Pages
+# would otherwise answer /go/… with the SPA's catch-all.
+[[routes]]
+pattern = "djkmdlegends.com/go/*"
+zone_name = "djkmdlegends.com"
+
+[[routes]]
+pattern = "www.djkmdlegends.com/go/*"
+zone_name = "djkmdlegends.com"
+
 [[kv_namespaces]]
 binding = "MAILING_LIST"
 id = "87b3a569d4e145a4a7458c26d88ad8fa"
