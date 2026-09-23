@@ -18,7 +18,7 @@
  */
 import { createHmac } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { renderCampaignHtml, renderCampaignText } from './campaign-template.mjs';
+import { formatEventDate, renderCampaignHtml, renderCampaignText } from './campaign-template.mjs';
 
 const MAILGUN_DOMAIN = 'mg.djkmdlegends.com';
 const SITE = 'https://djkmdlegends.com';
@@ -88,6 +88,15 @@ if (spec.eventId) {
     imageUrl: `${SITE}/api/events/${spec.eventId}/image`,
     priceLine: prices || undefined,
   };
+  // Hero layout: derive the facts block from the show record unless the spec
+  // spells it out. Without a hero this stays null and the classic card renders.
+  if (spec.hero && !spec.facts?.length) {
+    spec.facts = [
+      { label: 'When', value: formatEventDate(record.startTime).replace('&middot;', '·') },
+      { label: 'Where', value: [record.venueName, record.venueAddress].filter(Boolean).join(', ') },
+      ...(prices ? [{ label: 'Tickets', value: prices.replace(/—/g, '-') }] : []),
+    ];
+  }
   spec.cta ??= { label: 'Get Tickets', url: `${SITE}/?event=${spec.eventId}` };
 }
 

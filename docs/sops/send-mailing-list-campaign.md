@@ -64,7 +64,10 @@ A small JSON file (scratchpad is fine for one-offs; commit recurring ones under
   "intro": ["1–3 short paragraphs of body copy."],         // required, array of strings
   "eventId": "43c4f19d-…",   // optional — pulls name/date/venue/prices/image from EVENTS KV
                              // and defaults the CTA to the ticket-modal deep link
-  "cta": { "label": "Get Tickets", "url": "https://djkmdlegends.com/?event=…" }, // optional override
+  "cta": { "label": "Get Tickets", "url": "https://djkmdlegends.com/go/<slug>?s=email" }, // see "Tracked links"
+  "ctaNote": "Prefer the phone? Call 781-879-4291.",     // optional small line under the button
+  "hero": { "url": "https://djkmdlegends.com/assets/campaigns/<name>.jpg", "alt": "…" }, // opts into the hero layout
+  "facts": [ { "label": "When", "value": "Saturday, October 17, 2026 — doors 4:00 PM" } ], // optional; auto-derived from eventId
   "outro": ["Optional closing lines (muted styling)."],    // optional
   "tag": "rat-pack-aug-28"   // optional Mailgun tag for stats; default "campaign"
 }
@@ -73,6 +76,40 @@ A small JSON file (scratchpad is fine for one-offs; commit recurring ones under
 With `eventId` set, the email gets an **event card**: poster image
 (`/api/events/<id>/image`), show name, gold date line (authored ET wall-clock, never
 UTC-shifted), venue, and a price line from the ticket types.
+
+### Two layouts
+
+- **Classic** (no `hero`): headline, intro paragraphs, the auto **event card** (poster from
+  `/api/events/<id>/image`, name, gold date, venue, price line), CTA, outro.
+- **Hero** (`hero` set, LGD-29): campaign art across the top, a centered headline and lead
+  paragraph, then a gold-labelled **facts block** — When / Where / Tickets / On stage /
+  Opening — in place of the event card. The rest of `intro` sits under the CTA. With an
+  `eventId` and no explicit `facts`, When/Where/Tickets are derived from the show record.
+
+Prefer the hero layout when the poster's own text (dates, prices, venue) would contradict
+or duplicate the email's copy — crop the art, let the facts block carry the details.
+
+> **Campaign art lives at `public/assets/campaigns/<name>.jpg` in the site repo** and ships
+> with a Pages deploy. Use **JPEG** — `/api/events/<id>/image` serves WEBP, which Outlook on
+> Windows will not render, and a broken hero is a dead campaign.
+
+### Tracked links (LGD-28)
+
+Point every campaign CTA at the first-party redirect, never the raw deep link:
+
+```
+https://djkmdlegends.com/go/<slug>?s=email
+```
+
+1. Add the slug → destination to `CAMPAIGN_LINKS` in `worker/src/clicks.ts` and **deploy the
+   worker** before the send, or the link falls back to the homepage.
+2. `?s=` tags the channel (`email`, `card` for the printed QR cards). **Mail clients strip
+   `Referer`** — proven on a real click 2026-09-23 — so the tag is the only channel signal
+   that survives an inbox.
+3. Read results with the admin passcode:
+   `curl -s -H "Authorization: Bearer <ADMIN_PASSCODE>" https://djkmdlegends.com/api/admin/clicks`
+   — per-slug/source totals plus recent clicks. Mailgun's own click tracking is **off** on
+   this domain (verified), so this is the only click data that exists.
 
 ### Copy guidance
 
