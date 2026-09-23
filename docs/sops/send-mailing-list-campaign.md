@@ -106,7 +106,12 @@ https://djkmdlegends.com/go/<slug>?s=email
 2. `?s=` tags the channel (`email`, `card` for the printed QR cards). **Mail clients strip
    `Referer`** — proven on a real click 2026-09-23 — so the tag is the only channel signal
    that survives an inbox.
-3. Read results with the admin passcode:
+3. **`--to` test sends retag themselves to `?s=test`** automatically, so a round of
+   test emails can never inflate the campaign's number. **Count a campaign with
+   `source='email'`;** `source='test'` is ours. If test clicks ever do land as `email`
+   (a hand-rolled curl, a preflight), relabel them *before* the `--all` send:
+   `UPDATE clicks SET source='test' WHERE slug='<slug>' AND source='email';`
+4. Read results with the admin passcode:
    `curl -s -H "Authorization: Bearer <ADMIN_PASSCODE>" https://djkmdlegends.com/api/admin/clicks`
    — per-slug/source totals plus recent clicks. Mailgun's own click tracking is **off** on
    this domain (verified), so this is the only click data that exists.
