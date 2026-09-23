@@ -78,6 +78,7 @@ One Worker (`worker/src/index.ts`) routes four groups of endpoints, on two route
 | `/api/admin/events/:id/parties/:paymentId/seats` | PUT | Staff assign / top up / move a party's seats (`{ seatIds }`); 409 names seats taken meanwhile | D1 `seats` (one batch, restored on conflict) + KV party |
 | `/api/admin/events/:id/parties/:paymentId/confirmation` | POST | Re-send the buyer's Legends confirmation email (`{ to? }` sends a copy elsewhere without touching the party) | Mailgun |
 | `/go/:slug` | GET | Campaign click tracking (LGD-28): records the click, 302s to the campaign destination. Own routes (`djkmdlegends.com/go/*`), `/api/go/:slug` as a fallback | D1 `clicks` |
+| `/go/e/:eventId` | GET | Tracked link for any show (LGD-32) — what Manage Shows' Copy link / QR code hand out; `?s=` tags the channel. A malformed id still redirects home | D1 `clicks` |
 | `/api/admin/clicks` | GET | Per-slug/source click totals + recent clicks (passcode-gated) | D1 `clicks` |
 | `/api/booking` | POST | Booking inquiry → emails the team + confirmation to sender | Mailgun |
 | `/api/mailing-list` | POST | Save a signup (email + optional name) | KV `MAILING_LIST` |

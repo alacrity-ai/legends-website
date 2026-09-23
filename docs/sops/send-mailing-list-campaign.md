@@ -103,17 +103,22 @@ https://djkmdlegends.com/go/<slug>?s=email
 
 1. Add the slug → destination to `CAMPAIGN_LINKS` in `worker/src/clicks.ts` and **deploy the
    worker** before the send, or the link falls back to the homepage.
-2. `?s=` tags the channel (`email`, `card` for the printed QR cards). **Mail clients strip
+2. **Any show has a tracked link already** — `https://djkmdlegends.com/go/e/<eventId>` needs
+   no `CAMPAIGN_LINKS` entry and no deploy (LGD-32). It's what Manage Shows' **Copy link**
+   (`?s=share`) and **QR code** (`?s=qr`) hand out. Use a named slug only for a campaign
+   that isn't one show (a season, a "we're back" mail).
+3. `?s=` tags the channel (`email`, `card` for the printed QR cards). **Mail clients strip
    `Referer`** — proven on a real click 2026-09-23 — so the tag is the only channel signal
    that survives an inbox.
-3. **`--to` test sends retag themselves to `?s=test`** automatically, so a round of
+4. **`--to` test sends retag themselves to `?s=test`** automatically, so a round of
    test emails can never inflate the campaign's number. **Count a campaign with
    `source='email'`;** `source='test'` is ours. If test clicks ever do land as `email`
    (a hand-rolled curl, a preflight), relabel them *before* the `--all` send:
    `UPDATE clicks SET source='test' WHERE slug='<slug>' AND source='email';`
-4. Read results with the admin passcode:
+5. Read results with the admin passcode:
    `curl -s -H "Authorization: Bearer <ADMIN_PASSCODE>" https://djkmdlegends.com/api/admin/clicks`
-   — per-slug/source totals plus recent clicks. Mailgun's own click tracking is **off** on
+   — per-slug/source totals plus recent clicks; per-show rows carry the show's name, so a
+   single show's email / QR / shared-link pull is three rows side by side. Mailgun's own click tracking is **off** on
    this domain (verified), so this is the only click data that exists.
 
 ### Copy guidance
