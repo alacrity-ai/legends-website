@@ -1,6 +1,6 @@
 .PHONY: help dev dev-site dev-worker dev-admin build build-admin lint preview install clean \
        docker-up docker-down docker-build docker-logs \
-       deploy-worker deploy-admin test test-shared test-worker test-e2e d1-migrate-local d1-migrate-remote
+       deploy-worker deploy-admin deploy-site test test-shared test-worker test-e2e d1-migrate-local d1-migrate-remote
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -71,6 +71,28 @@ docker-logs: ## Tail logs from running containers
 
 deploy-worker: ## Deploy the worker to Cloudflare
 	cd worker && npm run deploy
+
+# The public site is the ONLY artifact with build-time configuration baked in
+# (VITE_* are inlined by Vite; the worker reads secrets at runtime and the admin
+# PWA calls /api same-origin). Normal path is the GitHub Actions workflow, which
+# holds the secrets — this target is break-glass. LGD-30: a local build without
+# VITE_BOOKING_API_URL shipped `http://localhost:8787` to production, so the live
+# site asked every visitor's own machine for the events feed. Nothing failed
+# loudly: wrangler reported success over a broken bundle. Hence two checks —
+# the input before building, the artifact before deploying.
+deploy-site: ## Build + deploy the public site to Pages (legends-website) — break-glass; CI is the normal path
+	@if [ -z "$$VITE_BOOKING_API_URL" ]; then \
+		echo "refusing: VITE_BOOKING_API_URL is unset — a local build would bake in http://localhost:8787."; \
+		echo "           production value is https://djkmdlegends.com (CI injects it from a GitHub secret)."; \
+		echo "           prefer the 'Deploy to Cloudflare Pages' workflow; see docs/resources/1-SOPS.md SOP 6."; \
+		exit 1; \
+	fi
+	npm run build
+	@if grep -rq "localhost" dist/assets/*.js; then \
+		echo "refusing: the built bundle still references localhost — check every VITE_* variable."; \
+		exit 1; \
+	fi
+	npx wrangler pages deploy dist --project-name legends-website --branch main --commit-dirty=true
 
 deploy-admin: build-admin ## Build + deploy the admin PWA to Cloudflare Pages (legends-admin)
 	# --branch main: the Pages project’s production branch is `main`; without it a deploy from a feature branch only creates a preview.
