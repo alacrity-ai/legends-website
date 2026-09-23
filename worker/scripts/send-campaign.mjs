@@ -100,6 +100,18 @@ if (spec.eventId) {
   spec.cta ??= { label: 'Get Tickets', url: `${SITE}/?event=${spec.eventId}` };
 }
 
+// A test send must never be countable as the campaign (LGD-28). Retag the
+// tracked CTA so `source='email'` in the clicks table only ever means a real
+// recipient — otherwise every round of "send me the test" inflates the number
+// the campaign is later judged by, and the two are indistinguishable after
+// the fact.
+if (toOne && spec.cta?.url?.includes('/go/')) {
+  const url = new URL(spec.cta.url);
+  url.searchParams.set('s', 'test');
+  spec.cta.url = url.toString();
+  console.log(`test send: CTA retagged to ${url.searchParams.get('s')} so it won't count as campaign traffic`);
+}
+
 const unsubToken = (email) =>
   createHmac('sha256', UNSUBSCRIBE_SECRET).update(email.trim().toLowerCase()).digest('hex');
 const unsubUrl = (email) =>
