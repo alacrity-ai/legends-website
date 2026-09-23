@@ -8,7 +8,7 @@ import {
   type ManagedEvent,
 } from '../../../services/admin-events.ts';
 import { UnauthorizedError } from '../../../services/guestlist.ts';
-import { downloadDataUrl, qrPngDataUrl, slugify } from '../../../utils/qr.ts';
+import { downloadDataUrl, qrPngDataUrl, shareUrl, slugify } from '../../../utils/qr.ts';
 import EditShow from './EditShow.tsx';
 import { downloadTicketHolders } from '../../../utils/ticket-holders.ts';
 import CancelShowModal from './CancelShowModal.tsx';
@@ -18,15 +18,6 @@ import styles from './ManageShows.module.css';
 
 interface ManageShowsProps {
   onUnauthorized: () => void;
-}
-
-/** The on-site share/QR target that opens a show with the quantity stepper. */
-function shareUrl(id: string): string {
-  const origin =
-    typeof window !== 'undefined' && window.location.origin
-      ? window.location.origin
-      : 'https://djkmdlegends.com';
-  return `${origin}/?event=${id}`;
 }
 
 function formatDateTime(iso: string): string {
