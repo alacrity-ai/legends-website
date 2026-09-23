@@ -26,6 +26,20 @@ const TOKEN_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
 /** `/go/:slug` and `/api/go/:slug` (the latter rides the existing `/api/*` route). */
 const GO_RE = /^\/(?:api\/)?go\/([^/]+)\/?$/;
 
+/**
+ * `/go/e/<eventId>` — a tracked link for any show, with no `CAMPAIGN_LINKS`
+ * entry and no deploy per show (LGD-32). This is what the admin console's
+ * Copy link / QR code buttons hand out, so a printed QR is measurable.
+ *
+ * The id is only shape-checked: a redirect must not wait on a KV read, and a
+ * deleted show already degrades to the homepage with no modal.
+ */
+const GO_EVENT_RE = /^\/(?:api\/)?go\/e\/(.*)$/i;
+const EVENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Slug recorded for a per-show link; also the KV key of the show record. */
+export const eventSlug = (eventId: string) => `event:${eventId.toLowerCase()}`;
+
 function normalize(raw: string | null): string | null {
   if (!raw) return null;
   let decoded: string;
@@ -84,16 +98,29 @@ export async function handleGo(
   ctx: ExecutionContext,
   corsHeaders: Record<string, string>,
 ): Promise<Response | null> {
-  const match = url.pathname.match(GO_RE);
-  if (!match) return null;
+  const eventMatch = url.pathname.match(GO_EVENT_RE);
+  const match = eventMatch ? null : url.pathname.match(GO_RE);
+  if (!eventMatch && !match) return null;
 
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
   }
 
-  const slug = normalize(match[1]);
-  const known = slug !== null && slug in CAMPAIGN_LINKS;
-  const destination = known ? CAMPAIGN_LINKS[slug as string] : SITE;
+  let slug: string | null;
+  let known: boolean;
+  let destination: string;
+  if (eventMatch) {
+    const raw = eventMatch[1].replace(/\/$/, '');
+    const eventId = EVENT_ID_RE.test(raw) ? raw.toLowerCase() : null;
+    // A truncated or mis-scanned QR still gets the homepage, never a 404.
+    slug = eventId ? eventSlug(eventId) : 'event:invalid';
+    known = eventId !== null;
+    destination = eventId ? `${SITE}/?event=${eventId}` : SITE;
+  } else {
+    slug = normalize((match as RegExpMatchArray)[1]);
+    known = slug !== null && slug in CAMPAIGN_LINKS;
+    destination = known ? CAMPAIGN_LINKS[slug as string] : SITE;
+  }
 
   ctx.waitUntil(
     recordClick(env.SEATING, { slug: slug ?? 'invalid', source: normalize(url.searchParams.get('s')), known }, request)
@@ -157,11 +184,24 @@ export async function handleAdminClicks(
       .bind(...(slug ? [slug, limit] : [limit]))
       .all<ClickRow>();
 
+    // `event:<id>` is also the show's KV key, so a name costs one lookup each.
+    const eventSlugs = [...new Set((totals.results ?? []).map((r) => r.slug))]
+      .filter((sl) => sl.startsWith('event:'))
+      .slice(0, 25);
+    const names = new Map<string, string>();
+    await Promise.all(
+      eventSlugs.map(async (sl) => {
+        const record = await env.EVENTS.get<{ showName?: string }>(sl, 'json');
+        if (record?.showName) names.set(sl, record.showName);
+      }),
+    );
+
     return jsonResponse(
       200,
       {
         totals: (totals.results ?? []).map((r) => ({
           slug: r.slug,
+          show: names.get(r.slug) ?? null,
           source: r.source,
           clicks: Number(r.clicks),
           lastAt: new Date(Number(r.last_at)).toISOString(),

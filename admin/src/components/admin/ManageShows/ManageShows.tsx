@@ -317,8 +317,8 @@ export default function ManageShows({ onUnauthorized }: ManageShowsProps) {
             <button
               type="button"
               className={`${styles.btn} ${styles.btnGhost}`}
-              onClick={() => handleDownloadQr(ev.showName, shareUrl(ev.id))}
-              title="Download a QR code that opens this show on the site"
+              onClick={() => handleDownloadQr(ev.showName, shareUrl(ev.id, 'qr'))}
+              title="Download a QR code that opens this show on the site (scans are counted)"
             >
               QR code
             </button>

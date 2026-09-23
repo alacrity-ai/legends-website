@@ -8,9 +8,16 @@ import qrcode from 'qrcode-generator';
  */
 const SITE = 'https://djkmdlegends.com';
 
-/** The on-site share/QR target that opens a show with the quantity stepper. */
-export function shareUrl(eventId: string): string {
-  return `${SITE}/?event=${eventId}`;
+/**
+ * The share/QR target that opens a show with the quantity stepper.
+ *
+ * Routed through the worker's tracked redirect (LGD-32) rather than straight at
+ * `/?event=…`, so a scan or a pasted link is countable. `?s=` records *how* it
+ * reached the customer — a QR on a card and a link in a Facebook post are the
+ * same show but different channels, and that is the whole question worth asking.
+ */
+export function shareUrl(eventId: string, source: 'share' | 'qr' = 'share'): string {
+  return `${SITE}/go/e/${eventId}?s=${source}`;
 }
 
 // The @types/qrcode-generator definitions omit these runtime methods.
