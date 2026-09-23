@@ -192,6 +192,23 @@ All three artifacts (public site → Pages `legends-website`, admin PWA → Page
 **Partial deploys** (assuming Cloudflare creds are in your env — see `claude_ops/docs/sops/cloudflare-deploys.md`):
 - Worker only (you only touched `worker/`): `make deploy-worker`.
 - Admin PWA only (you only touched `admin/`): `make deploy-admin` (builds, then `wrangler pages deploy admin/dist --project-name legends-admin`).
+- **Public site: use the workflow, not your laptop.** `make deploy-site` exists as break-glass and refuses to run without `VITE_BOOKING_API_URL`.
+
+> ⚠️ **The public site is the only artifact with configuration baked in at build time.**
+> Vite inlines `VITE_*` at build; the workflow supplies them from GitHub secrets. A local
+> `npm run build` without them silently falls back to `http://localhost:8787`, and a Pages
+> deploy of that bundle points every visitor's browser at *their own machine*: Upcoming
+> Shows renders empty (`ERR_CONNECTION_REFUSED`), Chrome shows a "wants access to … on your
+> PC" local-network prompt, and `/?event=…` deep links never open the ticket modal because
+> the feed never loads. Nothing fails loudly — wrangler reports success over a broken
+> bundle. This happened in production on 2026-09-23 for ~8 minutes (LGD-30).
+>
+> The worker (runtime secrets) and the admin PWA (same-origin `/api`, no build-time config)
+> have no equivalent trap. If you must deploy the site locally, `make deploy-site` checks
+> the variable before building and greps the built bundle for `localhost` before deploying.
+> To recover a bad deploy, read the correct value out of the last good deployment's bundle
+> (`wrangler pages deployment list --project-name legends-website`, fetch its `*.pages.dev`
+> JS) rather than guessing — a matching bundle hash proves the rebuild matches CI.
 
 **Before deploying**, run `make lint`, `make build` and `make build-admin` locally to catch type/build errors early.
 
