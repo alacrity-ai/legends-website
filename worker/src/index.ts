@@ -31,6 +31,7 @@ import { buildTicketConfirmationEmail } from './templates/ticket-confirmation.ts
 import { fetchUpcomingEvents } from './services/google-calendar.ts';
 import { buildSalesReport, buildShowBuyers } from './sales.ts';
 import { handleAdminCharts } from './charts.ts';
+import { handleAdminClicks, handleGo } from './clicks.ts';
 import { AttachError, assertSeatingMutable, attachChart, detachChart, resyncChart, stripLayout } from './seating/attach.ts';
 import { HOLD_TTL_MS, attachOrderToHold, confirmHold, deleteShowSeats, findHoldByOrder, getHold, holdSeatIds, occupancy, reassign, type HoldRow } from './seating/db.ts';
 import { HOLD_ID_RE, handleSeatingPublic } from './seating/holds.ts';
@@ -65,6 +66,10 @@ export default {
     }
 
     const url = new URL(request.url);
+
+    // Campaign links (LGD-28): /go/:slug records the click, then redirects.
+    const goResponse = await handleGo(request, url, env, ctx, corsHeaders);
+    if (goResponse) return goResponse;
 
     if (url.pathname === '/api/events') {
       if (request.method !== 'GET') {
@@ -128,6 +133,10 @@ export default {
 
     if (url.pathname === '/api/admin/sales' || url.pathname.startsWith('/api/admin/sales/')) {
       return handleAdminSales(request, url, env, corsHeaders);
+    }
+
+    if (url.pathname === '/api/admin/clicks') {
+      return handleAdminClicks(request, url, env, corsHeaders);
     }
 
     if (url.pathname === '/api/admin/mailing-list') {
