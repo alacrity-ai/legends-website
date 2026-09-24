@@ -47,6 +47,8 @@ export interface SalesBuyer {
   amountCents: number | null;
   /** True when the amount is the recorded checkout total rather than price × quantity. */
   recorded: boolean;
+  /** `square` for an online order; otherwise how staff recorded the sale (cash, check, comp, other). */
+  paidBy: 'square' | 'cash' | 'check' | 'comp' | 'other';
 }
 
 async function request<T>(path: string): Promise<T> {

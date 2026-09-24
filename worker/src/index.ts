@@ -39,6 +39,7 @@ import { groupSeatIds, objectNoun, seatNumbersPhrase } from '@seating/assign.ts'
 import { SEAT_ID_RE, seatLabel } from '@seating/ids.ts';
 import { listEventRecords } from './events-store.ts';
 import { TransferError, isTransferredAway, transferParty } from './transfer.ts';
+import { DoorSaleError, parseDoorSale, recordSale, recordedSaleNote, voidSale } from './door-sale.ts';
 import {
   adminPasscode,
   errorMessage,
@@ -1014,6 +1015,22 @@ async function handleAdminEvents(
     return handleGetEventGuests(guestsMatch[1], env, corsHeaders, noStore);
   }
 
+  // Door sales (LGD-33): staff record a sale made outside Square, or void one.
+  const partiesMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/parties$/);
+  if (partiesMatch) {
+    if (request.method !== 'POST') {
+      return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+    }
+    return handleRecordSale(partiesMatch[1], request, env, corsHeaders, noStore);
+  }
+  const partyMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/parties\/([A-Za-z0-9_-]{6,64})$/);
+  if (partyMatch) {
+    if (request.method !== 'DELETE') {
+      return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+    }
+    return handleVoidSale(partyMatch[1], partyMatch[2], env, corsHeaders, noStore);
+  }
+
   const checkinMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/checkin$/);
   if (checkinMatch) {
     if (request.method === 'POST') {
@@ -1085,7 +1102,8 @@ function partyNote(r: PartyRecord): string | null {
   const moved = from
     ? `Transferred from ${from.showName} (${new Date(from.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })})`
     : '';
-  return [r.ticketType, moved].filter(Boolean).join(' · ') || null;
+  const recorded = r.recordedSale ? recordedSaleNote(r.recordedSale) : '';
+  return [r.ticketType, recorded, moved].filter(Boolean).join(' · ') || null;
 }
 
 function partyRecordToParty(r: PartyRecord): Party {
@@ -1182,6 +1200,63 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * (to the buyer) and by staff re-sends. Never throws on Mailgun errors — the
  * result says what happened.
  */
+/**
+ * POST /api/admin/events/:id/parties — record a sale made outside Square
+ * (cash, check, comp). Writes the party the webhook would have, takes the
+ * seats, bumps `sold`; emails the buyer only when `sendConfirmation` is set.
+ */
+async function handleRecordSale(
+  id: string,
+  request: Request,
+  env: Env,
+  corsHeaders: Record<string, string>,
+  noStore: Record<string, string>,
+): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse(400, { error: 'Invalid JSON' }, corsHeaders);
+  }
+  try {
+    const input = parseDoorSale(body);
+    const r = await recordSale(env, id, input);
+    if (r.nowSoldOut) await clearLinkCache(env, id);
+    let confirmation: { sentTo: string } | { error: string } | undefined;
+    if (input.sendConfirmation) {
+      const sent = await sendTicketConfirmation(env, r.event, r.party, r.party.email);
+      if (sent.success) {
+        r.party.confirmationSentAt = new Date().toISOString();
+        await env.GUESTLIST.put(`party:${id}:${r.party.paymentId}`, JSON.stringify(r.party));
+        confirmation = { sentTo: r.party.email };
+      } else {
+        confirmation = { error: sent.error ?? 'send failed' };
+      }
+    }
+    return jsonResponse(200, { party: partyRecordToParty(r.party), sold: r.sold, soldOut: r.event.soldOut ?? false, ...(confirmation ? { confirmation } : {}) }, corsHeaders, noStore);
+  } catch (err) {
+    if (err instanceof DoorSaleError) return jsonResponse(err.status, { error: err.message, ...err.extra }, corsHeaders, noStore);
+    throw err;
+  }
+}
+
+/** DELETE /api/admin/events/:id/parties/:paymentId — void a recorded (non-Square) sale. */
+async function handleVoidSale(
+  id: string,
+  paymentId: string,
+  env: Env,
+  corsHeaders: Record<string, string>,
+  noStore: Record<string, string>,
+): Promise<Response> {
+  try {
+    const r = await voidSale(env, id, paymentId);
+    return jsonResponse(200, { voided: partyRecordToParty(r.party), sold: r.sold }, corsHeaders, noStore);
+  } catch (err) {
+    if (err instanceof DoorSaleError) return jsonResponse(err.status, { error: err.message }, corsHeaders, noStore);
+    throw err;
+  }
+}
+
 async function handleTransferParty(
   id: string,
   paymentId: string,

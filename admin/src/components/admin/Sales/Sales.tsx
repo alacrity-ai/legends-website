@@ -501,9 +501,10 @@ function ShowCard({ show, ticketTypes, expanded, buyers, onToggle }: ShowCardPro
                     </td>
                     <td className={styles.num}>{integer.format(b.quantity)}</td>
                     <td>{b.ticketType || '—'}</td>
-                    <td className={styles.num} title={b.recorded ? 'Checkout total' : 'Estimated from ticket price'}>
+                    <td className={styles.num} title={b.recorded ? (b.paidBy === 'square' ? 'Checkout total' : 'Amount staff recorded') : 'Estimated from ticket price'}>
                       {b.amountCents === null ? '—' : money(b.amountCents)}
                       {b.amountCents !== null && !b.recorded && <span className={styles.est}>est.</span>}
+                      {b.paidBy && b.paidBy !== 'square' && <span className={styles.est}>{b.paidBy}</span>}
                     </td>
                     <td className={styles.date}>{purchasedDate(b.purchasedAt)}</td>
                   </tr>

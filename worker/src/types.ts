@@ -175,6 +175,23 @@ export interface PartyRecord {
    * cannot put the buyer back on the show they left.
    */
   transferredOut?: PartyTransfer[];
+  /**
+   * Set when staff recorded this sale themselves (cash at the door, a check,
+   * a comp) instead of it arriving through the Square webhook. Such records
+   * carry a `door-…` payment id, and are the only ones staff may void.
+   */
+  recordedSale?: RecordedSale;
+}
+
+export type SalePaymentMethod = 'cash' | 'check' | 'comp' | 'other';
+
+/** A sale staff entered by hand (LGD-33): no Square payment stands behind it. */
+export interface RecordedSale {
+  method: SalePaymentMethod;
+  /** Who took the money ("Keith"); shown on the door list. */
+  takenBy?: string;
+  note?: string;
+  at: string;
 }
 
 /** One staff ticket transfer, as seen from either side of it. */
