@@ -1,4 +1,4 @@
-import type { Env, EventRecord, PartyRecord } from './types.ts';
+import type { Env, EventRecord, PartyRecord, SalePaymentMethod } from './types.ts';
 import { isTransferredAway } from './transfer.ts';
 
 /* ── Sales report (LGD-10) ─────────────────────────────────────
@@ -46,6 +46,8 @@ export type SalesBuyer = {
   purchasedAt: string;
   amountCents: number | null;
   recorded: boolean;
+  /** `square` for a webhook order; otherwise how staff said the money came in (LGD-33). */
+  paidBy: 'square' | SalePaymentMethod;
 };
 
 async function listParties(env: Env, eventId: string): Promise<PartyRecord[]> {
@@ -163,6 +165,7 @@ export async function buildShowBuyers(env: Env, event: EventRecord): Promise<{ b
       purchasedAt: p.purchasedAt,
       amountCents,
       recorded,
+      paidBy: p.recordedSale?.method ?? 'square',
     };
   });
   buyers.sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt));
