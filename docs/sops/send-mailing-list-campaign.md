@@ -178,9 +178,8 @@ curl -s --user "api:$(agentsecrets get legends_mailgun_api_key)" \
 - [x] Working per-recipient unsubscribe link in the footer (worker route, one click, no login)
 - [x] `List-Unsubscribe` + `List-Unsubscribe-Post: One-Click` headers (RFC 8058)
 - [x] Suppression honored on every send; explicit form re-signup is the only un-suppress
-- [x] Physical postal address in the footer — ⚠ currently the placeholder
-      `DJKMD Presents Legends · Chelmsford, MA` in `campaign-template.mjs`
-      (`POSTAL_ADDRESS`). **Get the real business mailing address from Leif and update it.**
+- [x] Physical postal address in the footer — DJKMD's business address,
+      `306 Boston Road, Unit K, Billerica, MA 01862` (`POSTAL_ADDRESS` in `campaign-template.mjs`)
 - [x] Truthful subject/from: `DJKMD Legends <events@mg.djkmdlegends.com>`, reply-to
       `booking@djkmdlegends.com`
 - Segmenting note: `import`-source entries never explicitly opted in. For anything
