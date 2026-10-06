@@ -16,9 +16,9 @@ const MUTED = '#b8b2a6';
 const FAINT = '#8d8778';
 const SERIF = "Georgia, 'Times New Roman', serif";
 
-// TODO(Leif): replace with the real business mailing address — CAN-SPAM
-// requires a valid physical postal address in every marketing email.
-export const POSTAL_ADDRESS = 'DJKMD Presents Legends · Chelmsford, MA';
+// CAN-SPAM requires a valid physical postal address in every marketing email.
+// DJKMD's business address (Leif, 2026-10-06).
+export const POSTAL_ADDRESS = 'DJKMD Presents Legends · 306 Boston Road, Unit K, Billerica, MA 01862';
 
 export function escapeHtml(s) {
   return String(s)
