@@ -91,21 +91,76 @@ function factsBlock(facts) {
 </table>`;
 }
 
+/** Spaced small-caps line above the headline ("Back by popular demand"). */
+function kickerLine(text, accent) {
+  return `<p style="margin:0 0 10px;font-size:13px;line-height:1.5;letter-spacing:0.22em;text-transform:uppercase;color:${accent};font-weight:bold;">${escapeHtml(text)}</p>`;
+}
+
+/** Who's on stage: a label over the names, separated by accent stars. */
+function lineupBlock(lineup, accent) {
+  const names = lineup.names
+    .map((n) => `<span style="white-space:nowrap;">${escapeHtml(n)}</span>`)
+    .join(`&nbsp;<span style="color:${accent};">&#9733;</span> `);
+  return `
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+       style="margin:6px 0 4px;border-top:1px solid ${BORDER};border-bottom:1px solid ${BORDER};">
+  <tr><td align="center" style="padding:20px 10px 22px;">
+    ${lineup.label ? `<p style="margin:0 0 10px;font-size:12px;letter-spacing:0.22em;text-transform:uppercase;color:${MUTED};">${escapeHtml(lineup.label)}</p>` : ''}
+    <p style="margin:0;font-size:19px;line-height:1.75;color:#f5f0e6;">${names}</p>
+  </td></tr>
+</table>`;
+}
+
+/** Side-by-side ticket cards: name, big price, optional note. */
+function ticketOptionsBlock(options, accent) {
+  const width = Math.floor(100 / options.length);
+  const cells = options
+    .map(
+      (o, i) => `
+    <td width="${width}%" valign="top" style="padding:0 ${i < options.length - 1 ? '6px' : '0'} 0 ${i > 0 ? '6px' : '0'};">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+             style="background:${CARD};border:1px solid ${BORDER};border-top:3px solid ${accent};border-radius:10px;">
+        <tr><td align="center" style="padding:18px 12px 20px;">
+          <p style="margin:0 0 6px;font-size:13px;letter-spacing:0.12em;text-transform:uppercase;color:${MUTED};">${escapeHtml(o.name)}</p>
+          <p style="margin:0;font-size:30px;line-height:1.2;color:${GOLD};font-weight:bold;">${escapeHtml(o.price)}</p>
+          ${o.note ? `<p style="margin:6px 0 0;font-size:13px;line-height:1.5;color:${MUTED};">${escapeHtml(o.note)}</p>` : ''}
+        </td></tr>
+      </table>
+    </td>`,
+    )
+    .join('');
+  return `
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:14px 0 0;">
+  <tr>${cells}
+  </tr>
+</table>`;
+}
+
 /**
  * @param spec  {subject, preheader, headline, intro: string[], outro?: string[],
  *               cta?: {label, url}, event?: {name, startTime, venueName,
  *               venueAddress, imageUrl?, priceLine?},
- *               hero?: {url, alt}, facts?: {label, value}[], ctaNote?: string}
+ *               hero?: {url, alt}, facts?: {label, value}[], ctaNote?: string,
+ *               kicker?: string, accent?: '#rrggbb',
+ *               lineup?: {label?, names: string[]},
+ *               ticketOptions?: {name, price, note?}[]}
  *
  * `hero` opts into the hero layout: art on top, a centered lead paragraph and a
  * facts block in place of the event card. Without it the classic layout renders
  * exactly as before.
+ *
+ * `kicker`, `lineup`, `ticketOptions` and `accent` are opt-in extras for a
+ * marquee show: a spaced line over the headline, the names on stage, price
+ * cards above the CTA, and a per-campaign accent colour (kicker, stars, card
+ * tops) that echoes the show's art. Gold stays the brand colour for the
+ * headline, prices and button.
  * @param unsubUrl  per-recipient unsubscribe URL (Mailgun `%recipient.unsub%`
  *                  during real sends; a concrete URL for previews/tests)
  */
 export function renderCampaignHtml(spec, unsubUrl) {
   const ev = spec.event;
   const facts = spec.facts?.length ? spec.facts : null;
+  const accent = /^#[0-9a-f]{6}$/i.test(spec.accent ?? '') ? spec.accent : GOLD;
   // Hero layout: the first paragraph is the centered lead, the rest sit under the CTA.
   const lead = (spec.intro ?? []).slice(0, 1);
   const body = (spec.intro ?? []).slice(1);
@@ -150,13 +205,20 @@ export function renderCampaignHtml(spec, unsubUrl) {
 
   <!-- Headline + lead -->
   <tr><td style="padding:26px 6px 4px;font-family:${SERIF};"${spec.hero ? ' align="center"' : ''}>
+    ${spec.kicker ? kickerLine(spec.kicker, accent) : ''}
     <h1 style="margin:0 0 18px;font-size:30px;line-height:1.25;color:${GOLD};font-weight:bold;">${escapeHtml(spec.headline)}</h1>
     ${spec.hero ? paragraphs(lead, MUTED) : paragraphs(spec.intro)}
   </td></tr>
 
+  <!-- Lineup -->
+  ${spec.lineup?.names?.length ? `<tr><td style="padding:4px 0;font-family:${SERIF};">${lineupBlock(spec.lineup, accent)}</td></tr>` : ''}
+
   <!-- Facts block (hero layout) or the classic event card -->
   ${facts ? `<tr><td style="padding:6px 0;font-family:${SERIF};">${factsBlock(facts)}</td></tr>` : ''}
   ${!facts && eventCard ? `<tr><td style="padding:6px 0;font-family:${SERIF};">${eventCard}</td></tr>` : ''}
+
+  <!-- Ticket options -->
+  ${spec.ticketOptions?.length ? `<tr><td style="padding:0;font-family:${SERIF};">${ticketOptionsBlock(spec.ticketOptions, accent)}</td></tr>` : ''}
 
   <!-- CTA -->
   ${spec.cta ? `<tr><td>${ctaButton(spec.cta.label, spec.cta.url)}</td></tr>` : ''}
@@ -168,7 +230,7 @@ export function renderCampaignHtml(spec, unsubUrl) {
   <!-- Outro -->
   ${spec.outro?.length ? `<tr><td style="padding:4px 6px 0;font-family:${SERIF};">${paragraphs(spec.outro, MUTED)}</td></tr>` : ''}
 
-  ${spec.hero && spec.cta ? `<tr><td align="center" style="padding:18px 6px 0;font-family:${SERIF};"><a href="${escapeHtml(spec.cta.url)}" target="_blank" style="font-size:14px;color:${GOLD};text-decoration:underline;">${escapeHtml(spec.cta.label)} &rsaquo;</a></td></tr>` : ''}
+  ${spec.hero && spec.cta ? `<tr><td align="center" style="padding:18px 6px 28px;font-family:${SERIF};"><a href="${escapeHtml(spec.cta.url)}" target="_blank" style="font-size:14px;color:${GOLD};text-decoration:underline;">${escapeHtml(spec.cta.label)} &rsaquo;</a></td></tr>` : ''}
 
   <!-- Footer -->
   <tr><td style="padding:34px 6px 0;border-top:1px solid ${BORDER};font-family:${SERIF};" align="center">
@@ -195,10 +257,14 @@ export function renderCampaignText(spec, unsubUrl) {
   const lines = [
     'DJKMD LEGENDS',
     '',
+    ...(spec.kicker ? [spec.kicker.toUpperCase()] : []),
     spec.headline,
     '',
     ...(spec.intro ?? []),
   ];
+  if (spec.lineup?.names?.length) {
+    lines.push('', `${spec.lineup.label ? `${spec.lineup.label}: ` : ''}${spec.lineup.names.join(' * ')}`);
+  }
   if (spec.facts?.length) {
     lines.push('', ...spec.facts.map((f) => `${f.label}: ${f.value}`));
   } else if (ev) {
@@ -209,6 +275,9 @@ export function renderCampaignText(spec, unsubUrl) {
       `${ev.venueName}${ev.venueAddress ? ` - ${ev.venueAddress}` : ''}`,
     );
     if (ev.priceLine) lines.push(ev.priceLine);
+  }
+  if (spec.ticketOptions?.length) {
+    lines.push('', ...spec.ticketOptions.map((o) => `${o.name}: ${o.price}${o.note ? ` (${o.note})` : ''}`));
   }
   if (spec.cta) lines.push('', `${spec.cta.label}: ${spec.cta.url}`);
   if (spec.ctaNote) lines.push(spec.ctaNote);
