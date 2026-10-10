@@ -28,8 +28,10 @@ export async function sheet(page: Page) {
   return {
     title,
     subtitle: d.locator('h3 + p').first(),
+    // The seat-chart preview is hidden on this prompt (LGD-34, SHOW_SEAT_PREVIEW);
+    // these locators let specs prove it stays hidden.
     diagram: d.locator('[aria-label="Where your seats are"]'),
-    seats: (state: 'selected' | 'sold' | 'available') => d.locator(`[data-seat-id][data-seat-state="${state}"]`),
+    seatDots: d.locator('[data-seat-id]'),
     legend: d.getByText(/your seats/),
     continueBtn: d.locator('button', { hasText: 'Looks good, continue' }),
     changeBtn: d.locator('button', { hasText: 'Change table' }),

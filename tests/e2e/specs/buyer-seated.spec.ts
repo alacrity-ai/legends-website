@@ -1,10 +1,12 @@
 /**
  * Reserved seating from the buyer's phone: seats are chosen for the party,
- * shown on a diagram, held while they pay; "Change table" and "Back" are the
- * only other moves. Every dead end has a message and a way back.
+ * told in one plain sentence (no seat-chart picture — LGD-34: buyers tried to
+ * tap it), held while they pay; "Change table" and "Back" are the only other
+ * moves. Every dead end has a message and a way back. Which seats are held is
+ * checked in D1, since the page no longer draws them.
  */
 import { expect, test } from '@playwright/test';
-import { activeHolds, createChart, createShow, deleteChart, deleteShow, seatStatuses, stageBusyNight, stageSoldOut, stageThreeLeft, type Show } from '../lib/api.ts';
+import { activeHolds, createChart, createShow, deleteChart, deleteShow, heldSeatIds, seatStatuses, stageBusyNight, stageSoldOut, stageThreeLeft, type Show } from '../lib/api.ts';
 import { dialog, interceptCheckout, openAndBuy, sheet } from '../lib/buyer.ts';
 import { shot } from '../lib/shots.ts';
 
@@ -30,13 +32,15 @@ test('party of 3, empty room: seated together at the front table, then checkout 
   await expect(s.title).toHaveText("We've saved seats for your party together at Table 2.");
   await expect(s.subtitle).toContainText('Seats T2-1, T2-2, T2-3');
   await expect(s.subtitle).toContainText('3 × Show Only · $119.85');
-  await expect(s.diagram).toBeVisible();
-  await expect(s.seats('selected')).toHaveCount(3);
-  expect(await s.seats('selected').evaluateAll((els) => els.map((e) => e.getAttribute('data-seat-id')))).toEqual(['o_2.1', 'o_2.2', 'o_2.3']);
-  await expect(s.seats('sold')).toHaveCount(0);
+  // Just the sentence and the two buttons: no seat chart, nothing to tap but the buttons.
+  await expect(s.diagram).toHaveCount(0);
+  await expect(s.seatDots).toHaveCount(0);
+  await expect(s.legend).toHaveCount(0);
+  await expect(dialog(page).locator('svg')).toHaveCount(0);
+  await expect(s.continueBtn).toBeVisible();
+  await expect(s.changeBtn).toBeVisible();
   await expect(dialog(page).getByText('Held for you for 10 minutes.')).toBeVisible();
-  await expect(s.legend).toBeVisible();
-  await expect(s.legend).not.toContainText('taken');
+  expect(heldSeatIds(show.id)).toEqual(['o_2.1', 'o_2.2', 'o_2.3']);
   await shot(page, testInfo, 'sheet');
 
   await s.continueBtn.click();
@@ -66,9 +70,8 @@ test('Change table lists only tables that seat the party, nearest first, and mov
 
   await s.tableRows.filter({ hasText: 'Table 6' }).click();
   await expect(s.title).toHaveText("We've saved seats for your party together at Table 6.");
-  expect(await s.seats('selected').evaluateAll((els) => els.map((e) => e.getAttribute('data-seat-id')))).toEqual(['o_6.1', 'o_6.2', 'o_6.3', 'o_6.4']);
-  const status = seatStatuses(show.id);
-  expect(Object.entries(status).filter(([, st]) => st === 'held').map(([id]) => id)).toEqual(['o_6.1', 'o_6.2', 'o_6.3', 'o_6.4']);
+  await expect(s.diagram).toHaveCount(0);
+  expect(heldSeatIds(show.id)).toEqual(['o_6.1', 'o_6.2', 'o_6.3', 'o_6.4']);
   expect(activeHolds(show.id)).toBe(1);
 
   await s.changeBtn.click();
@@ -94,15 +97,14 @@ test('closing the modal releases the hold', async ({ page }) => {
   await expect.poll(() => activeHolds(show.id)).toBe(0);
 });
 
-test('busy night: taken seats are drawn dimmed with a legend, and a pair still sits at the front', async ({ page }, testInfo) => {
+test('busy night: a pair still sits at the front, and Change table lists only tables with room', async ({ page }, testInfo) => {
   stageBusyNight(show.id);
   await openAndBuy(page, show.id, 2);
   const s = await sheet(page);
   await expect(s.title).toHaveText("We've saved seats for your party together at Table 2.");
   await expect(s.subtitle).toContainText('Seats T2-7, T2-8');
-  await expect(s.seats('selected')).toHaveCount(2);
-  await expect(s.seats('sold')).toHaveCount(45);
-  await expect(s.legend).toContainText('taken');
+  await expect(s.diagram).toHaveCount(0);
+  expect(heldSeatIds(show.id)).toEqual(['o_2.7', 'o_2.8']);
   await shot(page, testInfo, 'busy-night');
   await s.changeBtn.click();
   await expect(s.tableRows.first()).toBeVisible();
@@ -116,7 +118,8 @@ test('no single table can take 6: the party is split across neighbouring tables 
   const s = await sheet(page);
   await expect(s.title).toHaveText("We've saved seats for your party at Table 4 and Row A, right beside each other.");
   await expect(s.subtitle).toContainText('Seats T4-5, T4-6, T4-7, T4-8, A9, A10');
-  await expect(s.seats('selected')).toHaveCount(6);
+  await expect(s.diagram).toHaveCount(0);
+  expect(heldSeatIds(show.id)).toEqual(['o_4.5', 'o_4.6', 'o_4.7', 'o_4.8', 'o_r.9', 'o_r.10']);
   await shot(page, testInfo, 'split');
   await expect(s.continueBtn).toBeEnabled();
 });

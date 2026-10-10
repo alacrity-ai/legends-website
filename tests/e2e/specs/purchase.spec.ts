@@ -4,7 +4,7 @@
  * browser; the only stand-in is the Square stub.
  */
 import { expect, test } from '@playwright/test';
-import { createShow, deleteShow, guests, seatedShow, seatStatuses, sentMail, type Show } from '../lib/api.ts';
+import { createShow, deleteShow, guests, heldSeatIds, seatedShow, seatStatuses, sentMail, type Show } from '../lib/api.ts';
 import { openAndBuy, sheet } from '../lib/buyer.ts';
 
 test('reserved seating: pay on the (stub) Square page and land back on the site with the seats sold', async ({ page }) => {
@@ -44,11 +44,11 @@ test('reserved seating: pay on the (stub) Square page and land back on the site 
     expect(mail[0].attachments[0].content).toContain('LOCATION:Billerica Elks');
     expect((await guests(show.id)).parties[0].confirmationSentAt).toBeTruthy();
 
-    // The next buyer sees those seats taken and is placed beside them.
+    // The next buyer is placed beside those sold seats.
     await openAndBuy(page, show.id, 2);
     const s2 = await sheet(page);
-    await expect(s2.seats('sold')).toHaveCount(2);
     await expect(s2.subtitle).toContainText('Seats T2-3, T2-4');
+    expect(heldSeatIds(show.id)).toEqual(['o_2.3', 'o_2.4']);
   } finally {
     await deleteShow(show.id);
   }
