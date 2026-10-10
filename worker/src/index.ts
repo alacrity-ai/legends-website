@@ -38,8 +38,9 @@ import { HOLD_ID_RE, handleSeatingPublic } from './seating/holds.ts';
 import { groupSeatIds, objectNoun, seatNumbersPhrase } from '@seating/assign.ts';
 import { SEAT_ID_RE, seatLabel } from '@seating/ids.ts';
 import { listEventRecords } from './events-store.ts';
-import { TransferError, isTransferredAway, transferParty } from './transfer.ts';
+import { TransferError, isGoneFromShow, transferParty } from './transfer.ts';
 import { DoorSaleError, parseDoorSale, recordSale, recordedSaleNote, voidSale } from './door-sale.ts';
+import { RefundError, parseRefund, recordRefund, refundNote } from './refund.ts';
 import {
   adminPasscode,
   errorMessage,
@@ -1060,6 +1061,15 @@ async function handleAdminEvents(
     return handleResendConfirmation(confirmMatch[1], confirmMatch[2], request, env, corsHeaders, noStore);
   }
 
+  // Refund (LGD-37): the buyer got money back, so tickets come off the show.
+  const refundMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/parties\/([A-Za-z0-9_-]{6,64})\/refund$/);
+  if (refundMatch) {
+    if (request.method !== 'POST') {
+      return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+    }
+    return handleRecordRefund(refundMatch[1], refundMatch[2], request, env, corsHeaders, noStore);
+  }
+
   // Ticket transfer: staff move a party (or part of it) to another show.
   const transferMatch = url.pathname.match(/^\/api\/admin\/events\/([a-f0-9-]+)\/parties\/([A-Za-z0-9_-]{6,64})\/transfer$/);
   if (transferMatch) {
@@ -1103,7 +1113,7 @@ function partyNote(r: PartyRecord): string | null {
     ? `Transferred from ${from.showName} (${new Date(from.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })})`
     : '';
   const recorded = r.recordedSale ? recordedSaleNote(r.recordedSale) : '';
-  return [r.ticketType, recorded, moved].filter(Boolean).join(' · ') || null;
+  return [r.ticketType, recorded, moved, refundNote(r.refunds)].filter(Boolean).join(' · ') || null;
 }
 
 function partyRecordToParty(r: PartyRecord): Party {
@@ -1141,7 +1151,7 @@ async function handleGetEventGuests(
     if (!raw) continue;
     try {
       const record = JSON.parse(raw) as PartyRecord;
-      if (isTransferredAway(record)) continue; // every ticket moved to another show
+      if (isGoneFromShow(record)) continue; // every ticket moved to another show, or refunded
       parties.push(partyRecordToParty(record));
     } catch {
       // skip malformed entry
@@ -1253,6 +1263,35 @@ async function handleVoidSale(
     return jsonResponse(200, { voided: partyRecordToParty(r.party), sold: r.sold }, corsHeaders, noStore);
   } catch (err) {
     if (err instanceof DoorSaleError) return jsonResponse(err.status, { error: err.message }, corsHeaders, noStore);
+    throw err;
+  }
+}
+
+/** POST /api/admin/events/:id/parties/:paymentId/refund — take refunded tickets off the show. */
+async function handleRecordRefund(
+  id: string,
+  paymentId: string,
+  request: Request,
+  env: Env,
+  corsHeaders: Record<string, string>,
+  noStore: Record<string, string>,
+): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse(400, { error: 'Invalid JSON' }, corsHeaders);
+  }
+  try {
+    const r = await recordRefund(env, id, paymentId, parseRefund(body));
+    return jsonResponse(
+      200,
+      { refunded: r.refunded, remaining: r.party.quantity, sold: r.sold, party: partyRecordToParty(r.party) },
+      corsHeaders,
+      noStore,
+    );
+  } catch (err) {
+    if (err instanceof RefundError) return jsonResponse(err.status, { error: err.message }, corsHeaders);
     throw err;
   }
 }
@@ -1373,7 +1412,7 @@ async function handleResendConfirmation(
   }
   const partyKey = `party:${id}:${paymentId}`;
   const party = await env.GUESTLIST.get<PartyRecord>(partyKey, 'json');
-  if (!party || isTransferredAway(party)) return jsonResponse(404, { error: 'Party not found' }, corsHeaders);
+  if (!party || isGoneFromShow(party)) return jsonResponse(404, { error: 'Party not found' }, corsHeaders);
 
   const to = typeof override === 'string' ? override.trim() : party.email;
   if (!to) return jsonResponse(400, { error: 'This party has no email address on file' }, corsHeaders);
@@ -1478,7 +1517,7 @@ async function handleEventCheckin(
   }
 
   const exists = await env.GUESTLIST.get<PartyRecord>(`party:${id}:${payload.paymentId}`, 'json');
-  if (!exists || isTransferredAway(exists)) {
+  if (!exists || isGoneFromShow(exists)) {
     return jsonResponse(404, { error: 'Party not found in show' }, corsHeaders);
   }
 

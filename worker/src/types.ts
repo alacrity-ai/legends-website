@@ -176,11 +176,30 @@ export interface PartyRecord {
    */
   transferredOut?: PartyTransfer[];
   /**
+   * Tickets taken off this show because the buyer got their money back
+   * (LGD-37). Fully refunded = quantity 0, kept as the webhook's dedupe
+   * marker and hidden from every list, like a transfer.
+   */
+  refunds?: PartyRefund[];
+  /**
    * Set when staff recorded this sale themselves (cash at the door, a check,
    * a comp) instead of it arriving through the Square webhook. Such records
    * carry a `door-…` payment id, and are the only ones staff may void.
    */
   recordedSale?: RecordedSale;
+}
+
+/** How the money went back: Square's refund, or Keith paying the buyer back outside Square. */
+export type RefundMethod = 'square' | 'venmo' | 'cash' | 'check' | 'other';
+
+/** One refund staff recorded against a party (LGD-37). */
+export interface PartyRefund {
+  quantity: number;
+  method: RefundMethod;
+  /** What went back to the buyer, when known. */
+  amountCents?: number;
+  note?: string;
+  at: string;
 }
 
 export type SalePaymentMethod = 'cash' | 'check' | 'comp' | 'other';
