@@ -16,6 +16,13 @@
   margin: 0;
 }
 
+/* The "We've saved seats for your party…" sentence: the one thing on the
+   prompt to read, so it is the biggest type in the sheet (LGD-34). */
+.holdTitle {
+  font-size: var(--text-2xl);
+  line-height: 1.25;
+}
+
 .seats {
   color: var(--color-accent);
   font-size: var(--text-base);

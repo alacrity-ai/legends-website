@@ -1,8 +1,8 @@
 /**
  * "We've saved seats for your party" — the reserved-seating step of the ticket
  * modal (v0.5 P3). Opens with the party's seats already held by the worker,
- * shows a small diagram, and offers exactly two moves: continue to Square, or
- * change table (a list of tables that seat the whole party). Nobody taps a
+ * says where in plain words, and offers exactly two moves: continue to Square,
+ * or change table (a list of tables that seat the whole party). Nobody taps a
  * seat. Closing releases the hold; a hold that lapses is silently re-made.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -25,6 +25,15 @@ type State =
   | { status: 'holding' }
   | { status: 'ready'; hold: HeldSeats; note?: string }
   | { status: 'failed'; message: string };
+
+/**
+ * Seat-chart preview on the "We've saved seats…" prompt — HIDDEN for now (LGD-34).
+ * Buyers (mostly 65+) thought the diagram was something to tap and got stuck,
+ * so the prompt is now just the sentence and the two buttons. The diagram,
+ * legend and their view maths are kept intact below: flip this to `true` to
+ * bring the preview back.
+ */
+const SHOW_SEAT_PREVIEW = false;
 
 const DIAGRAM_W = 320;
 const DIAGRAM_H = 200;
@@ -202,7 +211,7 @@ export default function SeatSheet({ eventId, ticketType, quantity, priceLabel, o
     <div className={styles.sheet}>
       {!changing ? (
         <>
-          <h3 className={styles.title}>{hold.message}</h3>
+          <h3 className={`${styles.title} ${styles.holdTitle}`}>{hold.message}</h3>
           <p className={styles.seats}>
             {hold.seatLabels.length <= 6 ? `Seats ${hold.seatLabels.join(', ')}` : `${hold.seatLabels.length} seats together`}
             {' · '}
@@ -210,18 +219,22 @@ export default function SeatSheet({ eventId, ticketType, quantity, priceLabel, o
           </p>
           {state.note && <p className={styles.note}>{state.note}</p>}
 
-          <div className={styles.diagram} aria-label="Where your seats are">
-            <SeatMap layout={hold.layout} mode="pick" viewBox={viewBox} seatStates={seatStates} />
-          </div>
-          <div className={styles.legend}>
-            <span className={styles.legendYou} /> your seats
-            <span className={styles.legendOpen} /> open
-            {(hold.taken?.length ?? 0) > 0 && (
-              <>
-                <span className={styles.legendTaken} /> taken
-              </>
-            )}
-          </div>
+          {SHOW_SEAT_PREVIEW && (
+            <>
+              <div className={styles.diagram} aria-label="Where your seats are">
+                <SeatMap layout={hold.layout} mode="pick" viewBox={viewBox} seatStates={seatStates} />
+              </div>
+              <div className={styles.legend}>
+                <span className={styles.legendYou} /> your seats
+                <span className={styles.legendOpen} /> open
+                {(hold.taken?.length ?? 0) > 0 && (
+                  <>
+                    <span className={styles.legendTaken} /> taken
+                  </>
+                )}
+              </div>
+            </>
+          )}
 
           <p className={styles.held}>Held for you for 10 minutes.</p>
 

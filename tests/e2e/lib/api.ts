@@ -117,6 +117,14 @@ export function seatStatuses(showId: string): Record<string, string> {
   return Object.fromEntries(out[0].results.map((r) => [r.seat_id, r.status]));
 }
 
+/** Seat ids currently held (not yet paid) for a show, in seat order. */
+export function heldSeatIds(showId: string): string[] {
+  return Object.entries(seatStatuses(showId))
+    .filter(([, st]) => st === 'held')
+    .map(([id]) => id)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
 export function activeHolds(showId: string): number {
   const out = JSON.parse(d1(`SELECT COUNT(*) AS n FROM seat_holds WHERE show_id='${showId}' AND status='active'`)) as Array<{ results: Array<{ n: number }> }>;
   return Number(out[0].results[0].n);
