@@ -36,6 +36,10 @@ export default function Footer() {
           <a href={pressKitPath} download className={styles.pressKitLink}>
             Press Kit
           </a>
+
+          <a href="/privacy/" className={styles.pressKitLink}>
+            Privacy
+          </a>
         </nav>
 
         <p className={styles.copyright}>
