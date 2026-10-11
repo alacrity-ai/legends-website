@@ -28,8 +28,9 @@ export interface TransferResult {
   targetNowSoldOut: boolean;
 }
 
-/** A party whose tickets have all been moved to another show. */
-export const isTransferredAway = (p: PartyRecord): boolean => p.quantity === 0 && !!p.transferredOut?.length;
+/** A party with no tickets left on this show: all moved to another show, or refunded (LGD-37). */
+export const isGoneFromShow = (p: PartyRecord): boolean =>
+  p.quantity === 0 && (!!p.transferredOut?.length || !!p.refunds?.length);
 
 async function readEvent(env: Env, id: string, which: string): Promise<EventRecord> {
   const raw = await env.EVENTS.get(`event:${id}`);
@@ -87,6 +88,7 @@ export async function transferParty(
   // The target record starts clean: no outbound history, and no confirmation sent for this show yet.
   const carried: PartyRecord = { ...source };
   delete carried.transferredOut;
+  delete carried.refunds; // refund history belongs to the show it happened on
   delete carried.confirmationSentAt;
   const target: PartyRecord = {
     ...carried,
