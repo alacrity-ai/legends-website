@@ -8,13 +8,13 @@ import type { FeaturedAct } from '../types/featured-act.ts';
 export const featuredActs: FeaturedAct[] = [
   {
     id: 'sinatra',
-    name: 'Sinatra Under the Stars',
+    name: 'The Rat Pack',
     blurb:
-      'Joey Chiarenza brings Frank Sinatra and the Rat Pack to life — joined by Dino & Sammy Davis Jr. and a full orchestra. An AGT alum with hundreds of shows across New England.',
+      'Frank, Dean & Sammy with a live 17-piece orchestra: Joey Chiarenza as Sinatra, Joe Perce as Dean Martin and Lloyd Diamond as Sammy Davis Jr. See upcoming shows and get tickets.',
     href: '/sinatra/',
     imageSrc: '/sinatra/joey-chiarenza.jpg',
     imageAlt:
-      'Joey Chiarenza performing as Frank Sinatra alongside Dean Martin and Sammy Davis Jr. tributes with a live orchestra',
+      'Frank Sinatra, Dean Martin and Sammy Davis Jr. tribute performers on stage with a live orchestra',
   },
   {
     id: 'ladies-legends',
