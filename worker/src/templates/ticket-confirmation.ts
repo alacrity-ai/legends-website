@@ -5,6 +5,7 @@
  * Plain text + HTML + an .ics calendar file.
  */
 import type { EventRecord, PartyRecord } from '../types.ts';
+import { escapeIcs, foldIcs, icsUtc } from '../ics.ts';
 
 export interface TicketConfirmationInput {
   event: EventRecord;
@@ -124,33 +125,6 @@ A calendar file is attached so the night lands on your phone. Questions? Just re
   ]);
 
   return { subject, text, html, ics };
-}
-
-/** "2026-09-20T20:00:00-04:00" → "20260921T000000Z" (calendar apps want UTC). */
-function icsUtc(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-}
-
-function escapeIcs(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
-}
-
-/** RFC 5545: lines longer than 75 octets continue on the next line after a space. */
-function foldIcs(lines: string[]): string {
-  const out: string[] = [];
-  for (const line of lines) {
-    let rest = line;
-    let first = true;
-    while (rest.length > 0) {
-      const take = first ? 73 : 72;
-      out.push((first ? '' : ' ') + rest.slice(0, take));
-      rest = rest.slice(take);
-      first = false;
-    }
-  }
-  return out.join('\r\n') + '\r\n';
 }
 
 function escapeHtml(str: string): string {

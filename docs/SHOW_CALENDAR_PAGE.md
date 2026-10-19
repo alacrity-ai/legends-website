@@ -1,6 +1,6 @@
 # Show Calendar page — design + implementation (LGD-40)
 
-**Status:** shipped 2026-10-19. **Live:** https://djkmdlegends.com/calendar
+**Status:** shipped 2026-10-19. **Live:** https://djkmdlegends.com/calendar · subscribe/add-to-calendar: `CALENDAR_FEED.md` (LGD-41)
 **Ticket:** LGD-40. **Asked for by:** Keith, after clients asked whether Legends has an online calendar.
 
 ---
@@ -114,9 +114,9 @@ site must never be built on a laptop, see LGD-30 and `docs/resources/1-SOPS.md` 
 
 ## 5. Not done, on purpose
 
-- **Subscribe (.ics feed).** Some clients mean "a calendar I can add to my phone". The worker
-  already writes `.ics` files for confirmation emails (LGD-24); a public all-shows feed and a
-  *Subscribe* link on this page is a few hours' work. Separate ticket if Keith wants it.
+- ~~Subscribe (.ics feed)~~ — done the same day as LGD-41: see `CALENDAR_FEED.md`
+  (feed at `/api/calendar.ics`, **Subscribe** in the intro band, **Add to calendar** on
+  each card).
 - **Past shows.** The feed is upcoming-only, so earlier months are not offered. If a
   "what did we do last year" view is wanted, the feed needs a `?from=` and the back button a
   different floor.

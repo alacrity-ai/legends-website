@@ -2,7 +2,11 @@ import Button from '../shared/Button/Button.tsx';
 import type { CalendarEvent } from '../../types/event.ts';
 import { dayAnchorId, dayParts, formatTime12, longDate, monthLabel, type YearMonth } from '../../utils/calendar.ts';
 import { eventImageSrc } from '../../utils/event-image.ts';
+import { eventIcsUrl, googleEventUrl } from '../../utils/calendar-links.ts';
+import AddToCalendarMenu from './AddToCalendarMenu.tsx';
 import styles from './CalendarPage.module.css';
+
+const API_BASE = import.meta.env.VITE_BOOKING_API_URL as string;
 
 interface ShowListProps {
   month: YearMonth;
@@ -82,6 +86,19 @@ export default function ShowList({ month, shows, highlightDate, onOpen }: ShowLi
                     </a>
                   )}
                 </p>
+                {e.id && status !== 'cancelled' && (
+                  <div className={styles.cardAdd}>
+                    <AddToCalendarMenu
+                      label="Add to calendar"
+                      ariaLabel={`Add ${e.title} to your calendar`}
+                      variant="ghost"
+                      choices={[
+                        { label: 'Google Calendar', href: googleEventUrl(e, window.location.origin), external: true },
+                        { label: 'Apple Calendar, Outlook & others', hint: 'Downloads a calendar file', href: eventIcsUrl(API_BASE, e.id), download: true },
+                      ]}
+                    />
+                  </div>
+                )}
               </div>
 
               <Button variant={status === 'onSale' ? 'primary' : 'secondary'} className={styles.cardButton} onClick={() => onOpen(e)}>
