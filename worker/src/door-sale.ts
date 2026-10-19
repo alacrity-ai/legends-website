@@ -27,7 +27,10 @@ export const DOOR_ID_RE = /^door-[a-z0-9]{12}$/;
 export const isDoorSale = (p: Pick<PartyRecord, 'paymentId' | 'recordedSale'>): boolean => DOOR_ID_RE.test(p.paymentId) && !!p.recordedSale;
 
 const METHODS: readonly SalePaymentMethod[] = ['cash', 'check', 'comp', 'other'];
-const MAX_QTY = 20;
+// Typo guard, not a business rule: staff record group sales (a lodge buying 60
+// seats on one check), so this is the largest show we run, not the online
+// per-order cap in seating/holds.ts. Capacity itself is the show's business.
+const MAX_QTY = 200;
 const MAX_FIELD = 200;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

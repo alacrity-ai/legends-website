@@ -90,6 +90,8 @@ describe('POST /api/admin/events/:id/parties (record a door sale)', () => {
     expect((await record(ev.id, { ...CAROL, ticketType: 'VIP' })).status).toBe(400);
     expect((await record(ev.id, { ...CAROL, method: 'venmo' })).status).toBe(400);
     expect((await record(ev.id, { ...CAROL, quantity: 0 })).status).toBe(400);
+    expect((await record(ev.id, { ...CAROL, quantity: 201 })).status).toBe(400);
+    expect((await record(ev.id, { ...CAROL, firstName: 'Lodge', quantity: 60 })).status).toBe(200);
     expect((await record(ev.id, { ...CAROL, email: 'not-an-email' })).status).toBe(400);
     expect((await record(ev.id, { ...CAROL, seatIds: ['o_4.1'] })).status).toBe(400); // GA show
     expect((await record(ev.id, { ...CAROL, sendConfirmation: true, email: '' })).status).toBe(400);
