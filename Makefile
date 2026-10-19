@@ -36,7 +36,10 @@ build-admin: ## Production build of the admin PWA (outputs to admin/dist/)
 lint: ## Run ESLint
 	npm run lint
 
-test: test-shared test-worker test-e2e ## Every suite: shared unit → worker integration → browser e2e
+test: test-site test-shared test-worker test-e2e ## Every suite: site unit → shared unit → worker integration → browser e2e
+
+test-site: ## Unit tests for the public site (src/**/*.test.ts — calendar helpers)
+	npx vitest run
 
 test-shared: ## Unit tests for shared/seating (geometry, ids, validation, seat assignment)
 	cd shared && npx vitest run

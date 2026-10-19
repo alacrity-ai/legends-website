@@ -6,10 +6,19 @@ import styles from './Header.module.css';
 
 interface HeaderProps {
   onOpenMailingList: () => void;
+  /** Which page the header sits on; section anchors become absolute off the homepage. */
+  page?: 'home' | 'calendar';
 }
 
-export default function Header({ onOpenMailingList }: HeaderProps) {
+export default function Header({ onOpenMailingList, page = 'home' }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // On /calendar a bare `#about` would look for a section that is not there;
+  // `/#about` takes the visitor home and scrolls. `#calendar` exists on both
+  // pages (the grid on /calendar, Upcoming Shows on /), so it stays relative.
+  const anchor = (id: string) => (page === 'home' || id === sectionIds.calendar ? `#${id}` : `/#${id}`);
+  const hrefFor = (href: string) => (href.startsWith('#') ? anchor(href.slice(1)) : href);
+  const isCurrent = (href: string) => href === '/calendar' && page === 'calendar';
 
   const handleNavClick = () => {
     setMenuOpen(false);
@@ -18,7 +27,7 @@ export default function Header({ onOpenMailingList }: HeaderProps) {
   return (
     <header className={styles.header}>
       <Container className={styles.inner}>
-        <a href="#home" className={styles.wordmark}>
+        <a href={anchor(sectionIds.home)} className={styles.wordmark}>
           <img
             src="/assets/images/logo_wide.webp"
             alt={siteTitle}
@@ -47,9 +56,10 @@ export default function Header({ onOpenMailingList }: HeaderProps) {
               .map((item) => (
                 <li key={item.href}>
                   <a
-                    href={item.href}
+                    href={hrefFor(item.href)}
                     className={styles.navLink}
                     onClick={handleNavClick}
+                    aria-current={isCurrent(item.href) ? 'page' : undefined}
                   >
                     {item.label}
                   </a>
@@ -58,13 +68,13 @@ export default function Header({ onOpenMailingList }: HeaderProps) {
           </ul>
 
           <div className={styles.navButtons}>
-            <Button href={`#${sectionIds.calendar}`} variant="primary" onClick={handleNavClick}>
+            <Button href={anchor(sectionIds.calendar)} variant="primary" onClick={handleNavClick}>
               Buy Tickets!
             </Button>
             <Button variant="secondary" onClick={() => { handleNavClick(); onOpenMailingList(); }}>
               Mailing List
             </Button>
-            <Button href={`#${sectionIds.book}`} variant="secondary" onClick={handleNavClick}>
+            <Button href={anchor(sectionIds.book)} variant="secondary" onClick={handleNavClick}>
               Book Us!
             </Button>
           </div>

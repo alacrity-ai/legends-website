@@ -10,6 +10,7 @@ import Calendar from '../components/marketing/Calendar/Calendar.tsx';
 import BookingForm from '../components/marketing/BookingForm/BookingForm.tsx';
 import MailingList from '../components/marketing/MailingList/MailingList.tsx';
 import PressKit from '../components/marketing/PressKit/PressKit.tsx';
+import CalendarPage from '../components/calendar/CalendarPage.tsx';
 
 function MarketingSite() {
   const [showMailingList, setShowMailingList] = useState(false);
@@ -66,9 +67,14 @@ function MarketingSite() {
   );
 }
 
-// The staff console lives in its own PWA at admin.djkmdlegends.com (admin/);
-// /admin and /guestlist on this host are 301s in public/_redirects.
+// Two pages share this bundle: the one-page marketing site at / and the show
+// calendar at /calendar (LGD-40). Pages' `/* /index.html 200` fallback serves
+// both; a path check is all the routing two pages need. The staff console
+// lives in its own PWA at admin.djkmdlegends.com (admin/); /admin and
+// /guestlist on this host are 301s in public/_redirects.
 function App() {
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  if (path === '/calendar') return <CalendarPage />;
   return <MarketingSite />;
 }
 

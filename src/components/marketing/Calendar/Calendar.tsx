@@ -3,8 +3,9 @@ import Section from '../../layout/Section/Section.tsx';
 import Container from '../../layout/Container/Container.tsx';
 import Heading from '../../shared/Heading/Heading.tsx';
 import Button from '../../shared/Button/Button.tsx';
+import CalendarIcon from '../../shared/CalendarIcon/CalendarIcon.tsx';
 import TicketModal from '../TicketModal/TicketModal.tsx';
-import { calendarCopy, sectionIds } from '../../../content/site.ts';
+import { calendarCopy, calendarPagePath, sectionIds } from '../../../content/site.ts';
 import { fetchUpcomingEvents } from '../../../services/events.ts';
 import { eventImageSrc } from '../../../utils/event-image.ts';
 import type { CalendarEvent } from '../../../types/event.ts';
@@ -57,6 +58,12 @@ export default function Calendar() {
         <Heading align="center" subtitle={calendarCopy}>
           Upcoming Shows
         </Heading>
+
+        <div className={styles.calendarLinkRow}>
+          <Button href={calendarPagePath} variant="secondary" className={styles.calendarLink}>
+            <CalendarIcon /> View Full Calendar
+          </Button>
+        </div>
 
         {loading && (
           <p className={styles.statusText}>Loading upcoming shows...</p>
