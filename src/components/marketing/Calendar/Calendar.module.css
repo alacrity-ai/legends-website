@@ -1,3 +1,16 @@
+/* "View Full Calendar" sits between the heading and the cards (LGD-40). The
+   heading already carries its own bottom margin, so pull up into it a little. */
+.calendarLinkRow {
+  display: flex;
+  justify-content: center;
+  margin-top: calc(-1 * var(--space-lg));
+  margin-bottom: var(--space-2xl);
+}
+
+.calendarLink {
+  font-size: var(--text-sm);
+}
+
 .eventList {
   display: flex;
   flex-direction: column;

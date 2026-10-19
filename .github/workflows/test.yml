@@ -19,6 +19,9 @@ jobs:
         run: |
           (cd shared && npm ci)
           (cd worker && npm ci)
+      - name: Site unit tests
+        run: npx vitest run
+
       - name: Shared unit tests
         run: cd shared && npx vitest run
       - name: Worker integration tests (workerd, local D1/KV/R2, Square mocked)

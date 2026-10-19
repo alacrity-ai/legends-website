@@ -114,8 +114,14 @@
   transition: left 0.25s var(--ease-out), right 0.25s var(--ease-out);
 }
 
-.navLink:hover {
+.navLink:hover,
+.navLink[aria-current='page'] {
   color: var(--color-primary);
+}
+
+.navLink[aria-current='page']::after {
+  left: var(--space-sm);
+  right: var(--space-sm);
 }
 
 .navLink:hover::after {

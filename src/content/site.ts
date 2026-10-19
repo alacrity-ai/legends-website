@@ -13,6 +13,7 @@ export const navItems: NavItem[] = [
   { label: 'About', href: '#about' },
   { label: 'Video', href: '#media' },
   { label: 'Acts', href: '#acts' },
+  { label: 'Calendar', href: '/calendar' },
   { label: 'Press Kit', href: '#press-kit' },
 ];
 
@@ -112,6 +113,7 @@ export const ticketComingSoonMessage =
 /* ── Calendar ──────────────────────────────────────────────── */
 
 export const calendarCopy = 'See where Legends is appearing next.';
+export const calendarPagePath = '/calendar';
 
 /* ── Mailing list ──────────────────────────────────────────── */
 

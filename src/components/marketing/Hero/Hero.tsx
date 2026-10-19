@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import Section from '../../layout/Section/Section.tsx';
 import Container from '../../layout/Container/Container.tsx';
 import Button from '../../shared/Button/Button.tsx';
+import CalendarIcon from '../../shared/CalendarIcon/CalendarIcon.tsx';
 import TicketModal from '../TicketModal/TicketModal.tsx';
 import {
   heroHeadline,
   heroSubcopy,
   sectionIds,
+  calendarPagePath,
 } from '../../../content/site.ts';
 import { fetchUpcomingEvents } from '../../../services/events.ts';
 import { parseDescription } from '../../../utils/parse-description.ts';
@@ -94,7 +96,10 @@ export default function Hero({ onOpenMailingList }: HeroProps) {
             <Button href={`#${sectionIds.book}`} variant="primary">
               Book Us!
             </Button>
-            <Button href={`#${sectionIds.calendar}`} variant="primary">
+            <Button href={calendarPagePath} variant="primary">
+              <CalendarIcon /> Show Calendar
+            </Button>
+            <Button href={`#${sectionIds.calendar}`} variant="secondary">
               Upcoming Shows
             </Button>
             <Button variant="secondary" onClick={onOpenMailingList}>

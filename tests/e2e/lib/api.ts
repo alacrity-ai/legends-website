@@ -55,7 +55,9 @@ export interface Show {
   showName: string;
 }
 
-export async function createShow(opts: { seatingChartId?: string; capacity?: number; name?: string } = {}): Promise<Show> {
+export async function createShow(opts: { seatingChartId?: string; capacity?: number; name?: string; /** ISO with offset; the show runs three hours. */ startTime?: string } = {}): Promise<Show> {
+  const start = opts.startTime ?? '2027-06-01T20:00:00-04:00';
+  const end = new Date(new Date(start).getTime() + 3 * 3600_000).toISOString();
   const r = await admin('/api/admin/events', {
     method: 'POST',
     body: JSON.stringify({
@@ -65,8 +67,8 @@ export async function createShow(opts: { seatingChartId?: string; capacity?: num
       description: 'Dinner seating at the Elks. Doors 7, show 8.',
       venueName: 'Billerica Elks',
       venueAddress: '14 Webb Brook Rd, Billerica, MA 01821',
-      startTime: '2027-06-01T20:00:00-04:00',
-      endTime: '2027-06-01T23:00:00-04:00',
+      startTime: start,
+      endTime: end,
       tickets: [
         { ticketType: 'Show Only', price: 39.95 },
         { ticketType: 'Dinner + Show', price: 59.95 },
