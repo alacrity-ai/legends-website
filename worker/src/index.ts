@@ -41,6 +41,7 @@ import { listEventRecords } from './events-store.ts';
 import { TransferError, isGoneFromShow, transferParty } from './transfer.ts';
 import { DoorSaleError, parseDoorSale, recordSale, recordedSaleNote, voidSale } from './door-sale.ts';
 import { RefundError, parseRefund, recordRefund, refundNote } from './refund.ts';
+import { buildShowFeed, buildShowIcs, icsFilename, icsResponse } from './calendar-feed.ts';
 import {
   adminPasscode,
   errorMessage,
@@ -78,6 +79,24 @@ export default {
         return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
       }
       return handleEvents(env, corsHeaders);
+    }
+
+    // Public iCalendar feed + one-show file (LGD-41).
+    if (url.pathname === '/api/calendar.ics') {
+      if (request.method !== 'GET') {
+        return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+      }
+      const records = await listEventRecords(env);
+      return icsResponse(buildShowFeed(records, primaryOrigin(env)), corsHeaders, 'inline; filename="djkmd-legends-shows.ics"');
+    }
+    const icsMatch = url.pathname.match(/^\/api\/events\/([a-f0-9-]+)\/calendar\.ics$/);
+    if (icsMatch) {
+      if (request.method !== 'GET') {
+        return jsonResponse(405, { error: 'Method not allowed' }, corsHeaders);
+      }
+      const record = (await listEventRecords(env)).find((r) => r.id === icsMatch[1]);
+      if (!record) return jsonResponse(404, { error: 'Event not found' }, corsHeaders);
+      return icsResponse(buildShowIcs(record, primaryOrigin(env)), corsHeaders, `attachment; filename="${icsFilename(record.showName)}"`);
     }
 
     if (url.pathname === '/api/square/webhook') {

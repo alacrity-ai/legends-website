@@ -16,12 +16,15 @@ import MonthNav from './MonthNav.tsx';
 import MonthGrid from './MonthGrid.tsx';
 import ShowList from './ShowList.tsx';
 import { useCompactLayout } from './useCompactLayout.ts';
+import AddToCalendarMenu from './AddToCalendarMenu.tsx';
+import { feedUrl, googleSubscribeUrl, webcalUrl } from '../../utils/calendar-links.ts';
 import { fetchUpcomingEvents } from '../../services/events.ts';
 import type { CalendarEvent } from '../../types/event.ts';
 import { addMonths, dayAnchorId, eventsInMonth, groupByDay, monthLabel, monthOf, monthRange, todayISO, type YearMonth } from '../../utils/calendar.ts';
 import styles from './CalendarPage.module.css';
 
 const SITE_TITLE = 'DJKMD Legends';
+const FEED = feedUrl(import.meta.env.VITE_BOOKING_API_URL);
 
 export default function CalendarPage() {
   const today = useMemo(() => todayISO(), []);
@@ -119,6 +122,27 @@ export default function CalendarPage() {
                 {total} {total === 1 ? 'show' : 'shows'} on sale through {monthLabel(last)}
               </p>
             )}
+            <div className={styles.subscribeRow}>
+              <AddToCalendarMenu
+                label="Subscribe to this calendar"
+                variant="primary"
+                choices={[
+                  { label: 'Google Calendar', hint: 'Opens Google Calendar to add the feed', href: googleSubscribeUrl(FEED), external: true },
+                  { label: 'Apple Calendar / Outlook', hint: 'Opens your calendar app to subscribe', href: webcalUrl(FEED) },
+                  {
+                    label: 'Copy feed link',
+                    hint: 'Paste into any calendar app that subscribes by URL',
+                    onSelect: () => navigator.clipboard.writeText(FEED),
+                  },
+                ]}
+                footer={
+                  <span className={styles.feedUrl} title={FEED}>
+                    {FEED}
+                  </span>
+                }
+              />
+              <p className={styles.subscribeHint}>New shows appear in your calendar automatically.</p>
+            </div>
           </Container>
         </section>
 

@@ -78,6 +78,34 @@ test('header anchors go home from the calendar', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Calendar' })).toHaveAttribute('aria-current', 'page');
 });
 
+test('subscribe and add-to-calendar menus point at the feed and the one-show file (LGD-41)', async ({ page, request }) => {
+  await page.goto('/calendar', { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Subscribe to this calendar' }).click();
+  const menu = page.getByRole('menu', { name: 'Subscribe to this calendar' });
+  await expect(menu.getByRole('menuitem', { name: /Google Calendar/ })).toHaveAttribute('href', `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(`webcal://localhost:8797/api/calendar.ics`)}`);
+  await expect(menu.getByRole('menuitem', { name: /Apple Calendar \/ Outlook/ })).toHaveAttribute('href', 'webcal://localhost:8797/api/calendar.ics');
+  await expect(menu.getByText('http://localhost:8797/api/calendar.ics')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+
+  // The feed itself, and the one-show file the card links to.
+  const feed = await request.get('http://localhost:8797/api/calendar.ics');
+  expect(feed.headers()['content-type']).toBe('text/calendar; charset=utf-8');
+  expect(await feed.text()).toContain(`UID:${show.id}@djkmdlegends.com`);
+
+  await pageTo(page, SHOW_MONTH);
+  const card = page.locator(`li[data-show="${show.id}"]`);
+  await card.getByRole('button', { name: `Add ${show.showName} to your calendar` }).click();
+  const add = page.getByRole('menu', { name: `Add ${show.showName} to your calendar` });
+  const google = new URL((await add.getByRole('menuitem', { name: 'Google Calendar' }).getAttribute('href'))!);
+  expect(google.searchParams.get('text')).toBe(`${show.showName} — DJKMD Legends`);
+  expect(google.searchParams.get('dates')).toBe('20270615T193000/20270615T223000');
+  expect(google.searchParams.get('ctz')).toBe('America/New_York');
+  await expect(add.getByRole('menuitem', { name: /Apple Calendar, Outlook/ })).toHaveAttribute('href', `http://localhost:8797/api/events/${show.id}/calendar.ics`);
+  const one = await request.get(`http://localhost:8797/api/events/${show.id}/calendar.ics`);
+  expect(one.headers()['content-disposition']).toMatch(/^attachment; filename="calendar-night-/);
+});
+
 test.describe('desktop', () => {
   test.use({ viewport: { width: 1280, height: 900 }, isMobile: false, hasTouch: false, deviceScaleFactor: 1 });
 
