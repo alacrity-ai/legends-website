@@ -85,7 +85,7 @@ Escape, shows "Link copied" for the clipboard action.
 
 ```bash
 curl -s https://djkmdlegends.com/api/calendar.ics | head -20          # BEGIN:VCALENDAR … X-WR-CALNAME
-curl -s https://djkmdlegends.com/api/calendar.ics | awk 'length > 75'  # must print nothing
+curl -s https://djkmdlegends.com/api/calendar.ics | tr -d '\r' | awk 'length > 75'   # must print nothing (strip the CR first)
 ```
 
 On an iPhone: open https://djkmdlegends.com/calendar → Subscribe → *Apple Calendar /
