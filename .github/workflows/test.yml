@@ -17,6 +17,7 @@ jobs:
           node-version: 24
       - name: Install
         run: |
+          npm ci
           (cd shared && npm ci)
           (cd worker && npm ci)
       - name: Site unit tests
