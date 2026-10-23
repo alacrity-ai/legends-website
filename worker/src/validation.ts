@@ -93,6 +93,24 @@ export function parseCheckinPayload(body: unknown): { partyId: string } {
   return { partyId };
 }
 
+/**
+ * Event check-in body: `paymentId`, plus an optional `count` — how many of the
+ * party have arrived in total (1..quantity, checked by the handler). Without a
+ * count the whole party is checked in, which is what older admin builds send.
+ */
+export function parseEventCheckinPayload(body: unknown): { paymentId: string; count?: number } {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw new Error('Invalid request body');
+  }
+  const { count, ...rest } = body as Record<string, unknown>;
+  const { paymentId } = parseCheckinPaymentPayload(rest);
+  if (count === undefined) return { paymentId };
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 1) {
+    throw new Error('count must be a whole number of at least 1');
+  }
+  return { paymentId, count };
+}
+
 /** Check-in payload for the v0.3 multi-event roster, keyed by Square payment id. */
 export function parseCheckinPaymentPayload(body: unknown): { paymentId: string } {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {

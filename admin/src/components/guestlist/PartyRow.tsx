@@ -3,7 +3,8 @@ import styles from './PartyRow.module.css';
 
 interface PartyRowProps {
   party: Party;
-  checkedIn: boolean;
+  /** How many of the party are here: 0, some, or all of `party.quantity`. */
+  arrived: number;
   onClick: () => void;
 }
 
@@ -19,14 +20,21 @@ function chipLabel(party: Party): string {
   return 'Mixed';
 }
 
-export default function PartyRow({ party, checkedIn, onClick }: PartyRowProps) {
+export default function PartyRow({ party, arrived, onClick }: PartyRowProps) {
   const fullName = `${party.firstName} ${party.lastName}`.trim();
-  const cls = checkedIn ? `${styles.row} ${styles.checkedIn}` : styles.row;
+  const checkedIn = arrived >= party.quantity;
+  const partly = arrived > 0 && !checkedIn;
+  const cls = checkedIn ? `${styles.row} ${styles.checkedIn}` : partly ? `${styles.row} ${styles.partly}` : styles.row;
   return (
     <button type="button" className={cls} onClick={onClick}>
       <span className={styles.left}>
         {checkedIn && <span className={styles.check} aria-hidden="true">✓</span>}
         <span className={styles.name}>{fullName || party.email}</span>
+        {partly && (
+          <span className={styles.partlyBadge} data-testid="party-arrived">
+            {arrived} of {party.quantity} here
+          </span>
+        )}
         {party.seatStatus === 'unassigned' ? (
           <span className={`${styles.seats} ${styles.seatsWarn}`}>needs seats</span>
         ) : party.seatLabels && party.seatLabels.length > 0 ? (

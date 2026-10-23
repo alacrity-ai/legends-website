@@ -1,4 +1,4 @@
-import type { CheckinMap, Party, TicketVariation } from '../../types/guestlist.ts';
+import type { ArrivedMap, CheckinMap, Party, TicketVariation } from '../../types/guestlist.ts';
 
 /** What the printed door sheet needs beyond the roster itself. */
 export interface PrintSheetOptions {
@@ -8,6 +8,8 @@ export interface PrintSheetOptions {
   subtitle: string | null;
   parties: Party[];
   checkedIn: CheckinMap;
+  /** How many of each checked-in party are here; missing = the whole party. */
+  arrivals?: ArrivedMap;
 }
 
 const WALK_UP_ROWS = 4;
@@ -55,7 +57,8 @@ function seatsCell(party: Party): string {
   return labels.join(', ') + (party.seatStatus === 'partial' ? ' (+more)' : '');
 }
 
-function partyRow(party: Party, checkedInAt: string | undefined, withSeats: boolean): string {
+function partyRow(party: Party, checkedInAt: string | undefined, arrived: number, withSeats: boolean): string {
+  const allHere = Boolean(checkedInAt) && arrived >= party.quantity;
   const name =
     `${party.lastName}, ${party.firstName}`.replace(/^, |, $/, '').trim() ||
     party.email;
@@ -64,16 +67,17 @@ function partyRow(party: Party, checkedInAt: string | undefined, withSeats: bool
   if (breakdown) noteBits.push(breakdown);
   if (checkedInAt) {
     const at = formatTime(checkedInAt);
-    noteBits.push(at ? `checked in ${at}` : 'checked in');
+    const who = allHere ? 'checked in' : `${arrived} of ${party.quantity} checked in`;
+    noteBits.push(at ? `${who}${allHere ? '' : ', first'} ${at}` : who);
   }
   if (party.notes) noteBits.push(party.notes);
   return `
       <tr>
-        <td class="box-cell"><span class="box">${checkedInAt ? '&#10003;' : ''}</span></td>
+        <td class="box-cell"><span class="box">${allHere ? '&#10003;' : ''}</span></td>
         <td class="name">${escapeHtml(name)}</td>
         <td class="qty">${party.quantity}</td>${withSeats ? `
         <td class="seats">${escapeHtml(seatsCell(party))}</td>` : ''}
-        <td class="arrived"><span class="blank"></span> of ${party.quantity}</td>
+        <td class="arrived">${checkedInAt && !allHere ? `<strong>${arrived}</strong>` : '<span class="blank"></span>'} of ${party.quantity}</td>
         <td class="notes">${escapeHtml(noteBits.join(' · '))}</td>
       </tr>`;
 }
@@ -189,7 +193,7 @@ export function buildSheetHtml(opts: PrintSheetOptions): string {
         <th>Notes</th>
       </tr>
     </thead>
-    <tbody>${parties.map((p) => partyRow(p, opts.checkedIn[p.id], withSeats)).join('')}
+    <tbody>${parties.map((p) => partyRow(p, opts.checkedIn[p.id], Math.min(opts.arrivals?.[p.id] ?? p.quantity, p.quantity), withSeats)).join('')}
       <tr class="walkups"><td colspan="${withSeats ? 6 : 5}">Walk-ups / door sales</td></tr>${Array.from({ length: WALK_UP_ROWS }, () => walkUpRow(withSeats)).join('')}
     </tbody>
   </table>

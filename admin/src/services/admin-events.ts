@@ -1,5 +1,5 @@
 import { clearPasscode, getPasscode, UnauthorizedError } from './guestlist.ts';
-import type { CheckinMap, Party } from '../types/guestlist.ts';
+import type { ArrivedMap, CheckinMap, Party } from '../types/guestlist.ts';
 import type { SeatingChart } from '@seating/types.ts';
 
 import { apiUrl } from './api-base.ts';
@@ -134,6 +134,8 @@ export interface SeatOccupancy {
 export interface EventGuests {
   parties: Party[];
   checkedIn: CheckinMap;
+  /** How many of each checked-in party are here (absent from older workers / legacy rosters = whole party). */
+  arrived?: ArrivedMap;
   /** Present for reserved-seating shows (v0.5): the snapshot layout + live seat state. */
   seating?: { layout: SeatingChart; seats: Record<string, SeatOccupancy> };
 }
@@ -143,13 +145,17 @@ export async function getEventGuests(id: string): Promise<EventGuests> {
   return authedRequest<EventGuests>(`/api/admin/events/${id}/guests`);
 }
 
-export async function eventCheckIn(id: string, paymentId: string): Promise<string> {
-  const data = await authedRequest<{ checkedInAt: string }>(`/api/admin/events/${id}/checkin`, {
+/**
+ * Check a party in. `count` = how many of the party are here in total;
+ * omitted, the whole party. Returns the first-arrival time and the count kept.
+ */
+export async function eventCheckIn(id: string, paymentId: string, count?: number): Promise<{ checkedInAt: string; count?: number }> {
+  const data = await authedRequest<{ checkedInAt: string; count?: number }>(`/api/admin/events/${id}/checkin`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ paymentId }),
+    body: JSON.stringify(count === undefined ? { paymentId } : { paymentId, count }),
   });
-  return data.checkedInAt;
+  return { checkedInAt: data.checkedInAt, count: data.count };
 }
 
 export async function eventUncheck(id: string, paymentId: string): Promise<void> {

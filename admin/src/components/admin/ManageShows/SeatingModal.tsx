@@ -5,10 +5,11 @@
  * layout lives here while nothing has sold; the unassigned list gets its
  * Assign action in P5.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { UnauthorizedError } from '../../../services/guestlist.ts';
 import { eventCheckIn, eventUncheck, getEventGuests, resendConfirmation, resyncSeating, setPartySeats, type EventGuests, type ManagedEvent } from '../../../services/admin-events.ts';
-import type { CheckinMap, Party } from '../../../types/guestlist.ts';
+import type { ArrivedMap, CheckinMap, Party } from '../../../types/guestlist.ts';
+import { arrivalCounts } from '../../guestlist/arrivals.ts';
 import OccupancyChart from '../../guestlist/OccupancyChart.tsx';
 import CheckInModal from '../../guestlist/CheckInModal.tsx';
 import SeatAssignSheet from '../../guestlist/SeatAssignSheet.tsx';
@@ -28,6 +29,7 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
   const [data, setData] = useState<EventGuests | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checkedIn, setCheckedIn] = useState<CheckinMap>({});
+  const [arrived, setArrived] = useState<ArrivedMap>({});
   const [selectedParty, setSelectedParty] = useState<Party | null>(null);
   const [assignParty, setAssignParty] = useState<Party | null>(null);
   const [resyncing, setResyncing] = useState(false);
@@ -37,6 +39,7 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
       const next = await getEventGuests(event.id);
       setData(next);
       setCheckedIn(next.checkedIn);
+      setArrived(next.arrived ?? {});
       setError(null);
     } catch (err) {
       if (err instanceof UnauthorizedError) {
@@ -103,15 +106,29 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
     }
   };
 
-  const checkIn = async (party: Party) => {
-    setCheckedIn((prev) => ({ ...prev, [party.id]: new Date().toISOString() }));
+  const arrivals = useMemo(() => arrivalCounts(data?.parties ?? [], checkedIn, arrived), [data, checkedIn, arrived]);
+
+  /** `count` = how many of the party are here in total; undefined = everyone. */
+  const checkIn = async (party: Party, count?: number) => {
+    const previousAt = checkedIn[party.id];
+    const previousCount = arrived[party.id];
+    setCheckedIn((prev) => ({ ...prev, [party.id]: prev[party.id] ?? new Date().toISOString() }));
+    setArrived((prev) => ({ ...prev, [party.id]: count ?? party.quantity }));
     try {
-      const at = await eventCheckIn(event.id, party.id);
-      setCheckedIn((prev) => ({ ...prev, [party.id]: at }));
+      const r = await eventCheckIn(event.id, party.id, count);
+      setCheckedIn((prev) => ({ ...prev, [party.id]: r.checkedInAt }));
+      setArrived((prev) => ({ ...prev, [party.id]: r.count ?? party.quantity }));
     } catch (err) {
       setCheckedIn((prev) => {
         const next = { ...prev };
-        delete next[party.id];
+        if (previousAt) next[party.id] = previousAt;
+        else delete next[party.id];
+        return next;
+      });
+      setArrived((prev) => {
+        const next = { ...prev };
+        if (previousCount !== undefined) next[party.id] = previousCount;
+        else delete next[party.id];
         return next;
       });
       if (err instanceof UnauthorizedError) onUnauthorized();
@@ -121,7 +138,13 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
 
   const uncheck = async (party: Party) => {
     const previous = checkedIn[party.id];
+    const previousCount = arrived[party.id];
     setCheckedIn((prev) => {
+      const next = { ...prev };
+      delete next[party.id];
+      return next;
+    });
+    setArrived((prev) => {
       const next = { ...prev };
       delete next[party.id];
       return next;
@@ -130,6 +153,7 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
       await eventUncheck(event.id, party.id);
     } catch (err) {
       if (previous) setCheckedIn((prev) => ({ ...prev, [party.id]: previous }));
+      if (previousCount !== undefined) setArrived((prev) => ({ ...prev, [party.id]: previousCount }));
       if (err instanceof UnauthorizedError) onUnauthorized();
       else alert(err instanceof Error ? err.message : 'Failed to undo check-in');
     }
@@ -170,7 +194,7 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
           <OccupancyChart
             layout={data.seating.layout}
             seats={data.seating.seats}
-            checkedIn={checkedIn}
+            arrivals={arrivals}
             parties={data.parties}
             onPartyTap={setSelectedParty}
             needsSeatsAction={(p) => (
@@ -195,9 +219,11 @@ export default function SeatingModal({ event, onClose, onResynced, onUnauthorize
         <CheckInModal
           party={selectedParty}
           checkedInAt={checkedIn[selectedParty.id] ?? null}
+          arrived={arrivals[selectedParty.id] ?? 0}
+          canCheckInSome
           onClose={() => setSelectedParty(null)}
-          onCheckIn={async () => {
-            await checkIn(selectedParty);
+          onCheckIn={async (count) => {
+            await checkIn(selectedParty, count);
             setSelectedParty(null);
           }}
           onUncheck={async () => {

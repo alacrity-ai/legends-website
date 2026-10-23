@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CheckinMap, Party } from '../../types/guestlist.ts';
+import type { ArrivedMap, CheckinMap, Party } from '../../types/guestlist.ts';
 import {
   UnauthorizedError,
   checkIn as legacyCheckIn,
@@ -26,6 +26,7 @@ import CheckInModal from './CheckInModal.tsx';
 import OccupancyChart from './OccupancyChart.tsx';
 import SeatAssignSheet from './SeatAssignSheet.tsx';
 import { occupancyCounts } from './occupancy.ts';
+import { arrivalCounts, arrivalTotals } from './arrivals.ts';
 import { printCheckinSheet } from './print-sheet.ts';
 import styles from './Guestlist.module.css';
 
@@ -87,6 +88,8 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [parties, setParties] = useState<Party[] | null>(null);
   const [checkedIn, setCheckedIn] = useState<CheckinMap>({});
+  /** How many of each checked-in party are here (missing = whole party). */
+  const [arrived, setArrived] = useState<ArrivedMap>({});
   const [query, setQuery] = useState('');
   const [selectedParty, setSelectedParty] = useState<Party | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -150,6 +153,7 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
   const chooseSelection = useCallback((sel: Selection | null) => {
     setParties(null);
     setCheckedIn({});
+    setArrived({});
     setSeating(null);
     setQuery('');
     setSelection(sel);
@@ -168,6 +172,7 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
         if (cancelled) return;
         setParties(data.parties);
         setCheckedIn(data.checkedIn);
+        setArrived(data.arrived ?? {});
         setSeating(data.seating ?? null);
         setLoadError(null);
       } catch (err) {
@@ -196,6 +201,14 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
         const next: CheckinMap = { ...data.checkedIn };
         for (const id of busyRef.current) {
           if (prev[id]) next[id] = prev[id];
+          else delete next[id];
+        }
+        return next;
+      });
+      setArrived((prev) => {
+        const next: ArrivedMap = { ...(data.arrived ?? {}) };
+        for (const id of busyRef.current) {
+          if (prev[id] !== undefined) next[id] = prev[id];
           else delete next[id];
         }
         return next;
@@ -285,33 +298,54 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
     );
   }, [parties, query]);
 
+  /** How many of each party are here — what the list, chart, stats and print sheet show. */
+  const arrivals = useMemo(() => arrivalCounts(parties ?? [], checkedIn, arrived), [parties, checkedIn, arrived]);
+
   const stats = useMemo(() => {
     if (!parties) return null;
     const totalTickets = parties.reduce((s, p) => s + p.quantity, 0);
-    const checkedInTickets = parties
-      .filter((p) => checkedIn[p.id])
-      .reduce((s, p) => s + p.quantity, 0);
-    const checkedInParties = parties.filter((p) => checkedIn[p.id]).length;
-    const seats = seating ? occupancyCounts(seating.layout, seating.seats, checkedIn) : null;
-    return { totalParties: parties.length, totalTickets, checkedInParties, checkedInTickets, seats };
-  }, [parties, checkedIn, seating]);
+    const totals = arrivalTotals(parties, arrivals);
+    const seats = seating ? occupancyCounts(seating.layout, seating.seats, arrivals) : null;
+    return {
+      totalParties: parties.length,
+      totalTickets,
+      checkedInParties: totals.fullParties,
+      partialParties: totals.partialParties,
+      checkedInTickets: totals.arrivedTickets,
+      seats,
+    };
+  }, [parties, arrivals, seating]);
 
+  /** `count` = how many of the party are here in total (event rosters); undefined = everyone. */
   const handleCheckIn = useCallback(
-    async (party: Party) => {
+    async (party: Party, count?: number) => {
       if (!selection) return;
       const now = new Date().toISOString();
+      const previousAt = checkedIn[party.id];
+      const previousCount = arrived[party.id];
       busyRef.current.add(party.id);
-      setCheckedIn((prev) => ({ ...prev, [party.id]: now }));
+      setCheckedIn((prev) => ({ ...prev, [party.id]: prev[party.id] ?? now }));
+      setArrived((prev) => ({ ...prev, [party.id]: count ?? party.quantity }));
       try {
-        const at =
-          selection.kind === 'event'
-            ? await eventCheckIn(selection.id, party.id)
-            : await legacyCheckIn(selection.id, party.id);
-        setCheckedIn((prev) => ({ ...prev, [party.id]: at }));
+        if (selection.kind === 'event') {
+          const r = await eventCheckIn(selection.id, party.id, count);
+          setCheckedIn((prev) => ({ ...prev, [party.id]: r.checkedInAt }));
+          setArrived((prev) => ({ ...prev, [party.id]: r.count ?? party.quantity }));
+        } else {
+          const at = await legacyCheckIn(selection.id, party.id);
+          setCheckedIn((prev) => ({ ...prev, [party.id]: at }));
+        }
       } catch (err) {
         setCheckedIn((prev) => {
           const next = { ...prev };
-          delete next[party.id];
+          if (previousAt) next[party.id] = previousAt;
+          else delete next[party.id];
+          return next;
+        });
+        setArrived((prev) => {
+          const next = { ...prev };
+          if (previousCount !== undefined) next[party.id] = previousCount;
+          else delete next[party.id];
           return next;
         });
         if (err instanceof UnauthorizedError) {
@@ -323,7 +357,7 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
         busyRef.current.delete(party.id);
       }
     },
-    [selection],
+    [selection, checkedIn, arrived],
   );
 
   // Print a paper door sheet for the selected show (Keith's checklist).
@@ -347,15 +381,21 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
         subtitle = `${when} · ${ev.venueName}, ${ev.venueAddress}`;
       }
     }
-    printCheckinSheet({ title: selection.label, subtitle, parties, checkedIn });
-  }, [selection, parties, events, checkedIn]);
+    printCheckinSheet({ title: selection.label, subtitle, parties, checkedIn, arrivals });
+  }, [selection, parties, events, checkedIn, arrivals]);
 
   const handleUncheck = useCallback(
     async (party: Party) => {
       if (!selection) return;
       const previousAt = checkedIn[party.id];
+      const previousCount = arrived[party.id];
       busyRef.current.add(party.id);
       setCheckedIn((prev) => {
+        const next = { ...prev };
+        delete next[party.id];
+        return next;
+      });
+      setArrived((prev) => {
         const next = { ...prev };
         delete next[party.id];
         return next;
@@ -365,6 +405,7 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
         else await legacyUncheck(selection.id, party.id);
       } catch (err) {
         if (previousAt) setCheckedIn((prev) => ({ ...prev, [party.id]: previousAt }));
+        if (previousCount !== undefined) setArrived((prev) => ({ ...prev, [party.id]: previousCount }));
         if (err instanceof UnauthorizedError) {
           setAuth('signed-out');
           return;
@@ -374,7 +415,7 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
         busyRef.current.delete(party.id);
       }
     },
-    [selection, checkedIn],
+    [selection, checkedIn, arrived],
   );
 
   if (auth === 'signed-out') {
@@ -538,6 +579,7 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
           <div className={styles.stats} aria-live="polite">
             <span>
               <strong>{stats.checkedInParties}</strong> / {stats.totalParties} parties
+              {stats.partialParties > 0 && ` · ${stats.partialParties} partly here`}
             </span>
             <span>
               <strong>{stats.checkedInTickets}</strong> / {stats.totalTickets} tickets
@@ -558,7 +600,7 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
           <OccupancyChart
             layout={seating.layout}
             seats={seating.seats}
-            checkedIn={checkedIn}
+            arrivals={arrivals}
             parties={parties}
             onPartyTap={setSelectedParty}
             needsSeatsAction={(p) => (
@@ -573,7 +615,7 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
               <p className={styles.empty}>No purchases yet for this show.</p>
             )}
             {parties && parties.length > 0 && (
-              <PartyList parties={filteredParties} checkedIn={checkedIn} onSelect={setSelectedParty} />
+              <PartyList parties={filteredParties} arrivals={arrivals} onSelect={setSelectedParty} />
             )}
           </>
         )}
@@ -583,9 +625,11 @@ export default function Guestlist({ onBack }: GuestlistProps = {}) {
         <CheckInModal
           party={selectedParty}
           checkedInAt={checkedIn[selectedParty.id] ?? null}
+          arrived={arrivals[selectedParty.id] ?? 0}
+          canCheckInSome={selection?.kind === 'event'}
           onClose={() => setSelectedParty(null)}
-          onCheckIn={async () => {
-            await handleCheckIn(selectedParty);
+          onCheckIn={async (count) => {
+            await handleCheckIn(selectedParty, count);
             setSelectedParty(null);
           }}
           onUncheck={async () => {

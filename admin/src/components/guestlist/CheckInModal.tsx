@@ -4,9 +4,15 @@ import styles from './CheckInModal.module.css';
 
 interface CheckInModalProps {
   party: Party;
+  /** When the party's first guest checked in; null = nobody yet. */
   checkedInAt: string | null;
+  /** How many of the party are here. Defaults to all of it once checked in. */
+  arrived?: number;
+  /** Offer "some of the party is here" (event rosters; legacy CSV rosters are all-or-nothing). */
+  canCheckInSome?: boolean;
   onClose: () => void;
-  onCheckIn: () => Promise<void> | void;
+  /** `count` = how many of the party are here in total after this; undefined = the whole party. */
+  onCheckIn: (count?: number) => Promise<void> | void;
   onUncheck: () => Promise<void> | void;
   /** Reserved-seating shows: open the seat picker for this party. */
   onChangeSeats?: () => void;
@@ -36,6 +42,8 @@ function formatTime(iso: string | null): string | null {
 export default function CheckInModal({
   party,
   checkedInAt,
+  arrived,
+  canCheckInSome = false,
   onClose,
   onCheckIn,
   onUncheck,
@@ -47,6 +55,17 @@ export default function CheckInModal({
   const [resendError, setResendError] = useState<string | null>(null);
   const fullName = `${party.firstName} ${party.lastName}`.trim() || party.email;
   const checkedTime = formatTime(checkedInAt);
+  const total = party.quantity;
+  const here = checkedInAt ? Math.min(arrived ?? total, total) : 0;
+  const remaining = total - here;
+  const allHere = Boolean(checkedInAt) && remaining <= 0;
+  const partlyHere = here > 0 && !allHere;
+  // How many are walking in now. Starts at everyone still expected, so the
+  // usual whole-party check-in stays one tap.
+  const [picked, setPicked] = useState(Math.max(1, remaining));
+  // Another phone can check some of them in while this is open: never offer more than are still expected.
+  const arriving = Math.min(picked, Math.max(1, remaining));
+  const showStepper = canCheckInSome && remaining > 1;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -60,16 +79,22 @@ export default function CheckInModal({
     };
   }, [onClose]);
 
-  const handlePrimary = async () => {
+  const run = async (action: () => Promise<void> | void) => {
     if (busy) return;
     setBusy(true);
     try {
-      if (checkedInAt) await onUncheck();
-      else await onCheckIn();
+      await action();
     } finally {
       setBusy(false);
     }
   };
+  const handleCheckIn = () => run(() => onCheckIn(canCheckInSome ? here + arriving : undefined));
+  const handleUndo = () => run(onUncheck);
+
+  const checkInLabel =
+    here > 0 ? `Check in ${arriving} more`
+    : arriving < total ? `Check in ${arriving} of ${total}`
+    : `Check in ${fullName}`;
 
   const handleResend = async () => {
     if (!onResendConfirmation || busy || resend === 'sending') return;
@@ -159,30 +184,66 @@ export default function CheckInModal({
           </p>
         )}
 
-        {checkedInAt && checkedTime && (
+        {allHere && checkedTime && (
           <p className={styles.status}>
             Checked in at <strong>{checkedTime}</strong>.
           </p>
         )}
+        {partlyHere && (
+          <p className={`${styles.status} ${styles.statusPartly}`} data-testid="party-arrived-status">
+            <strong>{here} of {total}</strong> here{checkedTime ? ` · first arrived ${checkedTime}` : ''}.
+          </p>
+        )}
+
+        {showStepper && (
+          <div className={styles.stepper}>
+            <span className={styles.stepperLabel}>{here > 0 ? 'Arriving now' : 'How many are here?'}</span>
+            <div className={styles.stepperControls}>
+              <button
+                type="button"
+                className={styles.stepperButton}
+                onClick={() => setPicked(Math.max(1, arriving - 1))}
+                disabled={busy || arriving <= 1}
+                aria-label="One fewer"
+              >
+                −
+              </button>
+              <output className={styles.stepperValue} aria-live="polite" data-testid="arriving-count">
+                {arriving}
+              </output>
+              <button
+                type="button"
+                className={styles.stepperButton}
+                onClick={() => setPicked(Math.min(remaining, arriving + 1))}
+                disabled={busy || arriving >= remaining}
+                aria-label="One more"
+              >
+                +
+              </button>
+              <span className={styles.stepperOf}>of {remaining}{here > 0 ? ' still expected' : ''}</span>
+            </div>
+          </div>
+        )}
 
         <div className={styles.actions}>
-          {checkedInAt ? (
-            <button
-              type="button"
-              className={`${styles.button} ${styles.undo}`}
-              onClick={handlePrimary}
-              disabled={busy}
-            >
-              {busy ? 'Working…' : 'Undo check-in'}
-            </button>
-          ) : (
+          {!allHere && (
             <button
               type="button"
               className={`${styles.button} ${styles.primary}`}
-              onClick={handlePrimary}
+              onClick={() => void handleCheckIn()}
               disabled={busy}
             >
-              {busy ? 'Checking in…' : `Check in ${fullName}`}
+              {busy ? 'Checking in…' : checkInLabel}
+            </button>
+          )}
+          {checkedInAt && (
+            <button
+              type="button"
+              className={`${styles.button} ${styles.undo}`}
+              onClick={() => void handleUndo()}
+              disabled={busy}
+            >
+              {busy ? 'Working…' : 'Undo check-in'}
             </button>
           )}
           {onChangeSeats && (

@@ -9,15 +9,16 @@ import SeatMap from '@seating/SeatMap.tsx';
 import type { SeatState, SeatingChart } from '@seating/types.ts';
 import { layoutBounds } from '@seating/geometry.ts';
 import { fitViewBox } from '@seating/view.ts';
-import type { CheckinMap, Party } from '../../types/guestlist.ts';
+import type { ArrivedMap, Party } from '../../types/guestlist.ts';
 import type { SeatOccupancy } from '../../services/admin-events.ts';
-import { occupancyCounts } from './occupancy.ts';
+import { arrivedSeatIds, occupancyCounts } from './occupancy.ts';
 import styles from './OccupancyChart.module.css';
 
 export interface OccupancyChartProps {
   layout: SeatingChart;
   seats: Record<string, SeatOccupancy>;
-  checkedIn: CheckinMap;
+  /** How many of each party are here (see arrivalCounts). */
+  arrivals: ArrivedMap;
   parties: Party[];
   /** A sold seat was tapped: open its party. */
   onPartyTap?: (party: Party) => void;
@@ -28,19 +29,20 @@ export interface OccupancyChartProps {
 const VIEW_W = 400;
 const VIEW_H = 300;
 
-export default function OccupancyChart({ layout, seats, checkedIn, parties, onPartyTap, needsSeatsAction }: OccupancyChartProps) {
+export default function OccupancyChart({ layout, seats, arrivals, parties, onPartyTap, needsSeatsAction }: OccupancyChartProps) {
   const byId = useMemo(() => new Map(parties.map((p) => [p.id, p])), [parties]);
 
   const seatStates = useMemo(() => {
+    const here = arrivedSeatIds(layout, seats, arrivals);
     const out: Record<string, SeatState> = {};
     for (const [id, o] of Object.entries(seats)) {
-      if (o.status === 'sold') out[id] = o.partyId && checkedIn[o.partyId] ? 'checkedIn' : 'sold';
+      if (o.status === 'sold') out[id] = here.has(id) ? 'checkedIn' : 'sold';
       else if (o.status === 'held') out[id] = 'held';
     }
     return out;
-  }, [seats, checkedIn]);
+  }, [layout, seats, arrivals]);
 
-  const counts = useMemo(() => occupancyCounts(layout, seats, checkedIn), [layout, seats, checkedIn]);
+  const counts = useMemo(() => occupancyCounts(layout, seats, arrivals), [layout, seats, arrivals]);
   const viewBox = useMemo(() => fitViewBox(layoutBounds(layout), VIEW_W, VIEW_H, 30), [layout]);
   const needsSeats = useMemo(() => parties.filter((p) => p.seatStatus && p.seatStatus !== 'assigned'), [parties]);
 

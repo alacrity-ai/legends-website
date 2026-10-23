@@ -12,6 +12,7 @@ import {
   parseBookingInquiry,
   parseCheckinPayload,
   parseCheckinPaymentPayload,
+  parseEventCheckinPayload,
   parseEventDraft,
   parseEventPatch,
   parseMailingListSignup,
@@ -1185,12 +1186,19 @@ async function handleGetEventGuests(
   const checkinValues = await Promise.all(
     checkedInIds.map((cid) => env.GUESTLIST.get(`${prefix}${cid}`)),
   );
+  const quantityById = new Map(parties.map((p) => [p.id, p.quantity]));
   const checkedIn: Record<string, string> = {};
+  // How many of each checked-in party are here, never more than the party
+  // still holds (a partial refund or transfer can shrink it after check-in).
+  const arrived: Record<string, number> = {};
   for (let i = 0; i < checkedInIds.length; i++) {
     const raw = checkinValues[i];
     if (!raw) continue;
     try {
-      checkedIn[checkedInIds[i]] = (JSON.parse(raw) as CheckinRecord).checkedInAt;
+      const rec = JSON.parse(raw) as CheckinRecord;
+      checkedIn[checkedInIds[i]] = rec.checkedInAt;
+      const quantity = quantityById.get(checkedInIds[i]);
+      if (quantity !== undefined) arrived[checkedInIds[i]] = Math.min(rec.count ?? quantity, quantity);
     } catch {
       // skip malformed entry
     }
@@ -1207,7 +1215,7 @@ async function handleGetEventGuests(
     }
   }
 
-  return jsonResponse(200, { parties, checkedIn, ...(seating ? { seating } : {}) }, corsHeaders, noStore);
+  return jsonResponse(200, { parties, checkedIn, arrived, ...(seating ? { seating } : {}) }, corsHeaders, noStore);
 }
 
 /** Seat labels for ids, in the layout's own order (table by table, seat by seat). */
@@ -1528,21 +1536,30 @@ async function handleEventCheckin(
   env: Env,
   corsHeaders: Record<string, string>,
 ): Promise<Response> {
-  let payload: { paymentId: string };
+  let payload: { paymentId: string; count?: number };
   try {
-    payload = parseCheckinPaymentPayload(await request.json());
+    payload = parseEventCheckinPayload(await request.json());
   } catch (err) {
     return jsonResponse(400, { error: errorMessage(err) }, corsHeaders);
   }
 
-  const exists = await env.GUESTLIST.get<PartyRecord>(`party:${id}:${payload.paymentId}`, 'json');
-  if (!exists || isGoneFromShow(exists)) {
+  const party = await env.GUESTLIST.get<PartyRecord>(`party:${id}:${payload.paymentId}`, 'json');
+  if (!party || isGoneFromShow(party)) {
     return jsonResponse(404, { error: 'Party not found in show' }, corsHeaders);
   }
 
-  const record: CheckinRecord = { checkedInAt: new Date().toISOString() };
-  await env.GUESTLIST.put(`checkin:${id}:${payload.paymentId}`, JSON.stringify(record));
-  return jsonResponse(200, { ok: true, checkedInAt: record.checkedInAt }, corsHeaders);
+  // `count` is the party's arrived total, not an increment, so a retry or a
+  // second phone sending the same number is harmless.
+  const count = payload.count ?? party.quantity;
+  if (count > party.quantity) {
+    return jsonResponse(400, { error: `This party has only ${party.quantity} ticket${party.quantity === 1 ? '' : 's'}` }, corsHeaders);
+  }
+  const key = `checkin:${id}:${payload.paymentId}`;
+  const previous = await env.GUESTLIST.get<CheckinRecord>(key, 'json').catch(() => null);
+  const now = new Date().toISOString();
+  const record: CheckinRecord = { checkedInAt: previous?.checkedInAt ?? now, count, updatedAt: now };
+  await env.GUESTLIST.put(key, JSON.stringify(record));
+  return jsonResponse(200, { ok: true, checkedInAt: record.checkedInAt, count }, corsHeaders);
 }
 
 async function handleEventUncheck(
