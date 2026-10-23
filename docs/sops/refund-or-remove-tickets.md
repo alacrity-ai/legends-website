@@ -80,3 +80,13 @@ Partial refunds there are usually price differences (§1). Ask before recording 
 | 2026-10-10 | Rat Pack Oct 17 | Ruth W Harris (7fBa…, 1) | full, Square 9/17 | same |
 | 2026-10-10 | Rat Pack Oct 17 | Linda Dimauro (Fgn0…, 3) | full, Square 9/17 | same |
 | 2026-10-10 | 80's Legends Oct 23 | Cindy Agosto (bDTw…, 2) | full, Square 9/15 | same |
+| 2026-10-23 | Oldies Oct 25 | Janice Cappucci (OCM3…, 2) | full, Square 10/22 (group cancelled) | Leif: "reconcile the square refunds with the app" (full Square ↔ app pass) |
+| 2026-10-23 | Oldies Oct 25 | Marie Deldon (aECL…, 2) | full, Square 10/22 (group cancelled) | same |
+| 2026-10-23 | Oldies Oct 25 | Marie Valchuis (OG4a…, 2) | full, Square 10/22 (group cancelled) | same |
+| 2026-10-23 | Oldies Oct 25 | Malcolm Berkowitz (A3OB…, 2) | full, Square 10/22 (duplicate order; GwHI… kept) | same |
+| 2026-10-23 | Rat Pack Aug 28 (past) | AnnMarie Caruso (9qec…, 4) | full, Square 8/11 (accidental charge) | same — Sales history only |
+| 2026-10-23 | Rat Pack Aug 28 (past) | AnnMarie Caruso (H97p…, 4) | full, Square 8/7 (accidental charge) | same — Sales history only |
+
+Left alone on that pass (2026-10-23): Lisa Paradise ($50 of $99.90, 80's Oct 23) and Karen Russell ($90, Rat Pack Oct 17) are
+price differences after a transfer (§1: nothing to record). 27 full refunds sit on party records of **deleted** shows
+(mostly the cancelled September shows); those records appear nowhere (no door list, no Sales), so they were not touched.
