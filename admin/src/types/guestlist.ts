@@ -23,4 +23,8 @@ export interface Party {
   confirmationSentAt?: string;
 }
 
+/** Party id → when its first guest checked in. */
 export type CheckinMap = Record<string, string>;
+
+/** Party id → how many of the party have arrived (checked-in parties only). */
+export type ArrivedMap = Record<string, number>;

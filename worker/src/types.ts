@@ -140,7 +140,12 @@ export interface Party {
 }
 
 export interface CheckinRecord {
+  /** When the first guest of the party arrived. */
   checkedInAt: string;
+  /** How many of the party have arrived. Absent = the whole party (records written before partial check-in). */
+  count?: number;
+  /** Last change to `count`. */
+  updatedAt?: string;
 }
 
 /**

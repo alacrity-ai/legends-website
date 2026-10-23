@@ -32,6 +32,27 @@
   background: rgba(63, 165, 91, 0.2);
 }
 
+/* Some of the party is here (partial check-in). */
+.partly {
+  background: rgba(212, 175, 55, 0.12);
+}
+
+.partly:hover,
+.partly:focus-visible {
+  background: rgba(212, 175, 55, 0.2);
+}
+
+.partlyBadge {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text);
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 175, 55, 0.6);
+  background: rgba(212, 175, 55, 0.18);
+}
+
 .left {
   display: flex;
   align-items: center;
