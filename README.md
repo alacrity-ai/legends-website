@@ -88,7 +88,6 @@ cp .env.example .env.local
 | Variable                            | Purpose                              |
 | ----------------------------------- | ------------------------------------ |
 | `VITE_BOOKING_API_URL`              | Worker URL (`http://localhost:8787` for local dev) |
-| `VITE_YOUTUBE_VIDEO_ID`             | YouTube video ID for Media section   |
 
 > **Note:** The site runs locally without any `.env` file — all values have placeholder fallbacks. The booking form and calendar require the worker to be running.
 

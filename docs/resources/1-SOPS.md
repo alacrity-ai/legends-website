@@ -93,14 +93,13 @@ The old calendar-based instructions are preserved in `docs/EVENT_CREATION_GUIDE.
 
 ## SOP 3 — Set or change the homepage YouTube video 🧑‍💻
 
-The **Media** ("See Us Live") section is controlled by a build-time env var, **not** a content file. The section is **hidden entirely** when the value is empty.
+The **Media** section's videos are the `mediaVideos` list in `src/content/site.ts`. The **first entry is the default** shown on load; each entry gets a switcher chip.
 
-1. Get the YouTube **video ID** — the part after `v=` in `https://www.youtube.com/watch?v=dQw4w9WgXcQ` → `dQw4w9WgXcQ` (the ID only, not the full URL).
-2. Set it as the `VITE_YOUTUBE_VIDEO_ID` **GitHub Actions secret** (Repo → Settings → Secrets and variables → Actions). The deploy workflow injects it at build time.
-   - For local testing, put `VITE_YOUTUBE_VIDEO_ID=dQw4w9WgXcQ` in `.env.local`.
-3. **Deploy** (SOP 6). Because this is baked in at build time, the change only appears after a rebuild.
+1. Get the YouTube **video ID**, the part after `v=` in `https://www.youtube.com/watch?v=dQw4w9WgXcQ` → `dQw4w9WgXcQ`.
+2. Add, reorder or remove entries in `mediaVideos` (`id`, chip `label`, iframe `title`).
+3. **Deploy** (SOP 6). The site is static, so the change appears after a rebuild.
 
-To **hide** the section, clear the secret and redeploy.
+An empty list hides the section. (The old `VITE_YOUTUBE_VIDEO_ID` secret is no longer read; it can be deleted from the repo secrets.)
 
 ---
 
@@ -245,7 +244,7 @@ Reserved seating starts with a **layout** of the room, drawn once in Legends Adm
 | Sell reserved seats at a show | 🎤 | Legends Admin → Create a Show → Seating chart (SOP 2) | No |
 | Give a party seats / move them | 🎤 | Door Check-in → party → Assign / Change seats (SOP 5) | No |
 | Grandfathered (legacy) shows | 🎤 | Leave in Google Calendar until ~Sept 2026 | No |
-| Set the YouTube video | 🧑‍💻 | `VITE_YOUTUBE_VIDEO_ID` GitHub secret | **Yes** |
+| Set the YouTube videos | 🧑‍💻 | `mediaVideos` in `src/content/site.ts` | **Yes** |
 | Edit site copy | 🧑‍💻 | `src/content/site.ts` (and `social.ts`) | **Yes** |
 | View / export the mailing list | 🎤 | Legends Admin → Mailing List (CSV export); or KV `MAILING_LIST` via `wrangler` | No |
 | Load a guestlist | 🎤 | `tools/ingest-guestlist.mjs` → KV `GUESTLIST` | No |
