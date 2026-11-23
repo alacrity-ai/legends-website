@@ -76,16 +76,9 @@ export const eventTypes = [
 /* ── Media ─────────────────────────────────────────────────── */
 
 /**
- * DJKMD Legends promo video (https://youtu.be/u_eMzaB6RXM), supplied by Keith
- * on 2026-08-03. Public content, so the ID lives here; VITE_YOUTUBE_VIDEO_ID
- * (see .env.example) can still override it per build.
- */
-export const youtubeVideoId: string =
-  import.meta.env.VITE_YOUTUBE_VIDEO_ID || 'u_eMzaB6RXM';
-
-/**
  * Videos offered in the Media section's switcher. The first entry is the
- * default. The promo keeps its env override; more videos = more entries.
+ * default shown on load. YouTube ids are public, so they live here (the old
+ * VITE_YOUTUBE_VIDEO_ID build override was retired 2026-11-23).
  */
 export interface MediaVideo {
   /** YouTube video id. */
@@ -97,7 +90,10 @@ export interface MediaVideo {
 }
 
 export const mediaVideos: MediaVideo[] = [
-  { id: youtubeVideoId, label: 'Legends Promo', title: 'DJKMD Legends promo video' },
+  // "LEGENDS PROMO" (https://youtu.be/xNO_7JohqFI) — new default, from Leif 2026-11-23.
+  { id: 'xNO_7JohqFI', label: 'Legends Promo', title: 'DJKMD Legends promo video' },
+  // Original promo (https://youtu.be/u_eMzaB6RXM) — supplied by Keith on 2026-08-03.
+  { id: 'u_eMzaB6RXM', label: 'Promo 2', title: 'DJKMD Legends promo video (2)' },
   // "THE RAT PACK" — supplied by Keith on 2026-09-02 (LGD-11).
   { id: 'zLKgjY1znwc', label: 'The Rat Pack', title: 'The Rat Pack — live tribute performance' },
 ];
